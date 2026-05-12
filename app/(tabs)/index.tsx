@@ -21,9 +21,9 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
-      <View className="p-4 bg-primary rounded-xl shadow-lg m-4">
-        <Text className="text-primary-foreground font-bold text-lg text-center">
-          NativeWind is Ready! 🚀
+      <View className="p-4 bg-brand-green rounded-xl shadow-lg m-4">
+        <Text className="text-white font-poppins-bold text-lg text-center">
+          NativeWind & Poppins are Ready! 🚀
         </Text>
       </View>
       <ThemedView style={styles.stepContainer}>
