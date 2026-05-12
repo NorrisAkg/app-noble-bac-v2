@@ -6,6 +6,9 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { AppBar } from '@/components/ui/AppBar';
 
 export default function HomeScreen() {
   return (
@@ -21,10 +24,28 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
-      <View className="p-4 bg-brand-green rounded-xl shadow-lg m-4">
-        <Text className="text-white font-poppins-bold text-lg text-center">
-          NativeWind & Poppins are Ready! 🚀
-        </Text>
+      <View className="p-4 gap-4">
+        <Text className="font-poppins-bold text-xl text-brand-ink">UI Components</Text>
+        
+        <Button onPress={() => console.log('Primary pressed')}>
+          Bouton Principal
+        </Button>
+        
+        <Button variant="ghost" onPress={() => console.log('Ghost pressed')}>
+          Bouton Ghost
+        </Button>
+        
+        <Input 
+          label="Numéro de téléphone" 
+          placeholder="90 12 34 56" 
+          keyboardType="phone-pad"
+        />
+        
+        <Input 
+          label="Mot de passe" 
+          placeholder="••••••••" 
+          secureTextEntry 
+        />
       </View>
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
