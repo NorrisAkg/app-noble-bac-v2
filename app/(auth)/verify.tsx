@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AppBar } from '@/components/ui/AppBar';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +9,7 @@ const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = (width - 48 - 60) / 6; // Padding and gaps
 
 const OtpCircle = ({ filled, active }: { filled: boolean, active: boolean }) => (
-  <StyledView 
+  <View 
     className={`w-[46px] h-[46px] rounded-full border-2 items-center justify-center bg-white ${
       filled || active ? 'border-brand-green' : 'border-[#D5DAE0]'
     } ${active ? 'shadow-sm shadow-brand-green' : ''}`}

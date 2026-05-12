@@ -1,6 +1,10 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import { View, Text } from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetView,
+  BottomSheetFlatList,
+} from '@gorhom/bottom-sheet';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -31,9 +35,12 @@ export const CustomBottomSheet: React.FC<BottomSheetProps> = ({
     (props: any) => (
       <BottomSheetBackdrop
         {...props}
+        // Only appear when sheet is open (index >= 0)
         disappearsOnIndex={-1}
         appearsOnIndex={0}
-        opacity={0.4}
+        opacity={0.5}
+        // Critical: don't block touches when the sheet is closed
+        pressBehavior="close"
       />
     ),
     []
@@ -42,15 +49,18 @@ export const CustomBottomSheet: React.FC<BottomSheetProps> = ({
   return (
     <BottomSheet
       ref={bottomSheetRef}
+      // Start fully closed
       index={-1}
       snapPoints={snapPoints}
       enablePanDownToClose
       onClose={onClose}
       backdropComponent={renderBackdrop}
+      // Prevent the closed sheet from intercepting any touch events
+      enableOverDrag={false}
       handleIndicatorStyle={{ backgroundColor: '#D5DAE0', width: 40 }}
       backgroundStyle={{ borderTopLeftRadius: 20, borderTopRightRadius: 20 }}
     >
-      <BottomSheetView className="flex-1 pb-8">
+      <BottomSheetView style={{ flex: 1, paddingBottom: 32 }}>
         {title && (
           <Text className="px-6 pb-3 font-poppins-semibold text-[16px] text-brand-ink">
             {title}
