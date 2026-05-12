@@ -1,41 +1,49 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Eye, EyeOff, ChevronDown } from 'lucide-react-native';
-import { COUNTRIES } from '@/constants/countries';
+import { login } from '@/services/authService';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getApiErrorMessage } from '@/utils/apiError';
+
+const DEFAULT_DIAL = '+227'; // Niger
 
 export default function LoginScreen() {
   const router = useRouter();
+  const setAuth = useAuthStore((s) => s.setAuth);
+
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [country, setCountry] = useState({ code: 'NE', name: 'Niger', dial: '+227' }); // Default Niger as per templates
 
+  // Build the E.164 number — strip leading zeros on the local number
+  const e164Phone = `${DEFAULT_DIAL}${phone.replace(/^0+/, '')}`;
   const isValid = phone.length >= 6 && password.length >= 4;
 
-  const handleLogin = async () => {
-    if (!isValid) return;
-    setSubmitting(true);
-    // Simulation
-    setTimeout(() => {
-      setSubmitting(false);
-      router.replace('/(tabs)');
-    }, 1000);
-  };
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => login({ phone: e164Phone, password }),
+    onSuccess: async (res) => {
+      await setAuth(res.data.user, res.data.token);
+      // Navigation handled by the auth guard in _layout.tsx
+    },
+    onError: (error) => {
+      Alert.alert('Connexion échouée', getApiErrorMessage(error));
+    },
+  });
 
   return (
     <View className="flex-1 bg-background">
       <AppBar title="Connexion" onBack={() => router.back()} />
-      
-      <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView className="flex-1 px-6 pt-7">
+        <ScrollView className="flex-1 px-6 pt-7" keyboardShouldPersistTaps="handled">
           <Text className="font-poppins-bold text-2xl text-brand-ink tracking-tighter">
             Bon retour 👋
           </Text>
@@ -43,7 +51,7 @@ export default function LoginScreen() {
             Connecte-toi pour reprendre tes révisions là où tu les as laissées.
           </Text>
 
-          <Input 
+          <Input
             label="Numéro de téléphone"
             placeholder="90 12 34 56"
             keyboardType="phone-pad"
@@ -51,28 +59,26 @@ export default function LoginScreen() {
             onChangeText={setPhone}
             icon={
               <TouchableOpacity className="flex-row items-center gap-1.5 pr-2 border-r border-line">
-                <Text className="font-poppins-semibold text-sm text-brand-ink">
-                  {country.dial}
-                </Text>
+                <Text className="font-poppins-semibold text-sm text-brand-ink">{DEFAULT_DIAL}</Text>
                 <ChevronDown size={14} color="#5A6470" />
               </TouchableOpacity>
             }
           />
 
-          <Input 
+          <Input
             label="Mot de passe"
             placeholder="••••••••"
             secureTextEntry={!showPwd}
             value={password}
             onChangeText={setPassword}
             icon={
-              <TouchableOpacity onPress={() => setShowPwd(!showPwd)}>
+              <TouchableOpacity onPress={() => setShowPwd((v) => !v)}>
                 {showPwd ? <EyeOff size={20} color="#5A6470" /> : <Eye size={20} color="#5A6470" />}
               </TouchableOpacity>
             }
           />
 
-          <TouchableOpacity 
+          <TouchableOpacity
             className="self-end mb-6"
             onPress={() => router.push('/(auth)/forgot')}
           >
@@ -81,18 +87,12 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
-          <Button 
-            onPress={handleLogin} 
-            disabled={!isValid || submitting}
-            loading={submitting}
-          >
+          <Button onPress={() => mutate()} disabled={!isValid} loading={isPending}>
             Se connecter
           </Button>
 
-          <View className="mt-6 flex-row justify-center gap-1">
-            <Text className="font-poppins text-[13.5px] text-brand-ink-medium">
-              Nouveau ici ?
-            </Text>
+          <View className="mt-6 mb-10 flex-row justify-center gap-1">
+            <Text className="font-poppins text-[13.5px] text-brand-ink-medium">Nouveau ici ?</Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
               <Text className="font-poppins-semibold text-[13.5px] text-brand-green">
                 Créer un compte
