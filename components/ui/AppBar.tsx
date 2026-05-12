@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
-import { styled } from 'nativewind';
 import { ArrowLeft, X } from 'lucide-react-native';
 
 interface AppBarProps {
@@ -10,17 +9,13 @@ interface AppBarProps {
   right?: React.ReactNode;
 }
 
-const StyledView = styled(View);
-const StyledText = styled(Text);
-const StyledTouchableOpacity = styled(TouchableOpacity);
-
 export const AppBar: React.FC<AppBarProps> = ({ title, onBack, onClose, right }) => {
   return (
-    <StyledView className="bg-brand-green">
+    <View className="bg-brand-green">
       <SafeAreaView>
-        <StyledView className="h-[64px] flex-row items-center px-3 relative">
+        <View className="h-[64px] flex-row items-center px-3 relative">
           {(onBack || onClose) && (
-            <StyledTouchableOpacity
+            <TouchableOpacity
               onPress={onBack || onClose}
               className="w-10 h-10 rounded-full bg-white/15 items-center justify-center ml-1"
             >
@@ -29,23 +24,23 @@ export const AppBar: React.FC<AppBarProps> = ({ title, onBack, onClose, right })
               ) : (
                 <X size={16} color="white" />
               )}
-            </StyledTouchableOpacity>
+            </TouchableOpacity>
           )}
           
-          <StyledView className="absolute left-14 right-14 items-center pointer-events-none">
-            <StyledText 
+          <View className="absolute left-14 right-14 items-center pointer-events-none">
+            <Text 
               numberOfLines={1}
               className="font-poppins-semibold text-[17px] text-white"
             >
               {title}
-            </StyledText>
-          </StyledView>
+            </Text>
+          </View>
 
-          <StyledView className="ml-auto">
+          <View className="ml-auto">
             {right}
-          </StyledView>
-        </StyledView>
+          </View>
+        </View>
       </SafeAreaView>
-    </StyledView>
+    </View>
   );
 };

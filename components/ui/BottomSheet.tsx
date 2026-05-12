@@ -1,7 +1,6 @@
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useCallback, useRef, useEffect } from 'react';
+import { View, Text } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
-import { styled } from 'nativewind';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -10,9 +9,6 @@ interface BottomSheetProps {
   snapPoints?: string[];
   title?: string;
 }
-
-const StyledView = styled(View);
-const StyledText = styled(Text);
 
 export const CustomBottomSheet: React.FC<BottomSheetProps> = ({
   isOpen,
@@ -56,13 +52,13 @@ export const CustomBottomSheet: React.FC<BottomSheetProps> = ({
     >
       <BottomSheetView className="flex-1 pb-8">
         {title && (
-          <StyledText className="px-6 pb-3 font-poppins-semibold text-[16px] text-brand-ink">
+          <Text className="px-6 pb-3 font-poppins-semibold text-[16px] text-brand-ink">
             {title}
-          </StyledText>
+          </Text>
         )}
-        <StyledView className="px-2">
+        <View className="px-2">
           {children}
-        </StyledView>
+        </View>
       </BottomSheetView>
     </BottomSheet>
   );

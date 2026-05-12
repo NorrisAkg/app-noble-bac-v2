@@ -1,6 +1,5 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { styled } from 'nativewind';
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -13,9 +12,6 @@ interface ButtonProps {
   textClassName?: string;
   textStyle?: TextStyle;
 }
-
-const StyledTouchableOpacity = styled(TouchableOpacity);
-const StyledText = styled(Text);
 
 export const Button: React.FC<ButtonProps> = ({
   children,
@@ -45,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
   const variantTextClassName = isPrimary ? primaryTextClassName : ghostTextClassName;
 
   return (
-    <StyledTouchableOpacity
+    <TouchableOpacity
       activeOpacity={0.8}
       onPress={onPress}
       disabled={disabled || loading}
@@ -55,13 +51,13 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator color={isPrimary ? "white" : "#3DBE45"} />
       ) : (
-        <StyledText 
+        <Text 
           className={`${baseTextClassName} ${variantTextClassName} ${textClassName}`}
           style={textStyle}
         >
           {children}
-        </StyledText>
+        </Text>
       )}
-    </StyledTouchableOpacity>
+    </TouchableOpacity>
   );
 };
