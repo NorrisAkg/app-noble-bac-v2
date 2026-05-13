@@ -1,49 +1,61 @@
-import { create } from "zustand";
-import * as SecureStore from "expo-secure-store";
+import { create } from 'zustand';
+import * as SecureStore from 'expo-secure-store';
+import type { User } from '@/types/api';
+import { logout as apiLogout } from '@/services/authService';
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-}
+const STORAGE_KEYS = {
+  TOKEN: 'auth_token',
+  USER: 'auth_user',
+} as const;
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  /** Call after a successful login or OTP verification */
   setAuth: (user: User, token: string) => Promise<void>;
+  /** Revokes the token on the server then clears local storage */
   logout: () => Promise<void>;
+  /** Rehydrates auth state from SecureStore on app boot */
   initialize: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
 
   setAuth: async (user, token) => {
-    await SecureStore.setItemAsync("auth_token", token);
-    await SecureStore.setItemAsync("user_data", JSON.stringify(user));
+    await SecureStore.setItemAsync(STORAGE_KEYS.TOKEN, token);
+    await SecureStore.setItemAsync(STORAGE_KEYS.USER, JSON.stringify(user));
     set({ user, token, isAuthenticated: true });
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync("auth_token");
-    await SecureStore.deleteItemAsync("user_data");
+    // Best-effort server revocation (don't block if it fails — e.g. offline)
+    try {
+      await apiLogout();
+    } catch {
+      // silent
+    }
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.TOKEN);
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
     set({ user: null, token: null, isAuthenticated: false });
   },
 
   initialize: async () => {
-    const token = await SecureStore.getItemAsync("auth_token");
-    const userData = await SecureStore.getItemAsync("user_data");
-    
-    if (token && userData) {
-      set({ 
-        user: JSON.parse(userData), 
-        token, 
-        isAuthenticated: true 
-      });
+    const token = await SecureStore.getItemAsync(STORAGE_KEYS.TOKEN);
+    const rawUser = await SecureStore.getItemAsync(STORAGE_KEYS.USER);
+
+    if (token && rawUser) {
+      try {
+        const user: User = JSON.parse(rawUser);
+        set({ user, token, isAuthenticated: true });
+      } catch {
+        // Corrupted storage — clear it
+        await SecureStore.deleteItemAsync(STORAGE_KEYS.TOKEN);
+        await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+      }
     }
   },
 }));
