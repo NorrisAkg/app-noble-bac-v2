@@ -153,7 +153,7 @@ export default function HomeScreen() {
           title="Bibliothèque"
           subtitle="Ouvrages recommandés"
           action="Voir tout"
-          onAction={() => Alert.alert('Bibliothèque', 'Bientôt disponible')}
+          onAction={() => router.push('/books')}
         />
         <ScrollView
           horizontal
