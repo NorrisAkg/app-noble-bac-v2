@@ -1,35 +1,46 @@
-import { Tabs } from 'expo-router';
+import { Tabs as ExpoTabs } from 'expo-router';
 import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { CustomTabBar } from '@/components/ui/CustomTabBar';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <Tabs
+    <ExpoTabs
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
+      }}
+    >
+      <ExpoTabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Accueil',
         }}
       />
-      <Tabs.Screen
-        name="explore"
+      <ExpoTabs.Screen
+        name="courses"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Cours',
         }}
       />
-    </Tabs>
+      <ExpoTabs.Screen
+        name="library"
+        options={{
+          title: 'Sujets',
+        }}
+      />
+      <ExpoTabs.Screen
+        name="quiz"
+        options={{
+          title: 'Quiz',
+        }}
+      />
+      <ExpoTabs.Screen
+        name="profile"
+        options={{
+          title: 'Profil',
+        }}
+      />
+    </ExpoTabs>
   );
 }
