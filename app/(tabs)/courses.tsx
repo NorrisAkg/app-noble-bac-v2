@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 
 import { COURSE_SUBJECTS, COURSE_SECTIONS } from '@/constants/coursesData';
 import { SubjectChips } from '@/components/courses/SubjectChips';
@@ -36,12 +37,24 @@ export default function CoursesScreen() {
     setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const router = useRouter();
+
   const handleOpenLesson = (section: any, item: any) => {
     Alert.alert('Leçon', `Ouverture de : ${item.t}\n(Module PDF bientôt disponible)`);
   };
 
   const handleOpenChapterFiche = (section: any) => {
-    Alert.alert('Fiche de révision', `Ouverture des fiches pour : ${section.title}\n(Module PDF bientôt disponible)`);
+    // Example PDF URL for testing
+    const samplePdfUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+    
+    router.push({
+      pathname: '/pdf-viewer',
+      params: { 
+        url: samplePdfUrl, 
+        title: `Fiche · ${section.title}`,
+        subject: subject.label
+      }
+    });
   };
 
   const handleOpenChapterVideo = (section: any) => {
