@@ -57,16 +57,23 @@ export default function RootLayout() {
   useEffect(() => {
     if (!loaded) return;
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // DEV BYPASS — set EXPO_PUBLIC_BYPASS_AUTH=true in .env.local to skip the
+    // auth guard and go straight to (tabs) while building other modules.
+    // This variable is absent from all non-local env files and has zero effect
+    // in staging / production builds.
+    // ─────────────────────────────────────────────────────────────────────────
+    if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') return;
+
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login if not authenticated and not in auth group
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to home if authenticated and in auth group
       router.replace('/(tabs)');
     }
   }, [isAuthenticated, segments, loaded]);
+
 
   if (!loaded && !error) {
     return null;
