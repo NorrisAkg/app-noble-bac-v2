@@ -65,11 +65,13 @@ export default function RootLayout() {
     // ─────────────────────────────────────────────────────────────────────────
     if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') return;
 
+    const inTabsGroup = segments[0] === '(tabs)';
     const inAuthGroup = segments[0] === '(auth)';
+    const isLanding = segments[0] === 'landing';
 
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
+    if (!isAuthenticated && inTabsGroup) {
+      router.replace('/landing');
+    } else if (isAuthenticated && (inAuthGroup || isLanding)) {
       router.replace('/(tabs)');
     }
   }, [isAuthenticated, segments, loaded]);
