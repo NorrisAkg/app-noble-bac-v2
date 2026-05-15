@@ -26,12 +26,67 @@ export interface Series {
   name: string;
 }
 
+export interface Subject {
+  id: number;
+  name: string;
+  slug: string;
+  icon_slug: string;
+  chapter_count: number;
+}
+
+export interface Chapter {
+  id: number;
+  title: string;
+  description: string;
+  order: number;
+  file_count: number;
+  free_file: {
+    id: number;
+    title: string;
+  } | null;
+}
+
+export interface Lesson {
+  id: number;
+  title: string;
+  order: number;
+  duration_minutes: number;
+  is_free: boolean;
+  status: 'published' | 'draft';
+  content?: string;
+  chapter?: {
+    id: number;
+    title: string;
+  };
+}
+
+export interface Book {
+  id: number;
+  title: string;
+  author: string;
+  description: string;
+  page_count: number;
+  is_free: boolean;
+  status: string;
+  cover_url: string | null;
+  subject: {
+    id: number;
+    name: string;
+  } | null;
+}
+
 // ─── API Envelope ─────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T;
+  meta?: {
+    current_page?: number;
+    per_page?: number;
+    total?: number;
+    last_page?: number;
+  };
 }
 
 export interface ApiError {
@@ -73,7 +128,8 @@ export type AuthUserResponse = ApiResponse<User>;
 /** Returned by /login and /refresh */
 export interface TokenData {
   user: User;
-  token: string;
+  access_token: string;
+  refresh_token: string;
   expires_at: string;
 }
 export type LoginResponse = ApiResponse<TokenData>;

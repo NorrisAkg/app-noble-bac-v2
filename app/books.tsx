@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft, Search, X, ChevronDown } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
-import { LIBRARY_BOOKS, Book } from '@/constants/booksData';
+import { catalogService } from '@/services/catalogService';
+import { courseService } from '@/services/courseService';
+import type { Book, Subject } from '@/types/api';
 import { FilterSheet } from '@/components/books/FilterSheet';
 
 // Fallback gradient colors for book covers
@@ -24,42 +26,69 @@ export default function BooksLibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const [books, setBooks] = useState<Book[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [subject, setSubject] = useState<string>('all');
-  const [author, setAuthor] = useState<string>('all');
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   
-  const [pickerType, setPickerType] = useState<'subject' | 'author' | null>(null);
+  const [pickerType, setPickerType] = useState<'subject' | null>(null);
 
-  // Extract unique subjects and authors for the filters
-  const allSubjects = useMemo(() => ['all', ...Array.from(new Set(LIBRARY_BOOKS.map(b => b.subject)))], []);
-  const allAuthors = useMemo(() => ['all', ...Array.from(new Set(LIBRARY_BOOKS.map(b => b.author)))], []);
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-  // Filter books based on search and filters
-  const filteredBooks = useMemo(() => {
-    return LIBRARY_BOOKS.filter((b) => {
-      if (subject !== 'all' && b.subject !== subject) return false;
-      if (author !== 'all' && b.author !== author) return false;
-      if (searchQuery && !b.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      return true;
-    });
-  }, [searchQuery, subject, author]);
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      loadBooks();
+    }, 500);
 
-  const activeFiltersCount = (subject !== 'all' ? 1 : 0) + (author !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, selectedSubject]);
+
+  const loadInitialData = async () => {
+    try {
+      const subjData = await courseService.getSubjects();
+      setSubjects(subjData);
+      await loadBooks();
+    } catch (error) {
+      console.error("Failed to load initial library data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBooks = async () => {
+    setLoading(true);
+    try {
+      const response = await catalogService.getBooks({
+        search: searchQuery,
+        subject_id: selectedSubject?.id,
+      });
+      setBooks(response.data);
+    } catch (error) {
+      console.error("Failed to load books:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeFiltersCount = (selectedSubject ? 1 : 0) + (searchQuery ? 1 : 0);
 
   const resetFilters = () => {
     setSearchQuery('');
-    setSubject('all');
-    setAuthor('all');
+    setSelectedSubject(null);
   };
 
   const handleOpenBook = (book: Book) => {
-    // Navigate to PDF viewer (assuming it's a PDF for now)
+    // Navigate to PDF viewer
+    // We'll need a signed URL for the PDF in the next step
     router.push({
       pathname: '/pdf-viewer',
       params: { 
-        url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 
+        bookId: book.id.toString(),
         title: book.title,
-        subject: book.subject
+        subject: book.subject?.name || ''
       }
     });
   };
@@ -101,13 +130,8 @@ export default function BooksLibraryScreen() {
         <View style={styles.filtersRow}>
           <FilterPill
             label="Matière"
-            value={subject === 'all' ? null : subject}
+            value={selectedSubject?.name || null}
             onPress={() => setPickerType('subject')}
-          />
-          <FilterPill
-            label="Auteur"
-            value={author === 'all' ? null : author}
-            onPress={() => setPickerType('author')}
           />
           {activeFiltersCount > 0 && (
             <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
@@ -116,7 +140,7 @@ export default function BooksLibraryScreen() {
           )}
           <View style={{ flex: 1 }} />
           <Text style={styles.countText}>
-            {filteredBooks.length} ouvrage{filteredBooks.length > 1 ? 's' : ''}
+            {books.length} ouvrage{books.length > 1 ? 's' : ''}
           </Text>
         </View>
       </View>
@@ -126,26 +150,30 @@ export default function BooksLibraryScreen() {
         contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.gridInner}>
-          {filteredBooks.map((book) => (
-            <TouchableOpacity 
-              key={book.id} 
-              style={styles.bookCard}
-              activeOpacity={0.8}
-              onPress={() => handleOpenBook(book)}
-            >
-              <BookCover book={book} />
-              <Text style={styles.bookTitle} numberOfLines={2}>
-                {book.title}
-              </Text>
-              <Text style={styles.bookMeta} numberOfLines={1}>
-                {book.author} · {book.subject}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {loading && books.length === 0 ? (
+          <ActivityIndicator size="large" color="#3DBE45" style={{ marginTop: 40 }} />
+        ) : (
+          <View style={styles.gridInner}>
+            {books.map((book) => (
+              <TouchableOpacity 
+                key={book.id} 
+                style={styles.bookCard}
+                activeOpacity={0.8}
+                onPress={() => handleOpenBook(book)}
+              >
+                <BookCover book={book} />
+                <Text style={styles.bookTitle} numberOfLines={2}>
+                  {book.title}
+                </Text>
+                <Text style={styles.bookMeta} numberOfLines={1}>
+                  {book.author} · {book.subject?.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
-        {filteredBooks.length === 0 && (
+        {!loading && books.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Aucun livre ne correspond à tes filtres.</Text>
             <TouchableOpacity onPress={resetFilters} style={styles.emptyResetBtn}>
@@ -160,18 +188,12 @@ export default function BooksLibraryScreen() {
         isOpen={pickerType === 'subject'}
         onClose={() => setPickerType(null)}
         title="Choisir une matière"
-        options={allSubjects}
-        selectedValue={subject}
-        onSelect={(val) => setSubject(val || 'all')}
-      />
-
-      <FilterSheet
-        isOpen={pickerType === 'author'}
-        onClose={() => setPickerType(null)}
-        title="Choisir un auteur"
-        options={allAuthors}
-        selectedValue={author}
-        onSelect={(val) => setAuthor(val || 'all')}
+        options={subjects.map(s => s.name)}
+        selectedValue={selectedSubject?.name || 'Toutes'}
+        onSelect={(val) => {
+          const found = subjects.find(s => s.name === val);
+          setSelectedSubject(found || null);
+        }}
       />
     </View>
   );
@@ -196,20 +218,30 @@ const FilterPill = ({ label, value, onPress }: { label: string; value: string | 
 const BookCover = ({ book }: { book: Book }) => {
   return (
     <View style={styles.coverContainer}>
-      <View style={[styles.coverColor, { backgroundColor: BOOK_GRADIENTS[book.colorPrefix || 'maths'][0] }]} />
-      {/* Decorative inner book elements */}
-      <View style={styles.coverBinding} />
-      <View style={styles.coverBadge}>
-        <Text style={styles.coverBadgeText}>{book.subject.slice(0, 3).toUpperCase()}</Text>
-      </View>
-      {book.isPremium && (
-        <View style={styles.premiumBadge}>
-          <Text style={styles.premiumText}>⭐</Text>
+      <View style={[styles.coverColor, { backgroundColor: BOOK_GRADIENTS[book.subject?.id ? 'maths' : 'phys'][0] }]} />
+      
+      {book.cover_url ? (
+        <Image 
+          source={{ uri: book.cover_url }} 
+          style={StyleSheet.absoluteFill} 
+          contentFit="cover"
+          transition={300}
+        />
+      ) : (
+        <View style={styles.coverBadge}>
+          <Text style={styles.coverBadgeText}>{(book.subject?.name || 'BK').slice(0, 3).toUpperCase()}</Text>
         </View>
       )}
-      {!book.isPremium && (
+
+      <View style={styles.coverBinding} />
+      
+      {book.is_free ? (
         <View style={styles.freeBadge}>
           <Text style={styles.freeText}>GRATUIT</Text>
+        </View>
+      ) : (
+        <View style={styles.premiumBadge}>
+          <Text style={styles.premiumText}>⭐</Text>
         </View>
       )}
     </View>

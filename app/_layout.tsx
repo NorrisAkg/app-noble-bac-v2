@@ -9,6 +9,7 @@ import { QueryProvider } from '@/providers/QueryProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   useFonts,
   Poppins_400Regular,
@@ -60,7 +61,7 @@ export default function RootLayout() {
     // ─────────────────────────────────────────────────────────────────────────
     // DEV BYPASS — set EXPO_PUBLIC_BYPASS_AUTH=true in .env.local to skip the
     // auth guard and go straight to (tabs) while building other modules.
-    // This variable is absent from all non-local env files and has zero effect
+    // This variable is absent from all non‑local env files and has zero effect
     // in staging / production builds.
     // ─────────────────────────────────────────────────────────────────────────
     if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') return;
@@ -69,11 +70,24 @@ export default function RootLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const isLanding = segments[0] === 'landing';
 
-    if (!isAuthenticated && inTabsGroup) {
-      router.replace('/landing');
-    } else if (isAuthenticated && (inAuthGroup || isLanding)) {
-      router.replace('/(tabs)');
-    }
+    // New onboarding flow: check if the user has already seen onboarding
+    // using AsyncStorage. Because AsyncStorage is async, we perform the check
+    // inside this effect and navigate accordingly.
+    const checkOnboarding = async () => {
+      const seen = await AsyncStorage.getItem('hasSeenOnboarding');
+      if (seen !== 'true') {
+        // Show onboarding (landing) screen before any other navigation
+        router.replace('/onboarding');
+        return;
+      }
+      // If onboarding already seen, keep previous auth‑based navigation
+      if (!isAuthenticated && inTabsGroup) {
+        router.replace('/landing');
+      } else if (isAuthenticated && (inAuthGroup || isLanding)) {
+        router.replace('/(tabs)');
+      }
+    };
+    checkOnboarding();
   }, [isAuthenticated, segments, loaded]);
 
 

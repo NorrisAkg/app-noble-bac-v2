@@ -12,7 +12,7 @@ const apiClient = axios.create({
 // Request interceptor to add the auth token
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync("auth_token");
+    const token = await SecureStore.getItemAsync("access_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -29,7 +29,8 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized error (e.g., redirect to login)
-      await SecureStore.deleteItemAsync("auth_token");
+      await SecureStore.deleteItemAsync("access_token");
+      await SecureStore.deleteItemAsync("refresh_token");
     }
     return Promise.reject(error);
   }

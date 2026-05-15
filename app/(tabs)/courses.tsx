@@ -4,11 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 
-import { COURSE_SUBJECTS, COURSE_SECTIONS } from '@/constants/coursesData';
+import { COURSE_SUBJECTS as MOCK_SUBJECTS, COURSE_SECTIONS } from '@/constants/coursesData';
 import { SubjectChips } from '@/components/courses/SubjectChips';
 import { TabChips } from '@/components/courses/TabChips';
 import { SectionCard } from '@/components/courses/SectionCard';
 import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
+import { useQuery } from '@tanstack/react-query';
+import { courseService } from '@/services/courseService';
 
 const COURSE_TABS = [
   { k: 'cours',  label: 'Cours'  },
@@ -18,8 +20,26 @@ const COURSE_TABS = [
 
 export default function CoursesScreen() {
   const insets = useSafeAreaInsets();
-  const [subject, setSubject] = useState(COURSE_SUBJECTS[4]); // default Français
+  
+  // Fetch subjects from API
+  const { data: apiSubjects, isLoading } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: courseService.getSubjects,
+  });
+
+  // Map API subjects to local format if needed, or use them directly
+  // For now, we fallback to mocks if API is loading or empty
+  const subjects = apiSubjects?.map(s => ({ k: s.slug, label: s.name })) || MOCK_SUBJECTS;
+
+  const [subject, setSubject] = useState(subjects[0]);
   const [tab, setTab] = useState('cours');
+
+  // Sync subject when apiSubjects load for the first time
+  React.useEffect(() => {
+    if (apiSubjects && apiSubjects.length > 0) {
+      setSubject({ k: apiSubjects[0].slug, label: apiSubjects[0].name });
+    }
+  }, [apiSubjects]);
 
   const sections = COURSE_SECTIONS[subject.k] || [];
   
@@ -40,7 +60,13 @@ export default function CoursesScreen() {
   const router = useRouter();
 
   const handleOpenLesson = (section: any, item: any) => {
-    Alert.alert('Leçon', `Ouverture de : ${item.t}\n(Module PDF bientôt disponible)`);
+    router.push({
+      pathname: '/course-reader',
+      params: { 
+        title: item.t,
+        subject: subject.label
+      }
+    });
   };
 
   const handleOpenChapterFiche = (section: any) => {
@@ -76,7 +102,7 @@ export default function CoursesScreen() {
       <View style={{ flex: 1 }}>
         {/* Subject pills (small) */}
         <SubjectChips 
-          subjects={COURSE_SUBJECTS} 
+          subjects={subjects} 
           value={subject} 
           onChange={setSubject} 
         />

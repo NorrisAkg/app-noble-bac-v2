@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,13 +6,66 @@ import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
 import { ChevronLeft } from 'lucide-react-native';
 
+import { catalogService } from '@/services/catalogService';
+
 export default function PdfViewerScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { url, title, subject } = useLocalSearchParams<{ url: string; title: string; subject: string }>();
-  const [loading, setLoading] = useState(true);
+  const { url: initialUrl, title, subject, bookId } = useLocalSearchParams<{ 
+    url?: string; 
+    title?: string; 
+    subject?: string;
+    bookId?: string;
+  }>();
 
-  if (!url) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(initialUrl || null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (bookId && !initialUrl) {
+      loadSignedUrl();
+    } else if (initialUrl) {
+      setLoading(false);
+    }
+  }, [bookId, initialUrl]);
+
+  const loadSignedUrl = async () => {
+    try {
+      setLoading(true);
+      const signedUrl = await catalogService.getBookSignedUrl(Number(bookId));
+      setPdfUrl(signedUrl);
+    } catch (err: any) {
+      console.error("Failed to load PDF URL:", err);
+      setError(err.response?.status === 403 
+        ? "Cet ouvrage est réservé aux abonnés Premium." 
+        : "Impossible de charger le document."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
+        <Text style={{ color: '#fff', textAlign: 'center', fontFamily: 'Poppins_500Medium' }}>{error}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtnAction}>
+          <Text style={{ color: '#fff', fontFamily: 'Poppins_600SemiBold' }}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (loading && !pdfUrl) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#3DBE45" />
+      </View>
+    );
+  }
+
+  if (!pdfUrl) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: '#fff' }}>URL du document introuvable.</Text>
@@ -25,8 +78,8 @@ export default function PdfViewerScreen() {
 
   // Use Google Docs viewer on Android, direct URI on iOS
   const sourceUri = Platform.OS === 'android'
-    ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
-    : url;
+    ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`
+    : pdfUrl;
 
   return (
     <View style={styles.container}>
@@ -136,5 +189,12 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  backBtnAction: {
+    marginTop: 20,
+    backgroundColor: '#3DBE45',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
 });
