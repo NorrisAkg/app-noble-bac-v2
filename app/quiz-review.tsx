@@ -9,9 +9,9 @@ import { useQuizStore } from '@/store/useQuizStore';
 export default function QuizReviewScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { lastSession } = useQuizStore();
+  const lastFinishedSession = useQuizStore((s) => s.lastFinishedSession);
 
-  if (!lastSession) {
+  if (!lastFinishedSession) {
     return (
       <View style={styles.emptyContainer}>
         <Text>Aucune session trouvée.</Text>
@@ -22,31 +22,31 @@ export default function QuizReviewScreen() {
     );
   }
 
-  const { questions, userAnswers, score, total } = lastSession;
+  const { score, total_questions: total, questions } = lastFinishedSession;
+  const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
-      
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft color="#fff" size={24} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Détail du Quiz</Text>
-          <Text style={styles.headerSub}>{score}/{total} points · {Math.round((score/total)*100)}%</Text>
+          <Text style={styles.headerSub}>{score}/{total} points · {percentage}%</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {questions.map((q, qIdx) => {
-          const userAnswer = userAnswers[qIdx];
-          const isCorrect = userAnswer === q.correct;
+          const isCorrect = q.user_answer.is_correct;
 
           return (
-            <View key={qIdx} style={styles.questionCard}>
+            <View key={q.question_id} style={styles.questionCard}>
               <View style={styles.questionNumContainer}>
                 <Text style={styles.questionNum}>QUESTION {qIdx + 1}</Text>
                 {isCorrect ? (
@@ -62,46 +62,58 @@ export default function QuizReviewScreen() {
                 )}
               </View>
 
-              <Text style={styles.questionText}>{q.q}</Text>
+              <Text style={styles.questionText}>{q.statement}</Text>
 
               <View style={styles.optionsList}>
                 {q.options.map((opt, oIdx) => {
-                  const isCorrectOpt = oIdx === q.correct;
-                  const isUserPick = oIdx === userAnswer;
-                  
-                  let optStyle = styles.option;
-                  let optTextStyle = styles.optionText;
-                  
-                  if (isCorrectOpt) {
+                  const isUserPick = opt.is_selected;
+
+                  let optStyle: any = styles.option;
+                  let optTextStyle: any = styles.optionText;
+
+                  if (opt.is_correct) {
                     optStyle = [styles.option, styles.optionCorrect];
                     optTextStyle = [styles.optionText, styles.optionTextCorrect];
-                  } else if (isUserPick && !isCorrectOpt) {
+                  } else if (isUserPick) {
                     optStyle = [styles.option, styles.optionWrong];
                     optTextStyle = [styles.optionText, styles.optionTextWrong];
                   }
 
                   return (
-                    <View key={oIdx} style={optStyle}>
-                      <View style={[styles.optionLetter, isCorrectOpt && styles.letterCorrect, isUserPick && !isCorrectOpt && styles.letterWrong]}>
-                        <Text style={[styles.letterText, (isCorrectOpt || isUserPick) && styles.letterTextWhite]}>
+                    <View key={opt.id} style={optStyle}>
+                      <View
+                        style={[
+                          styles.optionLetter,
+                          opt.is_correct && styles.letterCorrect,
+                          isUserPick && !opt.is_correct && styles.letterWrong,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.letterText,
+                            (opt.is_correct || isUserPick) && styles.letterTextWhite,
+                          ]}
+                        >
                           {String.fromCharCode(65 + oIdx)}
                         </Text>
                       </View>
-                      <Text style={optTextStyle}>{opt}</Text>
-                      {isCorrectOpt && <Check size={16} color="#3DBE45" />}
-                      {isUserPick && !isCorrectOpt && <X size={16} color="#E14B36" />}
+                      <Text style={optTextStyle}>{opt.label}</Text>
+                      {opt.is_correct && <Check size={16} color="#3DBE45" />}
+                      {isUserPick && !opt.is_correct && <X size={16} color="#E14B36" />}
                     </View>
                   );
                 })}
               </View>
 
-              <View style={styles.explanationBox}>
-                <View style={styles.explHeader}>
-                  <Info size={14} color="#5A6470" />
-                  <Text style={styles.explTitle}>Explication</Text>
+              {q.explanation && (
+                <View style={styles.explanationBox}>
+                  <View style={styles.explHeader}>
+                    <Info size={14} color="#5A6470" />
+                    <Text style={styles.explTitle}>Explication</Text>
+                  </View>
+                  <Text style={styles.explText}>{q.explanation}</Text>
                 </View>
-                <Text style={styles.explText}>{q.expl}</Text>
-              </View>
+              )}
             </View>
           );
         })}

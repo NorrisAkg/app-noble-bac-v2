@@ -1,118 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { X, Check } from 'lucide-react-native';
-import Animated, { FadeInUp, SlideInDown } from 'react-native-reanimated';
+import { X } from 'lucide-react-native';
 
-import { quizService, QuizQuestion, QuizSession } from '@/services/quizService';
+import { quizService } from '@/services/quizService';
+import type { QuizSession, QuizSessionQuestion } from '@/services/quizService';
 import { useQuizStore } from '@/store/useQuizStore';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 export default function QuizSessionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { subjectId, subjectLabel = 'Quiz' } = useLocalSearchParams();
+  const { subjectId, subjectLabel = 'Quiz' } = useLocalSearchParams<{
+    subjectId: string;
+    subjectLabel?: string;
+  }>();
 
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [session, setSession] = useState<QuizSession | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  const [idx, setIdx] = useState(0);
-  const [picked, setPicked] = useState<number | null>(null);
-  const [showExpl, setShowExpl] = useState(false);
-  const [score, setScore] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<{question_id: number, answer_option_id: number | null}[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
-  const setLastSession = useQuizStore((s) => s.setLastSession);
+  const [idx, setIdx] = useState(0);
+  const [pickedOptionId, setPickedOptionId] = useState<number | null>(null);
+
+  const setLastFinishedSession = useQuizStore((s) => s.setLastFinishedSession);
 
   useEffect(() => {
-    initQuiz();
-  }, []);
-
-  const initQuiz = async () => {
-    try {
-      const chapters = await quizService.getQuizChapters(Number(subjectId));
-      if (chapters.length === 0) {
-        alert("Aucun quiz disponible pour cette matière.");
-        router.back();
-        return;
-      }
-
-      const data = await quizService.startSession(chapters[0].id);
-      setSession(data.session);
-      setQuestions(data.questions);
-      setUserAnswers(new Array(data.questions.length).fill(null));
-    } catch (error) {
-      console.error("Quiz init error:", error);
-      alert("Erreur lors du chargement du quiz.");
+    if (!subjectId) {
+      Alert.alert('Erreur', 'Matière introuvable.');
       router.back();
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
 
-  const total = questions.length;
-  const q = questions[idx];
-
-  const handlePick = (optionIdx: number) => {
-    if (picked !== null) return;
-    setPicked(optionIdx);
-    
-    const selectedOption = q.answer_options[optionIdx];
-    
-    const newAnswers = [...userAnswers];
-    newAnswers[idx] = {
-      question_id: q.id,
-      answer_option_id: selectedOption.id
-    };
-    setUserAnswers(newAnswers);
-
-    if (selectedOption.is_correct) {
-      setScore((s) => s + 1);
-    }
-    
-    setTimeout(() => {
-      setShowExpl(true);
-    }, 600);
-  };
-
-  const handleNext = async () => {
-    if (idx < total - 1) {
-      setIdx(idx + 1);
-      setPicked(null);
-      setShowExpl(false);
-    } else {
-      setLoading(true);
+    (async () => {
       try {
-        if (session) {
-          await quizService.submitBulkAnswers(session.id, userAnswers);
-          const finalSession = await quizService.finishSession(session.id);
-          
-          setLastSession([], [], score); 
-          
-          router.push({
-            pathname: '/quiz-results',
-            params: { 
-              score: finalSession.correct_count.toString(), 
-              total: total.toString() 
-            },
-          });
-        }
+        const data = await quizService.startSession(Number(subjectId));
+        setSession(data);
       } catch (error) {
-        console.error("Finish quiz error:", error);
-        alert("Erreur lors de l'enregistrement des résultats.");
+        Alert.alert('Quiz indisponible', getApiErrorMessage(error));
+        router.back();
       } finally {
         setLoading(false);
       }
+    })();
+  }, [subjectId]);
+
+  const questions: QuizSessionQuestion[] = session?.questions ?? [];
+  const total = questions.length;
+  const q = questions[idx];
+  const isLast = idx === total - 1;
+
+  const handlePick = (optionId: number) => {
+    if (submitting) return;
+    setPickedOptionId(optionId);
+  };
+
+  const handleNext = async () => {
+    if (!session || pickedOptionId === null || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await quizService.submitAnswer(session.id, q.id, pickedOptionId);
+
+      if (!isLast) {
+        setIdx((i) => i + 1);
+        setPickedOptionId(null);
+        setSubmitting(false);
+        return;
+      }
+
+      const finished = await quizService.finishSession(session.id);
+      setLastFinishedSession(finished);
+
+      router.replace({
+        pathname: '/quiz-results',
+        params: {
+          score: String(finished.score),
+          total: String(finished.total_questions),
+        },
+      });
+    } catch (error) {
+      Alert.alert('Erreur', getApiErrorMessage(error));
+      setSubmitting(false);
     }
   };
 
-  if (loading && !session) {
+  if (loading || !session || !q) {
     return (
       <View style={[styles.container, styles.centered]}>
+        <StatusBar style="light" />
         <ActivityIndicator size="large" color="#fff" />
-        <Text style={styles.loaderText}>Préparation du quiz...</Text>
+        <Text style={styles.loaderText}>Préparation du quiz…</Text>
       </View>
     );
   }
@@ -122,8 +102,8 @@ export default function QuizSessionScreen() {
       <StatusBar style="light" />
 
       <View style={[styles.topBar, { paddingTop: insets.top + 14 }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
+        <TouchableOpacity
+          onPress={() => router.back()}
           style={styles.closeBtn}
           activeOpacity={0.7}
         >
@@ -139,102 +119,50 @@ export default function QuizSessionScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.questionHeader}>
-          <Text style={styles.contextText}>
-            {subjectLabel}
-          </Text>
-          <Text style={styles.questionText}>
-            {q.content}
-          </Text>
+          <Text style={styles.contextText}>{subjectLabel}</Text>
+          <Text style={styles.questionText}>{q.statement}</Text>
         </View>
 
         <View style={styles.optionsContainer}>
-          {q.answer_options.map((opt, i) => {
-            const isPicked = picked === i;
-            const isCorrect = picked !== null && opt.is_correct;
-            const isWrongPick = isPicked && !opt.is_correct;
-
-            let cardStyle = styles.optCard;
-            let textStyle = styles.optText;
-            let iconWrapStyle = styles.optIconWrap;
-            let iconTextStyle = styles.optIconText;
-
-            if (isCorrect) {
-              cardStyle = styles.optCardCorrect;
-              textStyle = styles.optTextWhite;
-              iconWrapStyle = styles.optIconWrapTranslucent;
-              iconTextStyle = styles.optIconTextWhite;
-            } else if (isWrongPick) {
-              cardStyle = styles.optCardWrong;
-              textStyle = styles.optTextWhite;
-              iconWrapStyle = styles.optIconWrapTranslucent;
-              iconTextStyle = styles.optIconTextWhite;
-            }
+          {q.options.map((opt, i) => {
+            const isPicked = pickedOptionId === opt.id;
 
             return (
               <TouchableOpacity
                 key={opt.id}
-                onPress={() => handlePick(i)}
-                disabled={picked !== null}
+                onPress={() => handlePick(opt.id)}
+                disabled={submitting}
                 activeOpacity={0.8}
-                style={[
-                  cardStyle,
-                  isPicked && picked === null && styles.optCardShadow
-                ]}
+                style={[styles.optCard, isPicked && styles.optCardPicked]}
               >
-                <View style={iconWrapStyle}>
-                  {isCorrect ? (
-                    <Check size={16} color="#fff" strokeWidth={3} />
-                  ) : isWrongPick ? (
-                    <X size={16} color="#fff" strokeWidth={3} />
-                  ) : (
-                    <Text style={iconTextStyle}>{String.fromCharCode(65 + i)}</Text>
-                  )}
+                <View style={[styles.optIconWrap, isPicked && styles.optIconWrapPicked]}>
+                  <Text style={[styles.optIconText, isPicked && styles.optIconTextWhite]}>
+                    {String.fromCharCode(65 + i)}
+                  </Text>
                 </View>
-                <Text style={textStyle}>{opt.content}</Text>
+                <Text style={[styles.optText, isPicked && styles.optTextPicked]}>{opt.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </ScrollView>
 
-      {showExpl && (
-        <Animated.View 
-          entering={SlideInDown.duration(280)} 
-          style={[styles.drawer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
+        <TouchableOpacity
+          style={[styles.nextBtn, (pickedOptionId === null || submitting) && styles.nextBtnDisabled]}
+          onPress={handleNext}
+          activeOpacity={0.85}
+          disabled={pickedOptionId === null || submitting}
         >
-          <View style={styles.drawerHeader}>
-            <View style={[styles.drawerIcon, q.answer_options[picked!].is_correct ? styles.drawerIconCorrect : styles.drawerIconWrong]}>
-              {q.answer_options[picked!].is_correct ? (
-                <Check size={14} color="#3DBE45" strokeWidth={3} />
-              ) : (
-                <Text style={styles.drawerIconWrongText}>!</Text>
-              )}
-            </View>
-            <Text style={[styles.drawerTitle, q.answer_options[picked!].is_correct ? styles.drawerTitleCorrect : styles.drawerTitleWrong]}>
-              {q.answer_options[picked!].is_correct ? 'Bonne réponse !' : 'Pas tout à fait'}
+          {submitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.nextBtnText}>
+              {isLast ? 'Voir mon score' : 'Question suivante'}
             </Text>
-          </View>
-          
-          <Text style={styles.explText}>
-            {q.answer_options[picked!].explanation || "Pas d'explication disponible."}
-          </Text>
-
-          <TouchableOpacity 
-            style={[styles.nextBtn, loading && { opacity: 0.7 }]} 
-            onPress={handleNext} 
-            activeOpacity={0.8}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.nextBtnText}>
-                {idx === total - 1 ? 'Voir mon score' : 'Question suivante'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -289,7 +217,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 100, // Space for drawer
+    paddingBottom: 120,
   },
   questionHeader: {
     alignItems: 'center',
@@ -332,35 +260,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  optCardShadow: {
-    shadowOffset: { width: 0, height: 8 },
+  optCardPicked: {
+    backgroundColor: '#1A2027',
+    borderColor: '#1A2027',
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 6,
-  },
-  optCardCorrect: {
-    minHeight: 60,
-    borderRadius: 16,
-    backgroundColor: '#3DBE45',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    gap: 14,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  optCardWrong: {
-    minHeight: 60,
-    borderRadius: 16,
-    backgroundColor: '#E14B36',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    gap: 14,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
   },
   optIconWrap: {
     width: 28,
@@ -370,13 +275,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optIconWrapTranslucent: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  optIconWrapPicked: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   optIconText: {
     fontFamily: 'Poppins_700Bold',
@@ -384,8 +284,6 @@ const styles = StyleSheet.create({
     color: '#5A6470',
   },
   optIconTextWhite: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 12,
     color: '#fff',
   },
   optText: {
@@ -394,14 +292,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1A2027',
   },
-  optTextWhite: {
-    flex: 1,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 15,
+  optTextPicked: {
     color: '#fff',
   },
-  // Drawer
-  drawer: {
+  footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -410,54 +304,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 22,
-    paddingTop: 20,
+    paddingTop: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 20,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  drawerIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  drawerIconCorrect: {
-    backgroundColor: '#EAF7EB',
-  },
-  drawerIconWrong: {
-    backgroundColor: '#FBEDE8',
-  },
-  drawerIconWrongText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 14,
-    color: '#D38576',
-    marginTop: Platform.OS === 'ios' ? 2 : 0,
-  },
-  drawerTitle: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 14,
-  },
-  drawerTitleCorrect: {
-    color: '#3DBE45',
-  },
-  drawerTitleWrong: {
-    color: '#D38576',
-  },
-  explText: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 13.5,
-    color: '#5A6470',
-    lineHeight: 20,
-    marginBottom: 20,
   },
   nextBtn: {
     height: 50,
@@ -466,8 +318,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  nextBtnDisabled: {
+    opacity: 0.4,
+  },
   nextBtnText: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: Platform.OS === 'ios' ? 'Poppins_600SemiBold' : 'Poppins_600SemiBold',
     fontSize: 14,
     color: '#fff',
   },

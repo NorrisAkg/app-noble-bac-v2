@@ -1,37 +1,14 @@
 import { create } from 'zustand';
-
-interface QuizQuestion {
-  q: string;
-  options: string[];
-  correct: number;
-  expl: string;
-}
-
-interface QuizResult {
-  question: QuizQuestion;
-  userAnswer: number | null;
-}
+import type { QuizSessionFinished } from '@/services/quizService';
 
 interface QuizState {
-  lastSession: {
-    questions: QuizQuestion[];
-    userAnswers: (number | null)[];
-    score: number;
-    total: number;
-  } | null;
-  setLastSession: (questions: QuizQuestion[], userAnswers: (number | null)[], score: number) => void;
+  lastFinishedSession: QuizSessionFinished | null;
+  setLastFinishedSession: (session: QuizSessionFinished) => void;
   clearSession: () => void;
 }
 
 export const useQuizStore = create<QuizState>((set) => ({
-  lastSession: null,
-  setLastSession: (questions, userAnswers, score) => set({
-    lastSession: {
-      questions,
-      userAnswers,
-      score,
-      total: questions.length
-    }
-  }),
-  clearSession: () => set({ lastSession: null }),
+  lastFinishedSession: null,
+  setLastFinishedSession: (session) => set({ lastFinishedSession: session }),
+  clearSession: () => set({ lastFinishedSession: null }),
 }));

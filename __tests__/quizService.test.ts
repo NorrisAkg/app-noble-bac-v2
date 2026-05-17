@@ -10,38 +10,102 @@ describe('quizService', () => {
     jest.clearAllMocks();
   });
 
-  it('should start a session and return questions', async () => {
-    const mockResponse = {
+  it('startSession posts subject_id and returns the session with questions', async () => {
+    mockedApiClient.post.mockResolvedValueOnce({
       data: {
+        success: true,
+        message: 'OK',
         data: {
-          session: { id: 1, status: 'in_progress' },
-          questions: [{ id: 101, content: 'Test Question' }],
+          id: 1,
+          subject_id: 5,
+          status: 'in_progress',
+          total_questions: 1,
+          questions_answered: 0,
+          started_at: null,
+          completed_at: null,
+          questions: [
+            {
+              id: 101,
+              statement: 'Test Question',
+              question_type: 'mcq',
+              difficulty: 'easy',
+              options: [{ id: 201, label: 'A' }],
+            },
+          ],
         },
       },
-    };
-
-    mockedApiClient.post.mockResolvedValueOnce(mockResponse);
+    });
 
     const result = await quizService.startSession(5);
 
-    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions', {
-      quiz_chapter_id: 5,
-    });
-    expect(result.session.id).toBe(1);
-    expect(result.questions[0].content).toBe('Test Question');
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions', { subject_id: 5 });
+    expect(result.id).toBe(1);
+    expect(result.questions).toHaveLength(1);
+    expect(result.questions[0].statement).toBe('Test Question');
   });
 
-  it('should submit bulk answers', async () => {
-    mockedApiClient.post.mockResolvedValueOnce({ data: {} });
-
-    const answers = [
-      { question_id: 101, answer_option_id: 201 },
-    ];
-
-    await quizService.submitBulkAnswers(1, answers);
-
-    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions/1/answers/bulk', {
-      answers,
+  it('submitAnswer posts a single answer payload', async () => {
+    mockedApiClient.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        message: 'OK',
+        data: { questions_answered: 1, questions_remaining: 9 },
+      },
     });
+
+    const result = await quizService.submitAnswer(1, 101, 201);
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions/1/answers', {
+      question_id: 101,
+      selected_option_id: 201,
+    });
+    expect(result.questions_answered).toBe(1);
+    expect(result.questions_remaining).toBe(9);
+  });
+
+  it('finishSession posts to the finish endpoint and returns the finished resource', async () => {
+    mockedApiClient.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        message: 'OK',
+        data: {
+          id: 1,
+          subject: { id: 5, name: 'SVT' },
+          status: 'completed',
+          score: 8,
+          total_questions: 10,
+          percentage: 80,
+          started_at: null,
+          completed_at: null,
+          duration_seconds: 120,
+          questions: [],
+        },
+      },
+    });
+
+    const result = await quizService.finishSession(1);
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions/1/finish');
+    expect(result.score).toBe(8);
+    expect(result.percentage).toBe(80);
+  });
+
+  it('getHistory fetches the paginated history endpoint', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        message: 'OK',
+        data: [],
+        meta: { current_page: 1, per_page: 20, total: 0, last_page: 1 },
+      },
+    });
+
+    const result = await quizService.getHistory();
+
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/quiz/sessions/history', {
+      params: { page: 1, per_page: 20 },
+    });
+    expect(result.data).toEqual([]);
+    expect(result.meta?.current_page).toBe(1);
   });
 });

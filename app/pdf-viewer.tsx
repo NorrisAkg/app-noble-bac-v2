@@ -33,12 +33,12 @@ export default function PdfViewerScreen() {
   const loadSignedUrl = async () => {
     try {
       setLoading(true);
-      const signedUrl = await catalogService.getBookSignedUrl(Number(bookId));
-      setPdfUrl(signedUrl);
+      const { url } = await catalogService.downloadBook(Number(bookId));
+      setPdfUrl(url);
     } catch (err: any) {
       console.error("Failed to load PDF URL:", err);
-      setError(err.response?.status === 403 
-        ? "Cet ouvrage est réservé aux abonnés Premium." 
+      setError(err.response?.status === 403
+        ? "Cet ouvrage est réservé aux abonnés Premium."
         : "Impossible de charger le document."
       );
     } finally {

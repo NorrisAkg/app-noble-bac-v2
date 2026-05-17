@@ -8,6 +8,13 @@ export interface BookFilters {
   per_page?: number;
 }
 
+export interface BookDownload {
+  url: string;
+  expires_at: string;
+  expires_in_seconds: number;
+  file_name: string;
+}
+
 export const catalogService = {
   /**
    * GET /api/v1/courses/books
@@ -20,11 +27,14 @@ export const catalogService = {
   },
 
   /**
-   * POST /api/v1/courses/books/{bookId}/signed-url
+   * GET /api/v1/courses/books/{bookId}/download
+   * Premium-only (Gate `download` côté backend). Renvoie une URL signée R2 (TTL 2h).
    */
-  getBookSignedUrl: async (bookId: number): Promise<string> => {
-    const response = await apiClient.post<ApiResponse<{ url: string }>>(`/courses/books/${bookId}/signed-url`);
-    return response.data.data.url;
+  downloadBook: async (bookId: number): Promise<BookDownload> => {
+    const response = await apiClient.get<ApiResponse<BookDownload>>(
+      `/courses/books/${bookId}/download`,
+    );
+    return response.data.data;
   },
 
   /**

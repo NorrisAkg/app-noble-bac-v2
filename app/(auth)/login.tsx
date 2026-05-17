@@ -27,7 +27,7 @@ export default function LoginScreen() {
   const { mutate, isPending } = useMutation({
     mutationFn: () => login({ phone: e164Phone, password }),
     onSuccess: async (res) => {
-      await setAuth(res.data.user, res.data.token);
+      await setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
       // Navigation handled by the auth guard in _layout.tsx
     },
     onError: (error) => {
