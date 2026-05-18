@@ -14,6 +14,7 @@ import {
   Target,
   Clock,
   Award,
+  Download,
 } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
@@ -84,6 +85,7 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { id: 'edit', label: 'Modifier le profil', icon: Settings, route: '/settings/edit-profile' },
+    { id: 'downloads', label: 'Mes téléchargements', icon: Download, route: '/my-downloads' },
     { id: 'notif', label: 'Notifications', icon: Bell, route: '/settings/notifications' },
     { id: 'support', label: 'Support & Aide', icon: HelpCircle, route: '/settings/support' },
     { id: 'privacy', label: 'Confidentialité', icon: ShieldCheck, route: '/settings/privacy' },

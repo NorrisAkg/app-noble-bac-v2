@@ -115,11 +115,11 @@
 
 | Méthode | Endpoint backend | Service mobile | Écran(s) | Statut |
 |---|---|---|---|---|
-| GET | `/me/downloads/` | — | — | 🔴 |
-| GET | `/me/downloads/quota` | — | — | 🔴 |
-| POST | `/me/downloads/` | — | — | 🔴 |
-| GET | `/me/downloads/{userDownload}` | — | — | 🔴 |
-| DELETE | `/me/downloads/{userDownload}` | — | — | 🔴 |
+| GET | `/me/downloads/` | `myDownloadsService.listDownloads` | `app/my-downloads.tsx`, hook `useDownloadedSet` (badges sur listings) | 🟢 (M-P5) |
+| GET | `/me/downloads/quota` | `myDownloadsService.getQuota` | — (meta.quota déjà inclus dans GET /me/downloads) | 🟡 |
+| POST | `/me/downloads/` | `myDownloadsService.declareDownload` | `app/pdf-viewer.tsx` bouton "Télécharger hors-ligne" | 🟢 (M-P5) |
+| GET | `/me/downloads/{userDownload}` | `myDownloadsService.getDownload` | — (utile pour rafraîchir signed_url, futur) | 🟡 |
+| DELETE | `/me/downloads/{userDownload}` | `myDownloadsService.revokeDownload` | `app/my-downloads.tsx` bouton corbeille | 🟢 (M-P5) |
 
 **Contrat P6 backend (livré 2026-05-17)** :
 - Body de `POST /me/downloads/` : `{ downloadable_type, downloadable_id }`

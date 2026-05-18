@@ -289,3 +289,76 @@ export interface ExamFilters {
   page?: number;
   per_page?: number;
 }
+
+// ─── Module Offline (Mes téléchargements) ────────────────────────────────────
+
+/**
+ * Types polymorphes acceptes par POST /api/v1/me/downloads.
+ * Doit etre en sync avec App\Domain\Common\Enums\DownloadableType cote backend.
+ */
+export type OfflineDownloadableType = 'correction' | 'revision_sheet' | 'book';
+
+/**
+ * Sous-objet retourne dans UserDownloadResource.downloadable selon le type.
+ * Shape decoupe par le backend dans UserDownloadResource::resolveDownloadable().
+ */
+export type UserDownloadDownloadable =
+  | { id: number; title: string; exam_id: number; page_count: number | null }
+  | { id: number; title: string; chapter_id: number }
+  | { id: number; title: string; author: string | null; page_count: number | null }
+  | null;
+
+/**
+ * Shape retourne par GET /me/downloads et POST /me/downloads.
+ * Les champs `signed_url` et `signed_url_expires_at` sont presents UNIQUEMENT
+ * tant que l'URL est valide (when() cote backend).
+ */
+export interface UserDownload {
+  id: number;
+  downloadable_type: OfflineDownloadableType;
+  downloadable_id: number;
+  downloadable: UserDownloadDownloadable;
+  file_size_kb: number;
+  status: 'active' | 'inactive';
+  is_active: boolean;
+  downloaded_at: string;
+  last_opened_at: string | null;
+  expires_at: string | null;
+  signed_url?: string;
+  signed_url_expires_at?: string;
+}
+
+/**
+ * Payload renvoye par GET /api/v1/me/downloads/quota (et inclus dans
+ * meta.quota du GET /me/downloads).
+ */
+export interface OfflineQuotaStatus {
+  used_kb: number;
+  used_mb: number;
+  remaining_kb: number;
+  remaining_mb: number;
+  max_kb: number;
+  max_mb: number;
+  window_days: number;
+  usage_percentage: number;
+}
+
+/**
+ * Payload de POST /api/v1/me/downloads.
+ */
+export interface DeclareDownloadPayload {
+  downloadable_type: OfflineDownloadableType;
+  downloadable_id: number;
+}
+
+/**
+ * Erreur 422 retournee par DeclareDownloadAction quand le quota est insuffisant.
+ * Le champ `errors` de ApiError contient une `suggestion` listant les downloads
+ * a revoquer pour liberer assez d'espace.
+ */
+export interface QuotaExceededErrorPayload {
+  kb_needed: number;
+  kb_remaining: number;
+  kb_to_free: number;
+  download_ids: number[];
+}

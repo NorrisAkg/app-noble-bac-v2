@@ -3,11 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platfo
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronLeft, Search, X, ChevronDown } from 'lucide-react-native';
+import { ChevronLeft, Search, X, ChevronDown, Check } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
+import { useDownloadedSet } from '@/hooks/useDownloadedSet';
 import type { Book, Subject } from '@/types/api';
 import { FilterSheet } from '@/components/books/FilterSheet';
 
@@ -155,20 +156,11 @@ export default function BooksLibraryScreen() {
         ) : (
           <View style={styles.gridInner}>
             {books.map((book) => (
-              <TouchableOpacity 
-                key={book.id} 
-                style={styles.bookCard}
-                activeOpacity={0.8}
+              <BookCard
+                key={book.id}
+                book={book}
                 onPress={() => handleOpenBook(book)}
-              >
-                <BookCover book={book} />
-                <Text style={styles.bookTitle} numberOfLines={2}>
-                  {book.title}
-                </Text>
-                <Text style={styles.bookMeta} numberOfLines={1}>
-                  {book.author} · {book.subject?.name}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </View>
         )}
@@ -215,15 +207,37 @@ const FilterPill = ({ label, value, onPress }: { label: string; value: string | 
   );
 };
 
-const BookCover = ({ book }: { book: Book }) => {
+/**
+ * Carte d'un livre dans la liste. Encapsule BookCover et lit l'etat
+ * "deja telecharge" via useDownloadedSet (cache TanStack Query partage
+ * avec l'ecran "Mes telechargements" et le bouton dans pdf-viewer).
+ */
+const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress }) => {
+  const downloaded = useDownloadedSet();
+  const isDownloaded = downloaded.isDownloaded('book', book.id);
+
+  return (
+    <TouchableOpacity style={styles.bookCard} activeOpacity={0.8} onPress={onPress}>
+      <BookCover book={book} isDownloaded={isDownloaded} />
+      <Text style={styles.bookTitle} numberOfLines={2}>
+        {book.title}
+      </Text>
+      <Text style={styles.bookMeta} numberOfLines={1}>
+        {book.author} · {book.subject?.name}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+const BookCover: React.FC<{ book: Book; isDownloaded?: boolean }> = ({ book, isDownloaded }) => {
   return (
     <View style={styles.coverContainer}>
       <View style={[styles.coverColor, { backgroundColor: BOOK_GRADIENTS[book.subject?.id ? 'maths' : 'phys'][0] }]} />
-      
+
       {book.cover_url ? (
-        <Image 
-          source={{ uri: book.cover_url }} 
-          style={StyleSheet.absoluteFill} 
+        <Image
+          source={{ uri: book.cover_url }}
+          style={StyleSheet.absoluteFill}
           contentFit="cover"
           transition={300}
         />
@@ -234,7 +248,13 @@ const BookCover = ({ book }: { book: Book }) => {
       )}
 
       <View style={styles.coverBinding} />
-      
+
+      {isDownloaded === true && (
+        <View style={styles.downloadedBadge} accessibilityLabel="Téléchargé hors-ligne">
+          <Check size={11} color="#fff" strokeWidth={3} />
+        </View>
+      )}
+
       {book.is_free ? (
         <View style={styles.freeBadge}>
           <Text style={styles.freeText}>GRATUIT</Text>
@@ -424,6 +444,22 @@ const styles = StyleSheet.create({
   },
   premiumText: {
     fontSize: 12,
+  },
+  downloadedBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#3DBE45',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   freeBadge: {
     position: 'absolute',
