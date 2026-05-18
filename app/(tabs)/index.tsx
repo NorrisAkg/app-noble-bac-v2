@@ -277,7 +277,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   // Hero
   hero: {
-    background: 'transparent' as any,
     backgroundColor: '#3DBE45',
     paddingHorizontal: 20,
     paddingBottom: 64,
