@@ -188,3 +188,50 @@ export interface TokenData {
   expires_at: string;
 }
 export type LoginResponse = ApiResponse<TokenData>;
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+/**
+ * Shape retourne par GET /api/v1/profile (UserProfileResource).
+ * Plus riche que `User` (utilise pour login/register) car la Resource
+ * inclut country/series objets, avatar, gender, birth_date et is_premium.
+ */
+export interface UserProfile {
+  id: number;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string | null;
+  gender: 'M' | 'F' | 'Other' | null;
+  birth_date: string | null;
+  avatar_url: string | null;
+  country: {
+    id: number;
+    name: string;
+    code: string;
+    flag_emoji: string | null;
+  };
+  series: {
+    id: number;
+    label: string;
+    code: string;
+  };
+  phone_verified_at: string | null;
+  is_active: boolean;
+  is_admin: boolean;
+  is_premium: boolean;
+}
+
+/**
+ * Payload PATCH /api/v1/profile (UpdateProfileRequest cote backend).
+ * Tous les champs sont 'sometimes' : seuls les champs presents sont valides.
+ */
+export interface UpdateProfilePayload {
+  first_name?: string;
+  last_name?: string;
+  gender?: 'M' | 'F' | 'Other';
+  birth_date?: string;
+  series_id?: number;
+}
+
+export type ProfileResponse = ApiResponse<UserProfile>;

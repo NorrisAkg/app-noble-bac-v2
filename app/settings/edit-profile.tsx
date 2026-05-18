@@ -1,56 +1,96 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera, Check } from 'lucide-react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getProfile, updateProfile } from '@/services/profileService';
+import { getApiErrorMessage } from '@/utils/apiError';
+import type { UpdateProfilePayload, UserProfile } from '@/types/api';
 
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [form, setForm] = useState({
-    firstName: 'Awa',
-    lastName: 'Diallo',
-    email: 'awa.diallo@example.com',
-    phone: '+221 77 123 45 67',
+  const { data: profile, isLoading: isLoadingProfile } = useQuery<UserProfile>({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const [saving, setSaving] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleSave = () => {
-    setSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false);
+  // Initialise les champs editables des que le profile est charge.
+  useEffect(() => {
+    if (profile != null) {
+      setFirstName(profile.first_name);
+      setLastName(profile.last_name);
+    }
+  }, [profile]);
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['profile'], updated);
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
         router.back();
       }, 1000);
-    }, 1500);
+    },
+    onError: (err) => {
+      Alert.alert('Mise à jour impossible', getApiErrorMessage(err));
+    },
+  });
+
+  const isDirty =
+    profile != null && (firstName !== profile.first_name || lastName !== profile.last_name);
+
+  const handleSave = () => {
+    if (!isDirty) {
+      router.back();
+      return;
+    }
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    if (trimmedFirst.length < 2 || trimmedLast.length < 2) {
+      Alert.alert('Champs trop courts', 'Le prénom et le nom doivent contenir au moins 2 caractères.');
+      return;
+    }
+    // Backend `sometimes` : on ne fait passer que les champs modifies pour
+    // ne pas re-valider tout le payload inutilement.
+    const payload: UpdateProfilePayload = {};
+    if (trimmedFirst !== profile?.first_name) {
+      payload.first_name = trimmedFirst;
+    }
+    if (trimmedLast !== profile?.last_name) {
+      payload.last_name = trimmedLast;
+    }
+    updateMutation.mutate(payload);
   };
 
-  const InputField = ({ label, value, onChangeText, placeholder, keyboardType }: any) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput 
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        placeholderTextColor="#9AA3AC"
-      />
-    </View>
-  );
+  const initials = profile
+    ? `${profile.first_name?.charAt(0).toUpperCase() ?? ''}${profile.last_name?.charAt(0).toUpperCase() ?? ''}`
+    : '...';
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
-      
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft color="#fff" size={24} />
@@ -64,7 +104,7 @@ export default function EditProfileScreen() {
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>AD</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
             <TouchableOpacity style={styles.cameraBtn}>
               <Camera size={16} color="#3DBE45" />
@@ -73,51 +113,76 @@ export default function EditProfileScreen() {
           <Text style={styles.avatarHint}>Touche la photo pour la changer</Text>
         </View>
 
-        <View style={styles.form}>
-          <InputField 
-            label="Prénom" 
-            value={form.firstName} 
-            onChangeText={(t: string) => setForm({...form, firstName: t})}
-            placeholder="Ton prénom"
-          />
-          <InputField 
-            label="Nom" 
-            value={form.lastName} 
-            onChangeText={(t: string) => setForm({...form, lastName: t})}
-            placeholder="Ton nom"
-          />
-          <InputField 
-            label="Email" 
-            value={form.email} 
-            onChangeText={(t: string) => setForm({...form, email: t})}
-            placeholder="ton@email.com"
-            keyboardType="email-address"
-          />
-          <InputField 
-            label="Téléphone" 
-            value={form.phone} 
-            onChangeText={(t: string) => setForm({...form, phone: t})}
-            placeholder="+221 ..."
-            keyboardType="phone-pad"
-          />
+        {isLoadingProfile && profile == null ? (
+          <View style={styles.loader}>
+            <ActivityIndicator color="#3DBE45" />
+          </View>
+        ) : (
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Prénom</Text>
+              <TextInput
+                style={styles.input}
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Ton prénom"
+                placeholderTextColor="#9AA3AC"
+                maxLength={120}
+              />
+            </View>
 
-          <TouchableOpacity 
-            style={[styles.saveBtn, success && styles.saveBtnSuccess]} 
-            onPress={handleSave}
-            disabled={saving || success}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : success ? (
-              <View style={styles.successContent}>
-                <Check color="#fff" size={20} strokeWidth={3} />
-                <Text style={styles.saveBtnText}>Enregistré</Text>
-              </View>
-            ) : (
-              <Text style={styles.saveBtnText}>Enregistrer les modifications</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nom</Text>
+              <TextInput
+                style={styles.input}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Ton nom"
+                placeholderTextColor="#9AA3AC"
+                maxLength={120}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[styles.input, styles.inputReadonly]}
+                value={profile?.email ?? '—'}
+                editable={false}
+              />
+              <Text style={styles.helperText}>Modification de l&apos;email indisponible pour l&apos;instant.</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Téléphone</Text>
+              <TextInput
+                style={[styles.input, styles.inputReadonly]}
+                value={profile?.phone ?? '—'}
+                editable={false}
+              />
+              <Text style={styles.helperText}>
+                Le téléphone est l&apos;identifiant du compte (vérification OTP). Pour le changer, contacte le support.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveBtn, success && styles.saveBtnSuccess]}
+              onPress={handleSave}
+              disabled={updateMutation.isPending || success}
+            >
+              {updateMutation.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : success ? (
+                <View style={styles.successContent}>
+                  <Check color="#fff" size={20} strokeWidth={3} />
+                  <Text style={styles.saveBtnText}>Enregistré</Text>
+                </View>
+              ) : (
+                <Text style={styles.saveBtnText}>Enregistrer les modifications</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -199,6 +264,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9AA3AC',
   },
+  loader: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
   form: {
     paddingHorizontal: 20,
     gap: 20,
@@ -222,6 +291,16 @@ const styles = StyleSheet.create({
     color: '#1A2027',
     borderWidth: 1,
     borderColor: '#E5E9EB',
+  },
+  inputReadonly: {
+    backgroundColor: '#F1F3F5',
+    color: '#5A6470',
+  },
+  helperText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 11,
+    color: '#9AA3AC',
+    paddingLeft: 4,
   },
   saveBtn: {
     backgroundColor: '#3DBE45',

@@ -1,32 +1,78 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { 
-  Settings, 
-  Bell, 
-  ShieldCheck, 
-  HelpCircle, 
-  LogOut, 
-  ChevronRight, 
+import {
+  Settings,
+  Bell,
+  ShieldCheck,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
   Trophy,
   Target,
   Clock,
-  Award
+  Award,
 } from 'lucide-react-native';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useQuery } from '@tanstack/react-query';
 import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getProfile } from '@/services/profileService';
+import type { UserProfile } from '@/types/api';
+
+/**
+ * Concatene les initiales (max 2 chars) en majuscules.
+ * Robuste aux prenoms composes ("Awa Marie" -> "AM").
+ */
+function getInitials(firstName: string | undefined, lastName: string | undefined): string {
+  const first = firstName?.trim().charAt(0).toUpperCase() ?? '';
+  const last = lastName?.trim().charAt(0).toUpperCase() ?? '';
+  return `${first}${last}` || '?';
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
+  const fallbackUser = useAuthStore((s) => s.user);
 
+  const { data: profile, isLoading } = useQuery<UserProfile>({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Bascule vers le profile complet des qu'il est dispo, sinon fallback sur
+  // le user minimal (id/first_name/last_name/phone) deja en SecureStore.
+  const displayName =
+    profile != null
+      ? `${profile.first_name} ${profile.last_name}`
+      : fallbackUser != null
+        ? `${fallbackUser.first_name} ${fallbackUser.last_name}`
+        : '...';
+
+  const initials =
+    profile != null
+      ? getInitials(profile.first_name, profile.last_name)
+      : getInitials(fallbackUser?.first_name, fallbackUser?.last_name);
+
+  // Meta pays + serie : disponible uniquement depuis le profile complet.
+  const userMeta =
+    profile != null
+      ? `${profile.country.name} · Terminale ${profile.series.label}`
+      : isLoading
+        ? 'Chargement...'
+        : '';
+
+  // TODO M-P2.7 / M-P3 : stats utilisateur (quiz faits, score moyen, temps d'etude)
+  //   et badges ne sont pas encore exposes par le backend. Conservation des
+  //   slots UI avec '—' pour ne pas casser le rendu — a brancher quand un
+  //   endpoint /me/stats existera.
   const stats = [
-    { label: 'Quiz faits', value: '42', icon: Target, color: '#3DBE45' },
-    { label: 'Réussite', value: '85%', icon: Trophy, color: '#FFB800' },
-    { label: "Temps d'étude", value: '12h', icon: Clock, color: '#E8A090' },
+    { label: 'Quiz faits', value: '—', icon: Target, color: '#3DBE45' },
+    { label: 'Réussite', value: '—', icon: Trophy, color: '#FFB800' },
+    { label: "Temps d'étude", value: '—', icon: Clock, color: '#E8A090' },
   ];
 
   const badges = [
@@ -46,37 +92,45 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
+
       {/* Header with Background */}
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.headerContent}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>AD</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
             <TouchableOpacity style={styles.editAvatarBtn}>
               <Award size={14} color="#3DBE45" strokeWidth={3} />
             </TouchableOpacity>
           </View>
-          
-          <Text style={styles.userName}>Awa Diallo</Text>
-          <Text style={styles.userMeta}>Sénégal · Terminale S2</Text>
-          
-          <TouchableOpacity style={styles.premiumBadge}>
-            <Text style={styles.premiumText}>MEMBRE PREMIUM</Text>
-          </TouchableOpacity>
+
+          <Text style={styles.userName}>{displayName}</Text>
+          {userMeta.length > 0 && <Text style={styles.userMeta}>{userMeta}</Text>}
+
+          {profile?.is_premium === true && (
+            <TouchableOpacity style={styles.premiumBadge}>
+              <Text style={styles.premiumText}>MEMBRE PREMIUM</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
+        {isLoading && profile == null && (
+          <View style={styles.loaderRow}>
+            <ActivityIndicator color="#3DBE45" />
+          </View>
+        )}
+
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           {stats.map((stat, i) => (
-            <Animated.View 
+            <Animated.View
               key={stat.label}
               entering={FadeInUp.delay(i * 100)}
               style={styles.statCard}
@@ -97,14 +151,14 @@ export default function ProfileScreen() {
             <Text style={styles.seeAllText}>Voir tout</Text>
           </TouchableOpacity>
         </View>
-        
-        <ScrollView 
-          horizontal 
+
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.badgesScroll}
         >
           {badges.map((badge, i) => (
-            <Animated.View 
+            <Animated.View
               key={badge.id}
               entering={FadeInRight.delay(400 + i * 100)}
               style={styles.badgeCard}
@@ -118,7 +172,7 @@ export default function ProfileScreen() {
         {/* Menu Items */}
         <View style={styles.menuContainer}>
           {menuItems.map((item, i) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={item.id}
               style={[styles.menuItem, i === menuItems.length - 1 && { borderBottomWidth: 0 }]}
               onPress={() => router.push(item.route as any)}
@@ -221,6 +275,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     marginTop: -20,
+  },
+  loaderRow: {
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
