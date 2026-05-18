@@ -15,6 +15,7 @@ import {
   Clock,
   Award,
   Download,
+  Crown,
 } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
@@ -85,6 +86,7 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { id: 'edit', label: 'Modifier le profil', icon: Settings, route: '/settings/edit-profile' },
+    { id: 'subscription', label: 'Mon abonnement', icon: Crown, route: '/my-subscription' },
     { id: 'downloads', label: 'Mes téléchargements', icon: Download, route: '/my-downloads' },
     { id: 'notif', label: 'Notifications', icon: Bell, route: '/settings/notifications' },
     { id: 'support', label: 'Support & Aide', icon: HelpCircle, route: '/settings/support' },
@@ -110,9 +112,19 @@ export default function ProfileScreen() {
           <Text style={styles.userName}>{displayName}</Text>
           {userMeta.length > 0 && <Text style={styles.userMeta}>{userMeta}</Text>}
 
-          {profile?.is_premium === true && (
-            <TouchableOpacity style={styles.premiumBadge}>
+          {profile?.is_premium === true ? (
+            <TouchableOpacity
+              style={styles.premiumBadge}
+              onPress={() => router.push('/my-subscription' as never)}
+            >
               <Text style={styles.premiumText}>MEMBRE PREMIUM</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.upgradeBadge}
+              onPress={() => router.push('/subscription-plans' as never)}
+            >
+              <Text style={styles.upgradeText}>DEVENIR PREMIUM</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -271,6 +283,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 10,
     color: '#fff',
+    letterSpacing: 1,
+  },
+  upgradeBadge: {
+    backgroundColor: '#FFB800',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  upgradeText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 10,
+    color: '#1A2027',
     letterSpacing: 1,
   },
   content: {

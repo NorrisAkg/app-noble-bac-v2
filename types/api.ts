@@ -362,3 +362,59 @@ export interface QuotaExceededErrorPayload {
   kb_to_free: number;
   download_ids: number[];
 }
+
+// ─── Abonnements / Plans / Transactions ──────────────────────────────────────
+
+/**
+ * Shape retourne par GET /api/v1/subscriptions/plans
+ * (SubscriptionPlanResource cote backend). duration_days = 7/30/90 selon plan MVP.
+ */
+export interface SubscriptionPlan {
+  id: number;
+  code: string;
+  label: string;
+  duration_days: number;
+  price_fcfa: number;
+  currency: string;
+}
+
+/**
+ * Statuts possibles d'un abonnement (SubscriptionStatus enum cote backend).
+ */
+export type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
+
+/**
+ * Shape retourne par GET /api/v1/subscriptions/active
+ * (peut etre null si aucun abonnement actif).
+ */
+export interface ActiveSubscription {
+  id: number;
+  status: SubscriptionStatus;
+  country_id: number;
+  series_id: number;
+  plan?: SubscriptionPlan;
+  started_at: string | null;
+  expires_at: string | null;
+}
+
+/**
+ * Statuts possibles d'une transaction (TransactionStatus enum backend).
+ */
+export type TransactionStatus = 'pending' | 'confirmed' | 'failed' | 'expired';
+
+/**
+ * Shape retourne par GET /api/v1/subscriptions/transactions
+ * (TransactionResource — liste paginee).
+ */
+export interface PaymentTransaction {
+  id: number;
+  internal_reference: string;
+  cinetpay_transaction_id: string | null;
+  status: TransactionStatus;
+  amount_fcfa: number;
+  currency: string;
+  plan?: SubscriptionPlan;
+  webhook_received_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+}

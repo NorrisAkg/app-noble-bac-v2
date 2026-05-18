@@ -158,7 +158,7 @@ export default function HomeScreen() {
         <View style={styles.quickRow}>
           <QuickAction label="Cours" icon="book" onPress={() => router.push('/(tabs)/courses')} />
           <QuickAction label="Annales" icon="paper" onPress={() => Alert.alert('Annales', 'Bientôt disponible')} />
-          <QuickAction label="Premium" icon="star" accent onPress={() => Alert.alert('Premium', 'Bientôt disponible')} />
+          <QuickAction label="Premium" icon="star" accent onPress={() => router.push('/subscription-plans' as never)} />
         </View>
 
         {/* "Reprendre" : masque tant que le backend n'expose pas l'historique
@@ -260,7 +260,13 @@ export default function HomeScreen() {
               ))}
             </View>
 
-            <TouchableOpacity style={styles.premiumBtn} onPress={() => { setPremiumBook(null); Alert.alert('Premium', 'Bientôt disponible'); }}>
+            <TouchableOpacity
+              style={styles.premiumBtn}
+              onPress={() => {
+                setPremiumBook(null);
+                router.push('/subscription-plans' as never);
+              }}
+            >
               <Text style={styles.premiumBtnText}>Voir les offres Premium</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.laterBtn} onPress={() => setPremiumBook(null)}>

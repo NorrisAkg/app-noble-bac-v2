@@ -93,11 +93,11 @@
 
 | Méthode | Endpoint backend | Service mobile | Écran(s) | Statut |
 |---|---|---|---|---|
-| GET | `/subscriptions/plans` | — | — | 🔴 |
-| GET | `/subscriptions/active` | — | — | 🔴 |
-| GET | `/subscriptions/transactions` | — | — | 🔴 |
+| GET | `/subscriptions/plans` | `subscriptionService.getSubscriptionPlans` | `app/subscription-plans.tsx` | 🟢 (M-P3) |
+| GET | `/subscriptions/active` | `subscriptionService.getActiveSubscription` | `app/my-subscription.tsx`, `app/subscription-plans.tsx` (bannière) | 🟢 (M-P3) |
+| GET | `/subscriptions/transactions` | `subscriptionService.getTransactions` | `app/my-subscription.tsx` (historique) | 🟢 (M-P3) |
 
-**Note** : la modale "Premium bientôt" sur `(tabs)/index.tsx` ouvre juste un `Alert` natif. Aucun écran paywall.
+**Note** : le bouton "Premium" de la barre Home + le badge Premium du Profile mènent désormais vers `/subscription-plans` (paywall réel). Le paiement effectif (CinetPay) sera branché en M-P4.
 
 ---
 
