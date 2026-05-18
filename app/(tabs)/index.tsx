@@ -1,23 +1,35 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Modal, Animated,
+  StyleSheet, Alert, Modal, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Search, Bell, ChevronRight, Play } from 'lucide-react-native';
+import { Search, Bell, ChevronRight } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { QuickAction } from '@/components/home/QuickAction';
 import { BookCover } from '@/components/home/BookCover';
-import { HOME_BOOKS, type HomeBook } from '@/constants/homeBooks';
+import { daysUntilBac, getNextBacDate } from '@/constants/bacDates';
+import { catalogService } from '@/services/catalogService';
+import { getProfile } from '@/services/profileService';
+import type { Book, UserProfile } from '@/types/api';
 
-// ─── Days until BAC ──────────────────────────────────────────────────────────
-function daysUntilBac(): number {
-  const now = new Date();
-  const year = now.getMonth() >= 5 ? now.getFullYear() + 1 : now.getFullYear();
-  const bac = new Date(year, 5, 10); // June 10 (approximation)
-  return Math.max(0, Math.ceil((bac.getTime() - now.getTime()) / 86_400_000));
+// Palette deterministe pour habiller les covers livres (le backend n'expose
+// pas de couleur de couverture). Indexe par subject.id, fallback gris.
+const BOOK_PALETTE = [
+  { color: '#1F3A66', accent: '#F2C744' },
+  { color: '#0F5C42', accent: '#9DEBA2' },
+  { color: '#7A2326', accent: '#FFC2A6' },
+  { color: '#4A2A6B', accent: '#D6B6FF' },
+  { color: '#1F4E5A', accent: '#9DECEC' },
+  { color: '#5C3A1F', accent: '#FFD89A' },
+] as const;
+
+function bookColors(book: Book): { color: string; accent: string } {
+  const subjectId = book.subject?.id ?? 0;
+  return BOOK_PALETTE[subjectId % BOOK_PALETTE.length] ?? { color: '#3A4250', accent: '#D5DAE0' };
 }
 
 // ─── Section header ──────────────────────────────────────────────────────────
@@ -44,19 +56,38 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
-  const days = useMemo(daysUntilBac, []);
+
+  // Profil enrichi pour le countdown localise par pays UEMOA.
+  const { data: profile } = useQuery<UserProfile>({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const countryCode = profile?.country.code ?? null;
+  const days = useMemo(() => daysUntilBac(countryCode), [countryCode]);
+  const bacYear = useMemo(() => getNextBacDate(countryCode).getFullYear(), [countryCode]);
+
+  // Top 6 livres du catalog backend (filtres par scope cote backend via Sanctum user).
+  const booksQuery = useQuery({
+    queryKey: ['home', 'books'],
+    queryFn: () => catalogService.getBooks({ per_page: 6 }),
+    staleTime: 10 * 60 * 1000,
+  });
+  const books: Book[] = booksQuery.data?.data ?? [];
 
   // Premium gate sheet (tapped on locked book)
-  const [premiumBook, setPremiumBook] = useState<HomeBook | null>(null);
+  const [premiumBook, setPremiumBook] = useState<Book | null>(null);
 
   const firstName = user?.first_name ?? 'Étudiant';
   const initials = firstName[0]?.toUpperCase() ?? 'E';
-  const readyPct = 64; // Placeholder — will come from progress API
 
-  const handleBookPress = (book: HomeBook) => {
-    if (book.free) {
-      // TODO: navigate to PDF reader when that module is built
-      Alert.alert('Téléchargement', `"${book.title}" — bientôt disponible.`);
+  const handleBookPress = (book: Book) => {
+    if (book.is_free) {
+      router.push({
+        pathname: '/pdf-viewer',
+        params: { bookId: String(book.id), title: book.title, subject: book.subject?.name ?? '' },
+      });
     } else {
       setPremiumBook(book);
     }
@@ -97,22 +128,22 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Progress card */}
+        {/* Progress card — countdown localise par pays. Le pourcentage de
+            preparation est masque tant qu'aucun endpoint /me/stats n'existe
+            cote backend (a livrer en post-MVP, cf PLAN M-P2.7 TBD). */}
         <View style={styles.progressCard}>
-          {/* Days counter */}
           <View style={styles.daysBox}>
             <Text style={styles.daysNum}>{days}</Text>
             <Text style={styles.daysLabel}>jours</Text>
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.progressTitle}>
-              BAC {new Date().getFullYear() + 1}
+            <Text style={styles.progressTitle}>BAC {bacYear}</Text>
+            <Text style={styles.progressPct}>
+              {profile != null
+                ? `${profile.country.name} · ${profile.series.label}`
+                : 'Chargement de ton scope…'}
             </Text>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${readyPct}%` as any }]} />
-            </View>
-            <Text style={styles.progressPct}>Prêt à {readyPct} %</Text>
           </View>
         </View>
       </View>
@@ -130,41 +161,49 @@ export default function HomeScreen() {
           <QuickAction label="Premium" icon="star" accent onPress={() => Alert.alert('Premium', 'Bientôt disponible')} />
         </View>
 
-        {/* "Reprendre" section */}
-        <SectionHeader title="Reprendre" action="Tout voir" onAction={() => Alert.alert('Bibliothèque', 'Bientôt disponible')} />
-        <TouchableOpacity style={styles.resumeCard} activeOpacity={0.85} onPress={() => Alert.alert('Cours', 'Bientôt disponible')}>
-          <View style={styles.resumeIcon}>
-            <Text style={{ fontSize: 22 }}>🇫🇷</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.resumeTitle}>Français · Dissertation littéraire</Text>
-            <Text style={styles.resumeSubtitle}>Page 4 / 12</Text>
-            <View style={styles.resumeTrack}>
-              <View style={[styles.resumeFill, { width: '34%' }]} />
-            </View>
-          </View>
-          <View style={styles.resumePlayBtn}>
-            <ChevronRight size={14} color="#3DBE45" strokeWidth={2.4} />
-          </View>
-        </TouchableOpacity>
+        {/* "Reprendre" : masque tant que le backend n'expose pas l'historique
+            de lecture du user (cf PLAN M-P2.7 TBD, post-MVP). */}
 
-        {/* Books carousel */}
+        {/* Books carousel — donnees reelles depuis GET /courses/books */}
         <SectionHeader
           title="Bibliothèque"
           subtitle="Ouvrages recommandés"
           action="Voir tout"
           onAction={() => router.push('/books')}
         />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 14, paddingRight: 4 }}
-          style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
-        >
-          {HOME_BOOKS.map((b) => (
-            <BookCover key={b.id} book={b} onPress={() => handleBookPress(b)} />
-          ))}
-        </ScrollView>
+        {booksQuery.isLoading && books.length === 0 ? (
+          <View style={styles.bookCarouselLoader}>
+            <ActivityIndicator color="#3DBE45" />
+          </View>
+        ) : books.length === 0 ? (
+          <View style={styles.bookCarouselLoader}>
+            <Text style={styles.emptyText}>Aucun livre disponible pour le moment.</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 14, paddingRight: 4 }}
+            style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
+          >
+            {books.map((b) => {
+              const palette = bookColors(b);
+              return (
+                <BookCover
+                  key={b.id}
+                  book={{
+                    title: b.title,
+                    subject: b.subject?.name ?? 'Général',
+                    color: palette.color,
+                    accent: palette.accent,
+                    free: b.is_free,
+                  }}
+                  onPress={() => handleBookPress(b)}
+                />
+              );
+            })}
+          </ScrollView>
+        )}
       </ScrollView>
 
       {/* ── PREMIUM GATE BOTTOM SHEET ────────────────────────── */}
@@ -191,7 +230,16 @@ export default function HomeScreen() {
             {/* Book cover preview */}
             {premiumBook && (
               <View style={{ marginTop: 18 }}>
-                <BookCover book={premiumBook} onPress={() => {}} />
+                <BookCover
+                  book={{
+                    title: premiumBook.title,
+                    subject: premiumBook.subject?.name ?? 'Général',
+                    color: bookColors(premiumBook).color,
+                    accent: bookColors(premiumBook).accent,
+                    free: premiumBook.is_free,
+                  }}
+                  onPress={() => {}}
+                />
               </View>
             )}
 
@@ -360,6 +408,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.85)',
     marginTop: 4,
+  },
+  bookCarouselLoader: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 12,
+    color: '#9AA3AC',
+    textAlign: 'center',
   },
   // Body
   quickRow: {
