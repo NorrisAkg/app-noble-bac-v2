@@ -21,7 +21,7 @@
 | POST | `/auth/login` | `authService.login` | `(auth)/login.tsx` | 🟢 (corrigé en M-P0) |
 | POST | `/auth/password/request-reset` | — | — | 🔴 |
 | POST | `/auth/password/reset` | — | — | 🔴 |
-| POST | `/auth/refresh` | `authService.refreshToken` | aucun (à brancher dans interceptor 401) | 🟡 |
+| POST | `/auth/refresh` | `apiClient` interceptor (via `performRefresh`) | auto sur 401, single-flight queue | 🟢 (depuis M-P1.4) |
 | POST | `/auth/logout` | `authService.logout` | via `useAuthStore.logout()` | 🟢 |
 
 ---
@@ -135,7 +135,7 @@
 
 | Domaine | Endpoints backend | Intégrés | Dormants | Absents |
 |---|---|---|---|---|
-| Auth | 7 | 3 | 2 | 2 |
+| Auth | 7 | 4 | 1 | 2 |
 | Référentiel public | 3 | 1 + 1 indirect | 0 | 1 |
 | Profile | 2 | 0 | 0 | 2 |
 | Catalog | 5 | 0 | 1 | 4 |
@@ -144,7 +144,7 @@
 | Payments | 2 (+ webhook) | 0 | 0 | 2 |
 | Offline / Me downloads | 5 | 0 | 0 | 5 |
 | Quiz | 5 | 3 | 2 | 0 |
-| **Total** | **45** | **18 (40%)** | **5 (11%)** | **22 (49%)** + 1 webhook |
+| **Total** | **45** | **19 (42%)** | **4 (9%)** | **22 (49%)** + 1 webhook |
 
 ---
 

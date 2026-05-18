@@ -52,11 +52,11 @@ Voir [MAPPING_API.md](MAPPING_API.md) pour le détail endpoint par endpoint.
 - ✅ Register (`/auth/register`) — branché, OK
 - ✅ Logout (`/auth/logout`) — branché, OK
 - ✅ Countries / Series picker (`/countries`, `/countries/{id}/series`) — branchés en signup
-- ✅ Login (`/auth/login`) — branché (depuis P0)
+- ✅ Login (`/auth/login`) — branché (depuis M-P0)
+- ✅ **Auto-refresh sur 401** (`/auth/refresh`) — interceptor avec single-flight queue, fallback `clearLocal` (depuis M-P1.4, 2026-05-18)
 - ❌ OTP (`/auth/verify-otp`) — UI seule, pas de Firebase, pas d'appel API
 - ❌ Forgot password — route `/(auth)/forgot` référencée dans `login.tsx:83` mais **inexistante**
 - ❌ Reset password (`/auth/password/request-reset` + `/auth/password/reset`) — 0%
-- ❌ Auto-refresh sur 401 (`/auth/refresh`) — service écrit mais jamais déclenché par l'interceptor
 - ❌ Sortie du bypass `EXPO_PUBLIC_BYPASS_AUTH`
 
 #### Sous-tâches restantes
@@ -66,7 +66,7 @@ Voir [MAPPING_API.md](MAPPING_API.md) pour le détail endpoint par endpoint.
 | M-P1.1 | Brancher Firebase Phone Auth côté mobile (`@react-native-firebase/auth` ou Firebase JS Web SDK Expo-compatible) | ~1j |
 | M-P1.2 | `verify.tsx` : envoyer Firebase ID Token vers `POST /auth/verify-otp`, puis `setAuth()` avec le token retourné | ~3h |
 | M-P1.3 | Créer `app/(auth)/forgot.tsx` (saisie téléphone → `request-reset`) + `app/(auth)/reset.tsx` (OTP + nouveau mot de passe → `reset`) | ~4h |
-| M-P1.4 | Étendre `apiClient` interceptor : sur 401, tenter `/auth/refresh` avec `refresh_token` du SecureStore, retry une fois, sinon logout propre | ~3h |
+| ~~M-P1.4~~ ✅ | ~~Étendre `apiClient` interceptor : sur 401, tenter `/auth/refresh` avec `refresh_token` du SecureStore, retry une fois, sinon logout propre~~ — **livré 2026-05-18** (branche `feature/mobile-auth-refresh-401`, 7 tests Jest) | ~3h |
 | M-P1.5 | Retirer `EXPO_PUBLIC_BYPASS_AUTH` du `.env.local` (ou le forcer à `false` par défaut + documenter) | ~30min |
 | M-P1.6 | Tests Jest : services auth (login parse, refresh, error 401) | ~2h |
 

@@ -18,6 +18,8 @@ interface AuthState {
   setAuth: (user: User, accessToken: string, refreshToken: string) => Promise<void>;
   /** Revokes the token on the server then clears local storage */
   logout: () => Promise<void>;
+  /** Local-only cleanup. Called by apiClient when refresh fails (no server roundtrip). */
+  clearLocal: () => Promise<void>;
   /** Rehydrates auth state from SecureStore on app boot */
   initialize: () => Promise<void>;
 }
@@ -42,6 +44,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // silent
     }
+    await get().clearLocal();
+  },
+
+  clearLocal: async () => {
     await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);

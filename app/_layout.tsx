@@ -6,6 +6,7 @@ import '@/global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { QueryProvider } from '@/providers/QueryProvider';
+import { registerAuthCleanup } from '@/services/apiClient';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
@@ -46,6 +47,8 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    // Let apiClient drop the auth state locally when /auth/refresh fails on 401.
+    registerAuthCleanup(() => useAuthStore.getState().clearLocal());
     initialize();
   }, []);
 
