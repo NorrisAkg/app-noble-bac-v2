@@ -65,12 +65,14 @@
 |---|---|---|---|---|
 | GET | `/courses/subjects` | `courseService.getSubjects` | `(tabs)/courses.tsx`, `(tabs)/quiz.tsx`, `books.tsx` | 🟢 |
 | GET | `/courses/subjects/{subject}` | — | — | 🔴 |
-| GET | `/courses/subjects/{subject}/chapters` | `courseService.getChapters` | — (l'écran courses utilise `COURSE_SECTIONS` mock) | 🟡 |
+| GET | `/courses/subjects/{subject}/chapters` | `courseService.getChapters` | `(tabs)/courses.tsx` | 🟢 (depuis M-P2 Courses) |
 | GET | `/courses/chapters/{chapter}` | — | — | 🔴 |
-| GET | `/courses/chapters/{chapter}/lessons` | `courseService.getLessons` | — | 🟡 |
-| GET | `/courses/lessons/{lesson}` | `courseService.getLesson` | — (`course-reader.tsx` utilise `MOCK_LESSON`) | 🟡 |
-| GET | `/courses/revision-sheets/{revisionSheet}` | — | — | 🔴 |
-| GET | `/courses/chapter-videos/{chapterVideo}` | — | — | 🔴 |
+| GET | `/courses/chapters/{chapter}/lessons` | `courseService.getLessons` | `(tabs)/courses.tsx` | 🟢 (depuis M-P2 Courses) |
+| GET | `/courses/chapters/{chapter}/revision-sheets` 🆕 | `courseService.getRevisionSheetsByChapter` | `(tabs)/courses.tsx` | 🟢 (livré conjointement backend + mobile en M-P2 Courses) |
+| GET | `/courses/chapters/{chapter}/chapter-videos` 🆕 | `courseService.getChapterVideosByChapter` | `(tabs)/courses.tsx` | 🟢 (livré conjointement backend + mobile en M-P2 Courses) |
+| GET | `/courses/lessons/{lesson}` | `courseService.getLesson` | `course-reader.tsx` | 🟢 (depuis M-P2 Courses) |
+| GET | `/courses/revision-sheets/{revisionSheet}` | `courseService.getRevisionSheet` | `pdf-viewer.tsx` (param `revisionSheetId`) | 🟢 (depuis M-P2 Courses) |
+| GET | `/courses/chapter-videos/{chapterVideo}` | `courseService.getChapterVideo` | `chapter-video.tsx` | 🟢 (depuis M-P2 Courses) |
 | GET | `/courses/books` | `catalogService.getBooks` | `books.tsx` | 🟢 |
 | GET | `/courses/books/{book}` | — | — | 🔴 |
 | GET | `/courses/books/{book}/download` | `catalogService.downloadBook` | `pdf-viewer.tsx` | 🟢 (corrigé en M-P0) |
@@ -137,12 +139,12 @@
 | Référentiel public | 3 | 1 + 1 indirect | 0 | 1 |
 | Profile | 2 | 0 | 0 | 2 |
 | Catalog | 5 | 0 | 1 | 4 |
-| Courses | 11 | 3 | 4 | 4 |
+| Courses | 13 🆕 | 10 | 0 | 3 |
 | Subscriptions | 3 | 0 | 0 | 3 |
 | Payments | 2 (+ webhook) | 0 | 0 | 2 |
 | Offline / Me downloads | 5 | 0 | 0 | 5 |
 | Quiz | 5 | 3 | 2 | 0 |
-| **Total** | **43** | **10 (23%)** | **9 (21%)** | **23 (53%)** + 1 webhook |
+| **Total** | **45** | **18 (40%)** | **5 (11%)** | **22 (49%)** + 1 webhook |
 
 ---
 

@@ -7,15 +7,17 @@ import { WebView } from 'react-native-webview';
 import { ChevronLeft } from 'lucide-react-native';
 
 import { catalogService } from '@/services/catalogService';
+import { courseService } from '@/services/courseService';
 
 export default function PdfViewerScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { url: initialUrl, title, subject, bookId } = useLocalSearchParams<{ 
-    url?: string; 
-    title?: string; 
+  const { url: initialUrl, title, subject, bookId, revisionSheetId } = useLocalSearchParams<{
+    url?: string;
+    title?: string;
     subject?: string;
     bookId?: string;
+    revisionSheetId?: string;
   }>();
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(initialUrl || null);
@@ -23,27 +25,52 @@ export default function PdfViewerScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (bookId && !initialUrl) {
-      loadSignedUrl();
-    } else if (initialUrl) {
+    if (initialUrl) {
       setLoading(false);
+      return;
     }
-  }, [bookId, initialUrl]);
+    if (bookId) {
+      loadFromBook(Number(bookId));
+      return;
+    }
+    if (revisionSheetId) {
+      loadFromRevisionSheet(Number(revisionSheetId));
+      return;
+    }
+    setLoading(false);
+  }, [bookId, revisionSheetId, initialUrl]);
 
-  const loadSignedUrl = async () => {
+  const loadFromBook = async (id: number) => {
     try {
       setLoading(true);
-      const { url } = await catalogService.downloadBook(Number(bookId));
+      const { url } = await catalogService.downloadBook(id);
       setPdfUrl(url);
     } catch (err: any) {
-      console.error("Failed to load PDF URL:", err);
-      setError(err.response?.status === 403
-        ? "Cet ouvrage est réservé aux abonnés Premium."
-        : "Impossible de charger le document."
-      );
+      handleLoadError(err, 'Cet ouvrage est réservé aux abonnés Premium.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadFromRevisionSheet = async (id: number) => {
+    try {
+      setLoading(true);
+      const sheet = await courseService.getRevisionSheet(id);
+      if (!sheet.signed_url) {
+        setError("Cette fiche n'est pas encore prête au téléchargement.");
+        return;
+      }
+      setPdfUrl(sheet.signed_url);
+    } catch (err: any) {
+      handleLoadError(err, 'Cette fiche est réservée aux abonnés Premium.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadError = (err: any, premiumMessage: string) => {
+    console.error('Failed to load PDF URL:', err);
+    setError(err?.response?.status === 403 ? premiumMessage : 'Impossible de charger le document.');
   };
 
   if (error) {

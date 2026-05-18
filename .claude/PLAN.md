@@ -77,16 +77,33 @@ Voir [MAPPING_API.md](MAPPING_API.md) pour le détail endpoint par endpoint.
 
 ---
 
-### Phase M-P2 — Câblage des écrans existants 🟡 PARTIELLE
+### Phase M-P2 — Câblage des écrans existants 🟡 EN COURS
 
 **Objectif** : Remplacer les mocks par les vrais appels API. Beaucoup de services sont déjà écrits mais dormants — gains visuels rapides sans nouveau code service.
+
+#### Sous-lot livré : Courses (M-P2.3 + M-P2.4 + M-P2.5 + M-P2.6) ✅ 2026-05-18
+
+**Plan B retenu** (cf §11.) : extension backend + intégration mobile en un seul lot.
+
+- **Backend** : commit `32f30b7` (branche `feature/courses-listings-revsheets-videos`)
+  - 2 nouveaux endpoints : `GET /courses/chapters/{id}/revision-sheets`, `GET /courses/chapters/{id}/chapter-videos`
+  - 2 nouvelles Resources LIST + extension repos (`listByChapter` sur RevisionSheet & ChapterVideo)
+  - 8 tests Pest (publication filter, scoping, 401). Suite globale : 357 → 365 tests
+- **Mobile** : branche `feature/mobile-courses-real-data`
+  - `courseService` étendu (7 méthodes au lieu de 4 ; fix `getChapters(subjectId: number)` au lieu de slug)
+  - `(tabs)/courses.tsx` refondu : 3 onglets (Cours/Fiches/Vidéos) avec accordéon par chapitre, contenu chargé à l'expansion via React Query
+  - `course-reader.tsx` : `lessonId` param + `lesson.content` réel (états loading/forbidden/error)
+  - `pdf-viewer.tsx` étendu : nouveau param `revisionSheetId` (en plus de `bookId`/`url`)
+  - `chapter-video.tsx` : nouvelle route, YouTube embed via WebView
+  - 7 nouveaux tests Jest (suite 4 → 11)
+  - Types `RevisionSheet`, `RevisionSheetListItem`, `ChapterVideo`, `ChapterVideoListItem` dans `types/api.ts`
 
 #### État actuel
 
 - ✅ Books (liste + filtre matière + download) — branché
 - ✅ Quiz subjects (`/courses/subjects`) — branché
-- ✅ Quiz session complète — branchée depuis P0
-- 🟡 Courses (subjects branchés, **sections et chapitres en mock** `COURSE_SECTIONS`)
+- ✅ Quiz session complète — branchée depuis M-P0
+- ✅ **Courses (M-P2.3-6)** — chapitres + leçons + fiches + vidéos branchés (depuis sous-lot Courses)
 - ❌ Home — 100% mock (countdown BAC, resume card, carrousel HOME_BOOKS, progression 64% hardcodée)
 - ❌ Library (sujets BAC) — 100% mock (PDF W3.org de test, années 2015-2024 hardcodées)
 - ❌ Profile — Awa Diallo / Sénégal / S2 / 42 quiz / 85% **tous en dur**

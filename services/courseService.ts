@@ -1,5 +1,14 @@
 import apiClient from "./apiClient";
-import type { ApiResponse, Subject, Chapter, Lesson } from "@/types/api";
+import type {
+  ApiResponse,
+  Subject,
+  Chapter,
+  Lesson,
+  RevisionSheet,
+  RevisionSheetListItem,
+  ChapterVideo,
+  ChapterVideoListItem,
+} from "@/types/api";
 
 export const courseService = {
   /**
@@ -11,10 +20,13 @@ export const courseService = {
   },
 
   /**
-   * GET /api/v1/courses/subjects/{subjectSlug}/chapters
+   * GET /api/v1/courses/subjects/{subjectId}/chapters
+   * Le backend bind Subject par sa clé primaire (ID, pas slug).
    */
-  getChapters: async (subjectSlug: string): Promise<Chapter[]> => {
-    const response = await apiClient.get<ApiResponse<Chapter[]>>(`/courses/subjects/${subjectSlug}/chapters`);
+  getChapters: async (subjectId: number): Promise<Chapter[]> => {
+    const response = await apiClient.get<ApiResponse<Chapter[]>>(
+      `/courses/subjects/${subjectId}/chapters`,
+    );
     return response.data.data;
   },
 
@@ -22,7 +34,9 @@ export const courseService = {
    * GET /api/v1/courses/chapters/{chapterId}/lessons
    */
   getLessons: async (chapterId: number): Promise<Lesson[]> => {
-    const response = await apiClient.get<ApiResponse<Lesson[]>>(`/courses/chapters/${chapterId}/lessons`);
+    const response = await apiClient.get<ApiResponse<Lesson[]>>(
+      `/courses/chapters/${chapterId}/lessons`,
+    );
     return response.data.data;
   },
 
@@ -31,6 +45,47 @@ export const courseService = {
    */
   getLesson: async (lessonId: number): Promise<Lesson> => {
     const response = await apiClient.get<ApiResponse<Lesson>>(`/courses/lessons/${lessonId}`);
+    return response.data.data;
+  },
+
+  /**
+   * GET /api/v1/courses/chapters/{chapterId}/revision-sheets
+   */
+  getRevisionSheetsByChapter: async (chapterId: number): Promise<RevisionSheetListItem[]> => {
+    const response = await apiClient.get<ApiResponse<RevisionSheetListItem[]>>(
+      `/courses/chapters/${chapterId}/revision-sheets`,
+    );
+    return response.data.data;
+  },
+
+  /**
+   * GET /api/v1/courses/revision-sheets/{revisionSheetId}
+   * Retourne le détail avec une URL signée R2 (TTL 15min côté backend).
+   */
+  getRevisionSheet: async (revisionSheetId: number): Promise<RevisionSheet> => {
+    const response = await apiClient.get<ApiResponse<RevisionSheet>>(
+      `/courses/revision-sheets/${revisionSheetId}`,
+    );
+    return response.data.data;
+  },
+
+  /**
+   * GET /api/v1/courses/chapters/{chapterId}/chapter-videos
+   */
+  getChapterVideosByChapter: async (chapterId: number): Promise<ChapterVideoListItem[]> => {
+    const response = await apiClient.get<ApiResponse<ChapterVideoListItem[]>>(
+      `/courses/chapters/${chapterId}/chapter-videos`,
+    );
+    return response.data.data;
+  },
+
+  /**
+   * GET /api/v1/courses/chapter-videos/{chapterVideoId}
+   */
+  getChapterVideo: async (chapterVideoId: number): Promise<ChapterVideo> => {
+    const response = await apiClient.get<ApiResponse<ChapterVideo>>(
+      `/courses/chapter-videos/${chapterVideoId}`,
+    );
     return response.data.data;
   },
 };

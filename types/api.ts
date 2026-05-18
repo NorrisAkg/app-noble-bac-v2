@@ -75,6 +75,46 @@ export interface Book {
   } | null;
 }
 
+/** Listing renvoyé par GET /courses/chapters/{id}/revision-sheets */
+export interface RevisionSheetListItem {
+  id: number;
+  title: string;
+  description: string | null;
+  file_size_kb: number | null;
+  is_free: boolean;
+  status: 'published' | 'draft';
+}
+
+/** Détail renvoyé par GET /courses/revision-sheets/{id} */
+export interface RevisionSheet extends RevisionSheetListItem {
+  chapter: {
+    id: number;
+    title: string | null;
+  };
+  signed_url: string | null;
+  signed_url_expires_at: string | null;
+}
+
+/** Listing renvoyé par GET /courses/chapters/{id}/chapter-videos */
+export interface ChapterVideoListItem {
+  id: number;
+  title: string;
+  description: string | null;
+  youtube_video_id: string;
+  duration_sec: number | null;
+  thumbnail_url: string | null;
+  is_free: boolean;
+  status: 'published' | 'draft';
+}
+
+/** Détail renvoyé par GET /courses/chapter-videos/{id} */
+export interface ChapterVideo extends ChapterVideoListItem {
+  chapter: {
+    id: number;
+    title: string | null;
+  };
+}
+
 // ─── API Envelope ─────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {

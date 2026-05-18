@@ -1,73 +1,53 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronLeft, Share2, Bookmark } from 'lucide-react-native';
+import { ChevronLeft, Share2, Bookmark, Lock } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
 
 import { TexRenderer } from '@/components/courses/TexRenderer';
-
-// Mock data for testing
-const MOCK_LESSON = `
-  <h1>Dérivation et Étude de fonctions</h1>
-  <p>Cette leçon présente les notions essentielles sur la dérivation des fonctions numériques d'une variable réelle.</p>
-  
-  <div class="callout">
-    <div class="callout-title">Définition</div>
-    Soit $f$ une fonction numérique définie sur un intervalle $I$ et $x_0 \in I$. On dit que $f$ est dérivable en $x_0$ si la limite suivante existe et est finie :
-    $$ \lim_{h \to 0} \frac{f(x_0+h) - f(x_0)}{h} = f'(x_0) $$
-  </div>
-
-  <h2>1. Formules de dérivation</h2>
-  <p>Voici les dérivées usuelles à connaître par cœur :</p>
-  <ul>
-    <li>$(x^n)' = n x^{n-1}$</li>
-    <li>$(\sin x)' = \cos x$</li>
-    <li>$(\cos x)' = -\sin x$</li>
-    <li>$(\ln x)' = \frac{1}{x}$</li>
-    <li>$(e^x)' = e^x$</li>
-  </ul>
-
-  <h2>2. Propriétés</h2>
-  <p>Soient $u$ et $v$ deux fonctions dérivables sur $I$. Alors :</p>
-  <p>
-    $ (u+v)' = u' + v' $ <br/>
-    $ (uv)' = u'v + uv' $ <br/>
-    $ (\frac{u}{v})' = \frac{u'v - uv'}{v^2} $ (si $v(x) \neq 0$)
-  </p>
-
-  <div class="callout">
-    <div class="callout-title">Remarque</div>
-    La dérivée d'une fonction composée $(f \circ g)$ est donnée par :
-    $$ (f(g(x)))' = f'(g(x)) \times g'(x) $$
-  </div>
-`;
+import { courseService } from '@/services/courseService';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 export default function CourseReaderScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { title = 'Leçon', subject = 'Cours' } = useLocalSearchParams();
+  const { lessonId, subject = 'Cours' } = useLocalSearchParams<{
+    lessonId: string;
+    subject?: string;
+  }>();
+
+  const { data: lesson, isLoading, error } = useQuery({
+    queryKey: ['courses', 'lesson', lessonId],
+    queryFn: () => courseService.getLesson(Number(lessonId)),
+    enabled: !!lessonId,
+  });
+
+  const status: 'loading' | 'error' | 'forbidden' | 'ready' = !lessonId
+    ? 'error'
+    : isLoading
+    ? 'loading'
+    : error
+    ? ((error as any)?.response?.status === 403 ? 'forbidden' : 'error')
+    : 'ready';
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Top Bar spacer */}
+
       <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={styles.backBtn}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <ChevronLeft color="#fff" size={24} />
         </TouchableOpacity>
-        
+
         <View style={styles.headerTitleContainer}>
           <Text style={styles.subjectText}>{subject}</Text>
-          <Text style={styles.titleText} numberOfLines={1}>{title}</Text>
+          <Text style={styles.titleText} numberOfLines={1}>
+            {lesson?.title ?? 'Leçon'}
+          </Text>
         </View>
 
         <View style={styles.headerActions}>
@@ -81,11 +61,44 @@ export default function CourseReaderScreen() {
       </View>
 
       <View style={styles.content}>
-        <TexRenderer content={MOCK_LESSON} />
+        {status === 'loading' && (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#3DBE45" />
+            <Text style={styles.helperText}>Chargement de la leçon…</Text>
+          </View>
+        )}
+
+        {status === 'forbidden' && (
+          <View style={styles.centered}>
+            <Lock size={36} color="#9AA3AC" />
+            <Text style={styles.errorTitle}>Contenu Premium</Text>
+            <Text style={styles.errorText}>
+              Cette leçon est réservée aux abonnés Premium. Active ton abonnement pour y accéder.
+            </Text>
+          </View>
+        )}
+
+        {status === 'error' && (
+          <View style={styles.centered}>
+            <Text style={styles.errorTitle}>Impossible de charger la leçon</Text>
+            <Text style={styles.errorText}>{getApiErrorMessage(error)}</Text>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backToListBtn}>
+              <Text style={styles.backToListText}>Retour</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {status === 'ready' && lesson?.content && <TexRenderer content={lesson.content} />}
+
+        {status === 'ready' && !lesson?.content && (
+          <View style={styles.centered}>
+            <Text style={styles.errorTitle}>Leçon sans contenu</Text>
+            <Text style={styles.errorText}>Le contenu de cette leçon n'est pas encore disponible.</Text>
+          </View>
+        )}
       </View>
 
-      {/* Bottom Floating Action (Optional) */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.quizFab, { bottom: insets.bottom + 20 }]}
         activeOpacity={0.9}
         onPress={() => router.push('/(tabs)/quiz')}
@@ -142,6 +155,44 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  helperText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: '#5A6470',
+  },
+  errorTitle: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 16,
+    color: '#1A2027',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  errorText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: '#5A6470',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  backToListBtn: {
+    marginTop: 12,
+    backgroundColor: '#3DBE45',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  backToListText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 14,
+    color: '#fff',
   },
   quizFab: {
     position: 'absolute',
