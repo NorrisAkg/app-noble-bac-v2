@@ -1,102 +1,212 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  Linking,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronDown, Download, Eye, Play } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { COURSE_SUBJECTS } from '@/constants/coursesData';
 import { CustomBottomSheet } from '@/components/ui/BottomSheet';
+import { courseService } from '@/services/courseService';
+import { catalogService } from '@/services/catalogService';
+import { getProfile } from '@/services/profileService';
+import { getApiErrorMessage } from '@/utils/apiError';
+import type { ExamListItem, ExamVideoItem, Subject, UserProfile } from '@/types/api';
 
-const YEARS = [2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015];
 const TABS = [
   { id: 'epreuve', label: 'Épreuve' },
   { id: 'corrige', label: 'Corrigé' },
   { id: 'video', label: 'Vidéo' },
-];
+] as const;
+
+type TabKind = (typeof TABS)[number]['id'];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [year, setYear] = useState(2024);
-  const [tab, setTab] = useState('epreuve');
-  const [subject, setSubject] = useState(COURSE_SUBJECTS[0]);
+  const [tab, setTab] = useState<TabKind>('epreuve');
+  const [subjectId, setSubjectId] = useState<number | null>(null);
+  const [year, setYear] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Mock profile data
-  const profile = { country: { name: 'Sénégal' }, series: 'L1' };
+  const { data: profile } = useQuery<UserProfile>({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const handleOpenPdf = (title: string) => {
-    router.push({
-      pathname: '/pdf-viewer',
-      params: { 
-        url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 
-        title,
-        subject: subject.label
-      }
-    });
+  const { data: subjects = [] } = useQuery<Subject[]>({
+    queryKey: ['subjects'],
+    queryFn: courseService.getSubjects,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  // Selection initiale : 1er sujet des qu'ils arrivent.
+  useEffect(() => {
+    if (subjects.length > 0 && subjectId == null) {
+      setSubjectId(subjects[0].id);
+    }
+  }, [subjects, subjectId]);
+
+  const currentSubject = useMemo(
+    () => subjects.find((s) => s.id === subjectId) ?? null,
+    [subjects, subjectId],
+  );
+
+  // Liste des exams filtres par sujet + scope (country/series du profile).
+  const examsQuery = useQuery({
+    queryKey: [
+      'catalog',
+      'exams',
+      { subjectId, countryId: profile?.country.id, seriesId: profile?.series.id },
+    ],
+    queryFn: () =>
+      catalogService.getExams({
+        subject_id: subjectId ?? undefined,
+        country_id: profile?.country.id,
+        series_id: profile?.series.id,
+        per_page: 100,
+      }),
+    enabled: subjectId != null,
+  });
+
+  const exams: ExamListItem[] = examsQuery.data?.data ?? [];
+
+  // Annees dispo : extraites des exams retournes, tri desc.
+  const availableYears = useMemo(
+    () => Array.from(new Set(exams.map((e) => e.year))).sort((a, b) => b - a),
+    [exams],
+  );
+
+  // Auto-selection de la derniere annee dispo quand la liste change.
+  useEffect(() => {
+    if (availableYears.length > 0 && (year == null || !availableYears.includes(year))) {
+      setYear(availableYears[0]);
+    }
+  }, [availableYears, year]);
+
+  const examForYear = useMemo<ExamListItem | undefined>(
+    () => exams.find((e) => e.year === year),
+    [exams, year],
+  );
+
+  // ─── Actions PDF / videos ─────────────────────────────────────────────────
+
+  const openPdfMutation = useMutation({
+    mutationFn: async ({ examId, kind }: { examId: number; kind: 'epreuve' | 'corrige' }) => {
+      return kind === 'corrige'
+        ? catalogService.getCorrigeSignedUrl(examId)
+        : catalogService.getExamSignedUrl(examId);
+    },
+    onSuccess: (signed, { kind }) => {
+      router.push({
+        pathname: '/pdf-viewer',
+        params: {
+          url: signed.url,
+          title: kind === 'corrige' ? `Corrigé ${year}` : `Épreuve ${year}`,
+          subject: currentSubject?.name ?? '',
+        },
+      });
+    },
+    onError: (err) => {
+      Alert.alert('Impossible d’ouvrir le document', getApiErrorMessage(err));
+    },
+  });
+
+  const videosQuery = useQuery({
+    queryKey: ['catalog', 'videos', examForYear?.id],
+    queryFn: () =>
+      examForYear ? catalogService.getExamVideos(examForYear.id) : Promise.resolve([]),
+    enabled: examForYear != null && tab === 'video',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const openYoutubeVideo = async (video: ExamVideoItem) => {
+    const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Vidéo indisponible', 'Impossible d’ouvrir YouTube.');
+    }
   };
+
+  // ─── Rendu ────────────────────────────────────────────────────────────────
+
+  const profileMeta = profile != null ? `${profile.country.name} · Bac ${profile.series.label}` : '';
+
+  const isLoadingExams = examsQuery.isLoading;
+  const noExamsForSubject = !isLoadingExams && exams.length === 0;
+  const noExamForYear = !isLoadingExams && exams.length > 0 && examForYear == null;
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Status bar spacer */}
       <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
 
-      {/* App bar */}
       <View style={styles.appBar}>
         <Text style={styles.appBarTitle}>Sujets BAC</Text>
       </View>
 
       <View style={{ flex: 1 }}>
         <View style={styles.headerSection}>
-          <View style={styles.profileRow}>
-            <Text style={styles.profileText}>
-              {profile.country.name} · Bac {profile.series}
-            </Text>
-          </View>
+          {profileMeta.length > 0 && (
+            <View style={styles.profileRow}>
+              <Text style={styles.profileText}>{profileMeta}</Text>
+            </View>
+          )}
 
           {/* Subject selector button */}
-          <TouchableOpacity 
-            style={styles.subjectSelector} 
+          <TouchableOpacity
+            style={styles.subjectSelector}
             activeOpacity={0.8}
             onPress={() => setPickerOpen(true)}
+            disabled={subjects.length === 0}
           >
             <View style={styles.subjectIconWrap}>
-              <Text style={styles.subjectIconText}>{subject.label[0]}</Text>
+              <Text style={styles.subjectIconText}>
+                {currentSubject?.name.charAt(0).toUpperCase() ?? '?'}
+              </Text>
             </View>
             <View style={styles.subjectSelectorContent}>
               <Text style={styles.subjectLabel}>Matière</Text>
-              <Text style={styles.subjectValue}>{subject.label}</Text>
+              <Text style={styles.subjectValue}>{currentSubject?.name ?? 'Chargement...'}</Text>
             </View>
             <ChevronDown size={20} color="#5A6470" />
           </TouchableOpacity>
 
           {/* Years Scroller */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.yearsScroll}
-            style={styles.yearsContainer}
-          >
-            {YEARS.map((y) => {
-              const active = y === year;
-              return (
-                <TouchableOpacity
-                  key={y}
-                  style={[styles.yearBtn, active && styles.yearBtnActive]}
-                  onPress={() => setYear(y)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.yearText, active && styles.yearTextActive]}>
-                    {y}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {availableYears.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.yearsScroll}
+              style={styles.yearsContainer}
+            >
+              {availableYears.map((y) => {
+                const active = y === year;
+                return (
+                  <TouchableOpacity
+                    key={y}
+                    style={[styles.yearBtn, active && styles.yearBtnActive]}
+                    onPress={() => setYear(y)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.yearText, active && styles.yearTextActive]}>{y}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
 
           {/* Tabs */}
           <View style={styles.tabsContainer}>
@@ -109,9 +219,7 @@ export default function LibraryScreen() {
                   onPress={() => setTab(t.id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                    {t.label}
-                  </Text>
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -119,34 +227,58 @@ export default function LibraryScreen() {
         </View>
 
         {/* Content list */}
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={[styles.contentScroll, { paddingBottom: insets.bottom + 110 }]}
           showsVerticalScrollIndicator={false}
         >
-          {tab === 'epreuve' && (
+          {isLoadingExams && (
+            <View style={styles.stateBox}>
+              <ActivityIndicator color="#3DBE45" />
+            </View>
+          )}
+
+          {noExamsForSubject && (
+            <View style={styles.stateBox}>
+              <Text style={styles.stateText}>
+                Aucune annale publiée pour cette matière dans ton scope ({profileMeta}).
+              </Text>
+            </View>
+          )}
+
+          {noExamForYear && (
+            <View style={styles.stateBox}>
+              <Text style={styles.stateText}>Sélectionne une année.</Text>
+            </View>
+          )}
+
+          {examForYear != null && tab === 'epreuve' && (
             <DocCard
-              title={`${subject.label} · BAC ${year}`}
-              meta="Durée 4h · Coef. 6"
-              extra="12 pages · 2,4 Mo"
+              title={`${currentSubject?.name ?? ''} · BAC ${examForYear.year}`}
+              meta={examForYear.session ? `Session ${examForYear.session}` : 'Annale officielle'}
+              extra={`${examForYear.series.name} · ${examForYear.country.name}`}
               kind="pdf"
-              onOpen={() => handleOpenPdf(`Épreuve ${year}`)}
+              loading={openPdfMutation.isPending}
+              onOpen={() => openPdfMutation.mutate({ examId: examForYear.id, kind: 'epreuve' })}
             />
           )}
-          {tab === 'corrige' && (
+
+          {examForYear != null && tab === 'corrige' && (
             <DocCard
-              title={`Corrigé · ${subject.label} ${year}`}
-              meta="Détaillé étape par étape"
-              extra="18 pages · 3,1 Mo"
+              title={`Corrigé · ${currentSubject?.name ?? ''} ${examForYear.year}`}
+              meta="Premium requis"
+              extra={`${examForYear.series.name} · ${examForYear.country.name}`}
               kind="pdf-green"
-              onOpen={() => handleOpenPdf(`Corrigé ${year}`)}
+              loading={openPdfMutation.isPending}
+              onOpen={() => openPdfMutation.mutate({ examId: examForYear.id, kind: 'corrige' })}
             />
           )}
-          {tab === 'video' && (
-            <>
-              <VideoCard title={`${subject.label} · BAC ${year} — Exercice 1`} duration="14:32" />
-              <VideoCard title={`${subject.label} · BAC ${year} — Exercice 2`} duration="22:08" />
-              <VideoCard title={`${subject.label} · BAC ${year} — Problème final`} duration="36:45" />
-            </>
+
+          {examForYear != null && tab === 'video' && (
+            <VideosSection
+              isLoading={videosQuery.isLoading}
+              videos={videosQuery.data ?? []}
+              onOpen={openYoutubeVideo}
+            />
           )}
         </ScrollView>
       </View>
@@ -158,25 +290,25 @@ export default function LibraryScreen() {
         title="Choisir une matière"
       >
         <View style={styles.sheetGrid}>
-          {COURSE_SUBJECTS.map((s) => {
-            const active = s.k === subject.k;
+          {subjects.map((s) => {
+            const active = s.id === subjectId;
             return (
               <TouchableOpacity
-                key={s.k}
+                key={s.id}
                 style={[styles.sheetItem, active && styles.sheetItemActive]}
                 onPress={() => {
-                  setSubject(s);
+                  setSubjectId(s.id);
                   setPickerOpen(false);
                 }}
                 activeOpacity={0.7}
               >
                 <View style={[styles.sheetIconWrap, active && styles.sheetIconWrapActive]}>
                   <Text style={[styles.sheetIconText, active && styles.sheetIconTextActive]}>
-                    {s.label[0]}
+                    {s.name.charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <Text style={[styles.sheetItemLabel, active && styles.sheetItemLabelActive]}>
-                  {s.label}
+                  {s.name}
                 </Text>
               </TouchableOpacity>
             );
@@ -189,26 +321,55 @@ export default function LibraryScreen() {
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
-const DocCard = ({ title, meta, extra, kind, onOpen }: any) => {
+interface DocCardProps {
+  title: string;
+  meta: string;
+  extra: string;
+  kind: 'pdf' | 'pdf-green';
+  loading: boolean;
+  onOpen: () => void;
+}
+
+const DocCard: React.FC<DocCardProps> = ({ title, meta, extra, kind, loading, onOpen }) => {
   const isGreen = kind === 'pdf-green';
-  
   return (
-    <TouchableOpacity style={styles.docCard} activeOpacity={0.8} onPress={onOpen}>
+    <TouchableOpacity style={styles.docCard} activeOpacity={0.8} onPress={onOpen} disabled={loading}>
       <View style={[styles.docThumb, isGreen ? styles.docThumbGreen : styles.docThumbSalmon]}>
-        <Text style={[styles.docThumbText, isGreen ? styles.docThumbTextGreen : styles.docThumbTextSalmon]}>
+        <Text
+          style={[
+            styles.docThumbText,
+            isGreen ? styles.docThumbTextGreen : styles.docThumbTextSalmon,
+          ]}
+        >
           PDF
         </Text>
-        <View style={[styles.docThumbFold, isGreen ? styles.docThumbFoldGreen : styles.docThumbFoldSalmon]} />
+        <View
+          style={[
+            styles.docThumbFold,
+            isGreen ? styles.docThumbFoldGreen : styles.docThumbFoldSalmon,
+          ]}
+        />
       </View>
       <View style={styles.docInfo}>
         <Text style={styles.docTitle}>{title}</Text>
         <Text style={styles.docMeta}>{meta}</Text>
         <Text style={styles.docExtra}>{extra}</Text>
-        
+
         <View style={styles.docActions}>
-          <TouchableOpacity style={styles.docActionBtnPrimary} activeOpacity={0.8}>
-            <Download size={14} color="#fff" strokeWidth={2.5} />
-            <Text style={styles.docActionTextPrimary}>Télécharger</Text>
+          <TouchableOpacity
+            style={styles.docActionBtnPrimary}
+            activeOpacity={0.8}
+            onPress={onOpen}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Download size={14} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.docActionTextPrimary}>Ouvrir</Text>
+              </>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.docActionBtnSecondary} activeOpacity={0.8} onPress={onOpen}>
             <Eye size={14} color="#5A6470" strokeWidth={2.5} />
@@ -220,24 +381,70 @@ const DocCard = ({ title, meta, extra, kind, onOpen }: any) => {
   );
 };
 
-const VideoCard = ({ title, duration }: any) => {
+interface VideosSectionProps {
+  isLoading: boolean;
+  videos: ExamVideoItem[];
+  onOpen: (video: ExamVideoItem) => void;
+}
+
+const VideosSection: React.FC<VideosSectionProps> = ({ isLoading, videos, onOpen }) => {
+  if (isLoading) {
+    return (
+      <View style={styles.stateBox}>
+        <ActivityIndicator color="#3DBE45" />
+      </View>
+    );
+  }
+  if (videos.length === 0) {
+    return (
+      <View style={styles.stateBox}>
+        <Text style={styles.stateText}>Aucune vidéo commentée pour cette épreuve.</Text>
+      </View>
+    );
+  }
   return (
-    <TouchableOpacity style={styles.videoCard} activeOpacity={0.8}>
-      <View style={styles.videoThumb}>
-        <View style={styles.videoPlayBtn}>
-          <Play size={20} color="#3DBE45" strokeWidth={2.5} style={{ marginLeft: 3 }} />
-        </View>
-        <View style={styles.videoDurationBadge}>
-          <Text style={styles.videoDurationText}>{duration}</Text>
-        </View>
-      </View>
-      <View style={styles.videoInfo}>
-        <Text style={styles.videoTitle}>{title}</Text>
-        <Text style={styles.videoSub}>Vidéo officielle Noble BAC</Text>
-      </View>
-    </TouchableOpacity>
+    <>
+      {videos.map((v) => (
+        <VideoCard
+          key={v.id}
+          title={v.title}
+          duration={formatDuration(v.duration_sec)}
+          onOpen={() => onOpen(v)}
+        />
+      ))}
+    </>
   );
 };
+
+interface VideoCardProps {
+  title: string;
+  duration: string;
+  onOpen: () => void;
+}
+
+const VideoCard: React.FC<VideoCardProps> = ({ title, duration, onOpen }) => (
+  <TouchableOpacity style={styles.videoCard} activeOpacity={0.8} onPress={onOpen}>
+    <View style={styles.videoThumb}>
+      <View style={styles.videoPlayBtn}>
+        <Play size={20} color="#3DBE45" strokeWidth={2.5} style={{ marginLeft: 3 }} />
+      </View>
+      <View style={styles.videoDurationBadge}>
+        <Text style={styles.videoDurationText}>{duration}</Text>
+      </View>
+    </View>
+    <View style={styles.videoInfo}>
+      <Text style={styles.videoTitle}>{title}</Text>
+      <Text style={styles.videoSub}>Vidéo officielle Noble BAC</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+function formatDuration(seconds: number | null): string {
+  if (seconds == null || seconds <= 0) return '—';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
@@ -391,7 +598,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  // Document Card
+  stateBox: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stateText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 13,
+    color: '#5A6470',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
   docCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -499,7 +717,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#5A6470',
   },
-  // Video Card
   videoCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -558,7 +775,6 @@ const styles = StyleSheet.create({
     color: '#9AA3AC',
     marginTop: 4,
   },
-  // Bottom Sheet Grid
   sheetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

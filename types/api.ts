@@ -235,3 +235,57 @@ export interface UpdateProfilePayload {
 }
 
 export type ProfileResponse = ApiResponse<UserProfile>;
+
+// ─── Catalog (annales BAC) ────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/catalog (filtre par country_id, series_id, subject_id, year).
+ * Reponse paginee : data: ExamListItem[], meta: PaginationMeta.
+ */
+export interface ExamListItem {
+  id: number;
+  year: number;
+  session: string | null;
+  country: { id: number; name: string; iso_code: string };
+  series: { id: number; name: string };
+  subject: { id: number; name: string; icon_slug: string | null };
+}
+
+/**
+ * GET /api/v1/catalog/{exam} : detail d'une epreuve + flags PDF dispo.
+ */
+export interface ExamDetail extends ExamListItem {
+  has_exam_pdf: boolean;
+  has_corrige_pdf: boolean;
+}
+
+/**
+ * GET /api/v1/catalog/{exam}/videos : liste des videos commentees.
+ */
+export interface ExamVideoItem {
+  id: number;
+  title: string;
+  youtube_video_id: string;
+  duration_sec: number | null;
+  thumbnail_url: string | null;
+  order: number;
+  status: string;
+}
+
+/**
+ * POST /catalog/{exam}/signed-url et /catalog/{exam}/corrige/signed-url.
+ * TTL 15min cote backend (Constants::SIGNED_URL_READ_TTL).
+ */
+export interface ExamSignedUrl {
+  url: string;
+  expires_at: string;
+}
+
+export interface ExamFilters {
+  country_id?: number;
+  series_id?: number;
+  subject_id?: number;
+  year?: number;
+  page?: number;
+  per_page?: number;
+}

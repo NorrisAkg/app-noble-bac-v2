@@ -1,14 +1,24 @@
 # MAPPING API — Mobile ↔ Backend
 
-> Dernière mise à jour : 2026-05-17
-> Backend : Laravel `v1.4-P6-complete` ([api/routes/api.php](../../api/routes/api.php))
-> Mobile : branche `feature/mobile-fix-urgents-p4-p5`
+> Dernière mise à jour : 2026-05-18
+> Backend : Laravel `v1.4.1-hardened` ([api/routes/api.php](../../api/routes/api.php))
+> Mobile : branche `feature/mobile-m-p2-screens-wiring`
 
 ## Légende
 
 - **🟢 INTEGRÉ** : service mobile écrit + consommé par au moins un écran
 - **🟡 DORMANT** : service mobile écrit mais **jamais appelé** par un écran
 - **🔴 ABSENT** : aucun code mobile
+
+---
+
+## Health — `/api/v1/health` 🆕 (v1.4.1-hardened)
+
+| Méthode | Endpoint backend | Service mobile | Écran(s) | Statut |
+|---|---|---|---|---|
+| GET | `/health` | — | — (utile pour splash screen / smoke test) | 🔴 |
+
+**Note** : endpoint public (sans auth, hors throttle), renvoie 200 si DB+Redis OK sinon 503. Pratique pour un check de disponibilité au démarrage de l'app avant le login.
 
 ---
 

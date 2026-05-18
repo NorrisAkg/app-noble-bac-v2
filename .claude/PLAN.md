@@ -1,8 +1,15 @@
 # PLAN D'IMPLÉMENTATION — Le Noble BAC UEMOA Mobile
 
-> Dernière mise à jour : 2026-05-17
+> Dernière mise à jour : 2026-05-18
 > Stack : Expo SDK 54 / React Native 0.81 / TypeScript 5.9 / Expo Router 6 / NativeWind 4 / Zustand 5 / TanStack Query 5
-> Backend de référence : Laravel API `v1.4-P6-complete` (357 tests, 2026-05-17)
+> Backend de référence : Laravel API `v1.4.1-hardened` (396 tests, 2026-05-18) — post-audit complet
+>
+> Nouveautés backend depuis `v1.4-P6-complete` :
+> - `GET /api/v1/health` (public, DB+Redis) pour load-balancer / splash check.
+> - Indexes composites perf (transparent côté mobile).
+> - `ProductionConfigGuard` (n'affecte que prod backend).
+> - `AuditLogSanitizer` masque PII dans audit_logs (transparent).
+> - **Aucun breaking change** sur les routes `/api/v1` utilisées par le mobile.
 
 ---
 
