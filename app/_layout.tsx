@@ -73,17 +73,16 @@ export default function RootLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const isLanding = segments[0] === 'landing';
 
-    // New onboarding flow: check if the user has already seen onboarding
-    // using AsyncStorage. Because AsyncStorage is async, we perform the check
-    // inside this effect and navigate accordingly.
+    // Onboarding au premier lancement : on bascule vers landing.tsx qui
+    // sert d'ecran de bienvenue (video + CTA). Le flag AsyncStorage
+    // 'hasSeenOnboarding' evite de re-presenter le landing apres la 1ere
+    // visite (le landing lui-meme s'occupe de poser ce flag).
     const checkOnboarding = async () => {
       const seen = await AsyncStorage.getItem('hasSeenOnboarding');
       if (seen !== 'true') {
-        // Show onboarding (landing) screen before any other navigation
-        router.replace('/onboarding');
+        router.replace('/landing');
         return;
       }
-      // If onboarding already seen, keep previous auth‑based navigation
       if (!isAuthenticated && inTabsGroup) {
         router.replace('/landing');
       } else if (isAuthenticated && (inAuthGroup || isLanding)) {
@@ -105,7 +104,6 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>

@@ -9,10 +9,17 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverage: true,
   collectCoverageFrom: [
-    '**/*.{ts,tsx}',
+    'services/**/*.{ts,tsx}',
+    'store/**/*.{ts,tsx}',
+    'utils/**/*.{ts,tsx}',
+    'hooks/**/*.{ts,tsx}',
+    'constants/**/*.{ts,tsx}',
     '!**/node_modules/**',
     '!**/babel.config.js',
     '!**/jest.setup.js',
+    '!templates/**',
+    '!coverage/**',
   ],
+  testPathIgnorePatterns: ['/node_modules/', '/templates/', '/coverage/'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 };
