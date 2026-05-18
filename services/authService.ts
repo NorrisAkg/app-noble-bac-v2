@@ -3,6 +3,8 @@ import type {
   RegisterPayload,
   LoginPayload,
   VerifyOtpPayload,
+  RequestPasswordResetPayload,
+  ResetPasswordPayload,
   AuthUserResponse,
   LoginResponse,
   ApiResponse,
@@ -50,5 +52,28 @@ export async function logout(): Promise<void> {
  */
 export async function refreshToken(): Promise<LoginResponse> {
   const { data } = await apiClient.post<LoginResponse>('/auth/refresh');
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/password/request-reset
+ * Probe used by the mobile to confirm the phone is known before starting the
+ * Firebase OTP flow on-device. The backend ALWAYS responds 200 to avoid phone
+ * enumeration — it does not send any OTP itself.
+ */
+export async function requestPasswordReset(
+  payload: RequestPasswordResetPayload,
+): Promise<ApiResponse<null>> {
+  const { data } = await apiClient.post<ApiResponse<null>>('/auth/password/request-reset', payload);
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/password/reset
+ * Reset the password after the on-device Firebase OTP has produced an ID Token.
+ * Backend revokes all existing Sanctum tokens on success.
+ */
+export async function resetPassword(payload: ResetPasswordPayload): Promise<ApiResponse<null>> {
+  const { data } = await apiClient.post<ApiResponse<null>>('/auth/password/reset', payload);
   return data;
 }

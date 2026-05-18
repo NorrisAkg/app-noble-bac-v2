@@ -19,8 +19,8 @@
 | POST | `/auth/register` | `authService.register` | `(auth)/signup.tsx` | 🟢 |
 | POST | `/auth/verify-otp` | `authService.verifyOtp` | `(auth)/verify.tsx` (UI seule, **pas d'appel**) | 🟡 |
 | POST | `/auth/login` | `authService.login` | `(auth)/login.tsx` | 🟢 (corrigé en M-P0) |
-| POST | `/auth/password/request-reset` | — | — | 🔴 |
-| POST | `/auth/password/reset` | — | — | 🔴 |
+| POST | `/auth/password/request-reset` | `authService.requestPasswordReset` | `(auth)/forgot.tsx` | 🟢 (depuis M-P1.3) |
+| POST | `/auth/password/reset` | `authService.resetPassword` | `(auth)/reset.tsx` | 🟡 (HTTP prêt, attend Firebase M-P1.1) |
 | POST | `/auth/refresh` | `apiClient` interceptor (via `performRefresh`) | auto sur 401, single-flight queue | 🟢 (depuis M-P1.4) |
 | POST | `/auth/logout` | `authService.logout` | via `useAuthStore.logout()` | 🟢 |
 
@@ -135,7 +135,7 @@
 
 | Domaine | Endpoints backend | Intégrés | Dormants | Absents |
 |---|---|---|---|---|
-| Auth | 7 | 4 | 1 | 2 |
+| Auth | 7 | 5 | 2 | 0 |
 | Référentiel public | 3 | 1 + 1 indirect | 0 | 1 |
 | Profile | 2 | 0 | 0 | 2 |
 | Catalog | 5 | 0 | 1 | 4 |
@@ -144,7 +144,7 @@
 | Payments | 2 (+ webhook) | 0 | 0 | 2 |
 | Offline / Me downloads | 5 | 0 | 0 | 5 |
 | Quiz | 5 | 3 | 2 | 0 |
-| **Total** | **45** | **19 (42%)** | **4 (9%)** | **22 (49%)** + 1 webhook |
+| **Total** | **45** | **20 (44%)** | **5 (11%)** | **20 (44%)** + 1 webhook |
 
 ---
 

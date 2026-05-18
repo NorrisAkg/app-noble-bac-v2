@@ -160,6 +160,21 @@ export interface VerifyOtpPayload {
   id_token: string;
 }
 
+export interface RequestPasswordResetPayload {
+  /** E.164 format */
+  phone: string;
+}
+
+export interface ResetPasswordPayload {
+  /** E.164 format */
+  phone: string;
+  /** Firebase ID Token issued after on-device OTP success — must carry the same phone */
+  id_token: string;
+  /** New password, min 8 chars (backend enforces "confirmed" rule) */
+  password: string;
+  password_confirmation: string;
+}
+
 // ─── Auth Responses ───────────────────────────────────────────────────────────
 
 /** Returned by /register and /verify-otp */
