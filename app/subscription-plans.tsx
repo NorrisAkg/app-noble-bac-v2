@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { ChevronLeft, Check, Crown } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { getActiveSubscription, getSubscriptionPlans } from '@/services/subscriptionService';
+import { initiatePayment } from '@/services/paymentService';
+import { getApiErrorMessage } from '@/utils/apiError';
 import type { SubscriptionPlan } from '@/types/api';
 
 const PLAN_FEATURES = [
@@ -36,6 +38,7 @@ function pricePerDay(plan: SubscriptionPlan): string {
 export default function SubscriptionPlansScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [initiatingPlanId, setInitiatingPlanId] = useState<number | null>(null);
 
   const plansQuery = useQuery({
     queryKey: ['subscription-plans'],
@@ -49,13 +52,23 @@ export default function SubscriptionPlansScreen() {
     staleTime: 60 * 1000,
   });
 
-  const handleChoose = (plan: SubscriptionPlan) => {
-    // TODO M-P4 : navigation vers WebView CinetPay via POST /payments/initiate.
-    // Pour MVP M-P3 seul, on annonce que le paiement arrive en M-P4.
-    Alert.alert(
-      'Paiement Premium',
-      `Le paiement CinetPay pour "${plan.label}" sera disponible dans la prochaine étape (M-P4). En attendant, contacte le support pour activer manuellement.`,
-    );
+  const handleChoose = async (plan: SubscriptionPlan) => {
+    if (initiatingPlanId !== null) return;
+    setInitiatingPlanId(plan.id);
+    try {
+      const { transaction, payment_url } = await initiatePayment(plan.id);
+      router.push({
+        pathname: '/payment-checkout' as never,
+        params: {
+          transaction_id: String(transaction.id),
+          payment_url: encodeURIComponent(payment_url),
+        },
+      } as never);
+    } catch (e) {
+      Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de demarrer le paiement.'));
+    } finally {
+      setInitiatingPlanId(null);
+    }
   };
 
   const isLoading = plansQuery.isLoading;
@@ -127,6 +140,7 @@ export default function SubscriptionPlansScreen() {
                 plan={plan}
                 onChoose={() => handleChoose(plan)}
                 highlight={idx === 1}
+                isInitiating={initiatingPlanId === plan.id}
               />
             ))}
           </View>
@@ -144,9 +158,10 @@ interface PlanCardProps {
   plan: SubscriptionPlan;
   onChoose: () => void;
   highlight: boolean;
+  isInitiating: boolean;
 }
 
-const PlanCard: React.FC<PlanCardProps> = ({ plan, onChoose, highlight }) => (
+const PlanCard: React.FC<PlanCardProps> = ({ plan, onChoose, highlight, isInitiating }) => (
   <View style={[styles.planCard, highlight && styles.planCardHighlight]}>
     {highlight && (
       <View style={styles.bestBadge}>
@@ -161,13 +176,18 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, onChoose, highlight }) => (
     </View>
     <Text style={styles.pricePerDay}>{pricePerDay(plan)}</Text>
     <TouchableOpacity
-      style={[styles.chooseBtn, highlight && styles.chooseBtnHighlight]}
+      style={[styles.chooseBtn, highlight && styles.chooseBtnHighlight, isInitiating && styles.chooseBtnDisabled]}
       onPress={onChoose}
       activeOpacity={0.85}
+      disabled={isInitiating}
     >
-      <Text style={[styles.chooseBtnText, highlight && styles.chooseBtnTextHighlight]}>
-        Choisir ce plan
-      </Text>
+      {isInitiating ? (
+        <ActivityIndicator size="small" color={highlight ? '#fff' : '#3DBE45'} />
+      ) : (
+        <Text style={[styles.chooseBtnText, highlight && styles.chooseBtnTextHighlight]}>
+          Choisir ce plan
+        </Text>
+      )}
     </TouchableOpacity>
   </View>
 );
@@ -288,6 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chooseBtnHighlight: { backgroundColor: '#3DBE45', borderColor: '#3DBE45' },
+  chooseBtnDisabled: { opacity: 0.7 },
   chooseBtnText: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: '#3DBE45' },
   chooseBtnTextHighlight: { color: '#fff' },
 
