@@ -33,6 +33,10 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Firebase secrets (service account JSON contains a real private key — never commit)
+*-firebase-adminsdk-*.json
+firebase-credentials.json
+
 # typescript
 *.tsbuildinfo
 

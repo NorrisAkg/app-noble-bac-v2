@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Button } from '@/components/ui/Button';
 import { Delete } from 'lucide-react-native';
+import { firebaseAuthService, FirebaseOtpError } from '@/services/firebaseAuthService';
+import { verifyOtp } from '@/services/authService';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 const { width } = Dimensions.get('window');
-const CIRCLE_SIZE = (width - 48 - 60) / 6; // Padding and gaps
 
 const OtpCircle = ({ filled, active }: { filled: boolean, active: boolean }) => (
-  <View 
+  <View
     className={`w-[46px] h-[46px] rounded-full border-2 items-center justify-center bg-white ${
       filled || active ? 'border-brand-green' : 'border-[#D5DAE0]'
     } ${active ? 'shadow-sm shadow-brand-green' : ''}`}
@@ -33,9 +36,40 @@ const KeypadKey = ({ children, onClick }: { children: React.ReactNode, onClick: 
 
 export default function VerifyScreen() {
   const router = useRouter();
-  const { phone } = useLocalSearchParams();
+  const { phone: rawPhone } = useLocalSearchParams<{ phone?: string }>();
+  const phone = typeof rawPhone === 'string' ? rawPhone : '';
+
   const [code, setCode] = useState('');
   const [resendIn, setResendIn] = useState(45);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [sendingOtp, setSendingOtp] = useState(false);
+
+  // Envoi du SMS au mount (et a chaque clic "Renvoyer le code")
+  const sendOtp = async () => {
+    if (!phone) return;
+    setSendingOtp(true);
+    setVerificationError(null);
+    try {
+      const vid = await firebaseAuthService.sendVerificationCode(phone);
+      setVerificationId(vid);
+    } catch (e) {
+      setVerificationError(
+        e instanceof FirebaseOtpError ? e.message : getApiErrorMessage(e),
+      );
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!phone) {
+      Alert.alert('Erreur', 'Numéro de téléphone manquant.');
+      router.back();
+      return;
+    }
+    sendOtp();
+  }, [phone]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -47,20 +81,46 @@ export default function VerifyScreen() {
     if (code.length >= 6) return;
     setCode((c) => c + d);
   };
-  
+
   const back = () => setCode((c) => c.slice(0, -1));
 
   const isFilled = code.length === 6;
 
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      if (!verificationId) {
+        throw new FirebaseOtpError('Aucune verification en cours. Redemande un code.');
+      }
+      const idToken = await firebaseAuthService.confirmVerificationCode(verificationId, code);
+      return verifyOtp({ phone, id_token: idToken });
+    },
+    onSuccess: () => {
+      router.replace('/(auth)/congrats');
+    },
+    onError: (error) => {
+      const message = error instanceof FirebaseOtpError
+        ? error.message
+        : getApiErrorMessage(error);
+      Alert.alert('Vérification échouée', message);
+      setCode('');
+    },
+  });
+
   const handleVerify = () => {
-    if (!isFilled) return;
-    router.push('/(auth)/congrats');
+    if (!isFilled || !verificationId) return;
+    mutate();
+  };
+
+  const handleResend = async () => {
+    setCode('');
+    setResendIn(45);
+    await sendOtp();
   };
 
   return (
     <View className="flex-1 bg-white">
       <AppBar title="" onBack={() => router.back()} />
-      
+
       <View className="flex-1 px-6 pt-10">
         <Text className="text-center font-poppins-extrabold text-[30px] text-brand-ink tracking-tighter">
           Vérification
@@ -70,15 +130,36 @@ export default function VerifyScreen() {
           <Text className="font-poppins-medium">{phone || '+225 01 XX XX XX'}</Text>
         </Text>
 
+        {sendingOtp && (
+          <View className="flex-row items-center justify-center gap-2 mt-4">
+            <ActivityIndicator size="small" color="#3DBE45" />
+            <Text className="font-poppins text-xs text-brand-ink-medium">
+              Envoi du code en cours...
+            </Text>
+          </View>
+        )}
+
+        {verificationError && (
+          <View className="bg-[#FBEDE8] border border-[#E14B36] rounded-xl p-3 mx-1 mt-3">
+            <Text className="font-poppins-semibold text-xs text-[#A93122] mb-0.5">
+              Envoi SMS impossible
+            </Text>
+            <Text className="font-poppins text-xs text-[#A93122] leading-4">
+              {verificationError}
+            </Text>
+          </View>
+        )}
+
         <View className="flex-row justify-center gap-3 my-10">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <OtpCircle key={i} filled={i < code.length} active={i === code.length} />
           ))}
         </View>
 
-        <Button 
-          onPress={handleVerify} 
-          disabled={!isFilled}
+        <Button
+          onPress={handleVerify}
+          disabled={!isFilled || !verificationId || isPending}
+          loading={isPending}
           className={!isFilled ? 'bg-[#C7CCD2]' : ''}
         >
           VÉRIFIER
@@ -90,7 +171,7 @@ export default function VerifyScreen() {
               RENVOYER LE CODE ({resendIn}s)
             </Text>
           ) : (
-            <TouchableOpacity onPress={() => { setResendIn(45); setCode(''); }}>
+            <TouchableOpacity onPress={handleResend} disabled={sendingOtp}>
               <Text className="font-poppins-bold text-xs text-brand-green tracking-[1.5px] uppercase">
                 RENVOYER LE CODE
               </Text>

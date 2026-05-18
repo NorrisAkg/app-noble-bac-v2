@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { resetPassword } from '@/services/authService';
-import { firebaseAuthService, FirebaseNotConfiguredError } from '@/services/firebaseAuthService';
+import { firebaseAuthService, FirebaseOtpError } from '@/services/firebaseAuthService';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 export default function ResetPasswordScreen() {
@@ -32,9 +32,7 @@ export default function ResetPasswordScreen() {
       .then(setVerificationId)
       .catch((e) => {
         setVerificationError(
-          e instanceof FirebaseNotConfiguredError
-            ? "Le service de vérification SMS n'est pas encore activé sur cette version. Revenez bientôt."
-            : getApiErrorMessage(e),
+          e instanceof FirebaseOtpError ? e.message : getApiErrorMessage(e),
         );
       });
   }, [phone]);
@@ -45,7 +43,7 @@ export default function ResetPasswordScreen() {
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      if (!verificationId) throw new FirebaseNotConfiguredError();
+      if (!verificationId) throw new FirebaseOtpError('Aucune verification en cours. Redemande un code.');
       const idToken = await firebaseAuthService.confirmVerificationCode(verificationId, code);
       return resetPassword({
         phone: String(phone),
@@ -62,11 +60,10 @@ export default function ResetPasswordScreen() {
       );
     },
     onError: (error) => {
-      if (error instanceof FirebaseNotConfiguredError) {
-        Alert.alert('Service indisponible', error.message);
-        return;
-      }
-      Alert.alert('Échec', getApiErrorMessage(error));
+      const message = error instanceof FirebaseOtpError
+        ? error.message
+        : getApiErrorMessage(error);
+      Alert.alert('Échec', message);
     },
   });
 
