@@ -157,12 +157,33 @@ export default function HomeScreen() {
         {/* Quick actions */}
         <View style={styles.quickRow}>
           <QuickAction label="Cours" icon="book" onPress={() => router.push('/(tabs)/courses')} />
-          <QuickAction label="Annales" icon="paper" onPress={() => Alert.alert('Annales', 'Bientôt disponible')} />
+          <QuickAction label="Annales" icon="paper" onPress={() => router.push('/(tabs)/library')} />
           <QuickAction label="Premium" icon="star" accent onPress={() => router.push('/subscription-plans')} />
         </View>
 
-        {/* "Reprendre" : masque tant que le backend n'expose pas l'historique
-            de lecture du user (cf PLAN M-P2.7 TBD, post-MVP). */}
+        {/* Section « Reprendre » — CTA tant que le backend n'expose pas
+            l'historique de lecture (`/me/last-read` ou équivalent). On
+            affiche une carte d'amorçage qui pointe vers les cours, plutôt
+            que de masquer entièrement la section comme avant. */}
+        <TouchableOpacity
+          style={styles.resumeCard}
+          activeOpacity={0.85}
+          onPress={() => router.push('/(tabs)/courses')}
+        >
+          <View style={styles.resumeIcon}>
+            <Text style={styles.resumeEmoji}>📚</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.resumeTitle}>Commence ta première leçon</Text>
+            <Text style={styles.resumeSubtitle}>Choisis une matière pour démarrer.</Text>
+            <View style={styles.resumeTrack}>
+              <View style={[styles.resumeFill, { width: '0%' }]} />
+            </View>
+          </View>
+          <View style={styles.resumePlayBtn}>
+            <Text style={styles.resumePlayText}>›</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Books carousel — donnees reelles depuis GET /courses/books */}
         <SectionHeader
@@ -512,6 +533,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  resumePlayText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 20,
+    color: '#3DBE45',
+    lineHeight: 22,
+    marginTop: -2,
+  },
+  resumeEmoji: {
+    fontSize: 22,
   },
   // Modal / Bottom sheet
   modalBackdrop: {

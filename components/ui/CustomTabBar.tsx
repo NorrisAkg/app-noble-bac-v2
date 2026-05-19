@@ -1,7 +1,9 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, BookOpen, Layers, CheckSquare, User } from 'lucide-react-native';
+
+import { TabBarIcon, type TabBarIconName } from './TabBarIcon';
+import { C } from '@/constants/theme';
 
 // Expo-router augmente BottomTabNavigationOptions avec `href` (null = onglet
 // cache du tab bar) et tabBarTestID n'est pas dans les types officiels recents
@@ -12,12 +14,12 @@ type ExpoTabOptions = BottomTabNavigationOptions & {
   tabBarTestID?: string;
 };
 
-const TABS_CONFIG = {
-  index: { label: 'Accueil', icon: Home },
-  courses: { label: 'Cours', icon: BookOpen },
-  library: { label: 'Sujets', icon: Layers },
-  quiz: { label: 'Quiz', icon: CheckSquare },
-  profile: { label: 'Profil', icon: User },
+const TABS_CONFIG: Record<string, { label: string; icon: TabBarIconName }> = {
+  index: { label: 'Accueil', icon: 'home' },
+  courses: { label: 'Cours', icon: 'courses' },
+  library: { label: 'Sujets', icon: 'library' },
+  quiz: { label: 'Quiz', icon: 'quiz' },
+  profile: { label: 'Profil', icon: 'profile' },
 };
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -30,13 +32,12 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         const isFocused = state.index === index;
 
         // Skip hidden tabs or tabs not in our config
-        if (options.href === null || !TABS_CONFIG[route.name as keyof typeof TABS_CONFIG]) {
+        if (options.href === null || !TABS_CONFIG[route.name]) {
           return null;
         }
 
-        const tabConfig = TABS_CONFIG[route.name as keyof typeof TABS_CONFIG];
-        const Icon = tabConfig.icon;
-        const color = isFocused ? '#3DBE45' : '#9AA3AC';
+        const tabConfig = TABS_CONFIG[route.name];
+        const color = isFocused ? C.green : C.ink3;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -61,7 +62,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             style={styles.tabItem}
             activeOpacity={0.8}
           >
-            <Icon size={22} color={color} strokeWidth={isFocused ? 2 : 1.8} />
+            <TabBarIcon name={tabConfig.icon} color={color} strokeWidth={isFocused ? 2 : 1.8} />
             <Text
               style={[
                 styles.tabLabel,
@@ -84,15 +85,10 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#E6E8EB',
+    borderTopColor: C.line,
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingTop: 10,
-    elevation: 8,
-    shadowColor: '#1A2027',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
   },
   tabItem: {
     flex: 1,

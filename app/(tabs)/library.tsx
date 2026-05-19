@@ -16,6 +16,8 @@ import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { CustomBottomSheet } from '@/components/ui/BottomSheet';
+import { DiamondIcon } from '@/components/ui/DiamondIcon';
+import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
 import { courseService } from '@/services/courseService';
 import { catalogService } from '@/services/catalogService';
 import { getProfile } from '@/services/profileService';
@@ -172,11 +174,10 @@ export default function LibraryScreen() {
             onPress={() => setPickerOpen(true)}
             disabled={subjects.length === 0}
           >
-            <View style={styles.subjectIconWrap}>
-              <Text style={styles.subjectIconText}>
-                {currentSubject?.name.charAt(0).toUpperCase() ?? '?'}
-              </Text>
-            </View>
+            <SubjectIcon
+              kind={backendSlugToSubjectKind(currentSubject?.icon_slug)}
+              size={40}
+            />
             <View style={styles.subjectSelectorContent}>
               <Text style={styles.subjectLabel}>Matière</Text>
               <Text style={styles.subjectValue}>{currentSubject?.name ?? 'Chargement...'}</Text>
@@ -220,6 +221,7 @@ export default function LibraryScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                  <DiamondIcon size={14} gradientId={`dmd-lib-${t.id}`} />
                 </TouchableOpacity>
               );
             })}
@@ -302,11 +304,7 @@ export default function LibraryScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.sheetIconWrap, active && styles.sheetIconWrapActive]}>
-                  <Text style={[styles.sheetIconText, active && styles.sheetIconTextActive]}>
-                    {s.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={32} />
                 <Text style={[styles.sheetItemLabel, active && styles.sheetItemLabelActive]}>
                   {s.name}
                 </Text>
@@ -367,7 +365,7 @@ const DocCard: React.FC<DocCardProps> = ({ title, meta, extra, kind, loading, on
             ) : (
               <>
                 <Download size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.docActionTextPrimary}>Ouvrir</Text>
+                <Text style={styles.docActionTextPrimary}>Télécharger</Text>
               </>
             )}
           </TouchableOpacity>

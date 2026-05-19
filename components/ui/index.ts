@@ -19,5 +19,7 @@ export { Logo, LogoMini } from './Logo';
 export { PremiumLock } from './PremiumLock';
 export { SubjectIcon, backendSlugToSubjectKind } from './SubjectIcon';
 export type { SubjectKind } from './SubjectIcon';
+export { TabBarIcon } from './TabBarIcon';
+export type { TabBarIconName } from './TabBarIcon';
 export { Toast } from './Toast';
 export type { ToastTone } from './Toast';

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, TouchableOpacity, Text, StyleSheet, View } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { DiamondIcon } from '@/components/ui/DiamondIcon';
 
 interface Tab {
   k: string;
@@ -11,22 +12,6 @@ interface TabChipsProps {
   activeTab: string;
   onChange: (tabKey: string) => void;
 }
-
-// ─── Diamond chip icon ─────────────────────────────────────────
-const DiamondIcon = ({ size = 14 }) => (
-  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    {/* Simplified diamond for React Native without complex SVG gradients for now, 
-        using a rotated square to match the shape */}
-    <View style={{
-      width: size * 0.7,
-      height: size * 0.7,
-      backgroundColor: '#E8624C',
-      transform: [{ rotate: '45deg' }],
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.5)',
-    }} />
-  </View>
-);
 
 export const TabChips: React.FC<TabChipsProps> = ({ tabs, activeTab, onChange }) => {
   return (
@@ -52,7 +37,7 @@ export const TabChips: React.FC<TabChipsProps> = ({ tabs, activeTab, onChange })
             <Text style={[styles.label, active ? styles.labelActive : styles.labelInactive]}>
               {t.label}
             </Text>
-            <DiamondIcon size={14} />
+            <DiamondIcon size={14} gradientId={`dmd-${t.k}`} />
           </TouchableOpacity>
         );
       })}
