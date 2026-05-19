@@ -119,7 +119,7 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.iconBtn} onPress={() => Alert.alert('Recherche', 'Bientôt disponible')}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/search')}>
             <Search size={18} color="#fff" strokeWidth={1.8} />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]} onPress={() => Alert.alert('Notifications', 'Bientôt disponible')}>

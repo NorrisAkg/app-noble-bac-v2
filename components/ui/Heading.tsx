@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextProps, TextStyle } from 'react-native';
+import { Text, TextProps, TextStyle, StyleProp } from 'react-native';
 import { C } from '@/constants/theme';
 
 export type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'caption' | 'label';
@@ -7,7 +7,7 @@ export type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'caption' | 'lab
 interface HeadingProps extends TextProps {
   level?: HeadingLevel;
   color?: string;
-  style?: TextStyle;
+  style?: StyleProp<TextStyle>;
 }
 
 const STYLES: Record<HeadingLevel, TextStyle> = {
