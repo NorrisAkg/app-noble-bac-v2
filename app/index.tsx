@@ -49,6 +49,8 @@ export default function SplashScreen() {
     }, 2800);
 
     return () => clearTimeout(timer);
+    // Animations + redirection : volontairement one-shot au mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -105,6 +107,8 @@ const ActivityDot = ({ delay }: { delay: number }) => {
       clearTimeout(timer);
       loop.stop();
     };
+    // Boucle d'animation : doit démarrer une seule fois au mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <Animated.View style={[styles.dot, { opacity, transform: [{ scale }] }]} />;

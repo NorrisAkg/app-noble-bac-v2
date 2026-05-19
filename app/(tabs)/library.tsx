@@ -80,7 +80,7 @@ export default function LibraryScreen() {
     enabled: subjectId != null,
   });
 
-  const exams: ExamListItem[] = examsQuery.data?.data ?? [];
+  const exams: ExamListItem[] = useMemo(() => examsQuery.data?.data ?? [], [examsQuery.data]);
 
   // Annees dispo : extraites des exams retournes, tri desc.
   const availableYears = useMemo(

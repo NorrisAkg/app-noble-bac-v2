@@ -3,7 +3,6 @@ import { View, Text } from 'react-native';
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetView,
-  BottomSheetFlatList,
 } from '@gorhom/bottom-sheet';
 
 interface BottomSheetProps {

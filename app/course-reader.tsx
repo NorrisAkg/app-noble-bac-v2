@@ -93,7 +93,7 @@ export default function CourseReaderScreen() {
         {status === 'ready' && !lesson?.content && (
           <View style={styles.centered}>
             <Text style={styles.errorTitle}>Leçon sans contenu</Text>
-            <Text style={styles.errorText}>Le contenu de cette leçon n'est pas encore disponible.</Text>
+            <Text style={styles.errorText}>Le contenu de cette leçon n&apos;est pas encore disponible.</Text>
           </View>
         )}
       </View>

@@ -31,21 +31,21 @@ export default function PrivacyScreen() {
         <Text style={styles.h1}>Politique de confidentialité</Text>
         
         <Text style={styles.p}>
-          Le Noble BAC UEMOA collecte un minimum de données pour fournir l'app : ton nom, ton email,
+          Le Noble BAC UEMOA collecte un minimum de données pour fournir l&apos;app : ton nom, ton email,
           ton numéro de téléphone, ton pays et ta série de Bac. Ces informations restent stockées sur des
           serveurs sécurisés et ne sont jamais revendues.
         </Text>
 
         <H2>1. Données collectées</H2>
         <Text style={styles.p}>
-          Identité (prénom, nom), contact (email, téléphone), scope d'étude (pays + série),
+          Identité (prénom, nom), contact (email, téléphone), scope d&apos;étude (pays + série),
           progression pédagogique (quiz, sujets consultés), historique de paiements.
         </Text>
 
         <H2>2. Conservation</H2>
         <Text style={styles.p}>
           Les données sont conservées tant que ton compte est actif. À la suppression de ton compte,
-          elles sont effacées sous 30 jours, à l'exception des journaux de paiement conservés conformément aux lois fiscales UEMOA.
+          elles sont effacées sous 30 jours, à l&apos;exception des journaux de paiement conservés conformément aux lois fiscales UEMOA.
         </Text>
 
         <H2>3. Tes droits</H2>
@@ -56,7 +56,7 @@ export default function PrivacyScreen() {
 
         <H2>4. Partenaires</H2>
         <Text style={styles.p}>
-          Nous utilisons des partenaires de confiance pour les paiements, l'hébergement et les communications. Chacun reçoit le strict minimum nécessaire à sa fonction.
+          Nous utilisons des partenaires de confiance pour les paiements, l&apos;hébergement et les communications. Chacun reçoit le strict minimum nécessaire à sa fonction.
         </Text>
 
         <H2>5. Contact</H2>

@@ -179,8 +179,8 @@ export default function SignupScreen() {
               {agree && <Check size={14} color="white" strokeWidth={3} />}
             </View>
             <Text className="flex-1 font-poppins text-[12.5px] text-brand-ink-medium leading-5">
-              J'accepte les{' '}
-              <Text className="text-brand-green font-poppins-semibold">conditions d'utilisation</Text>
+              J&apos;accepte les{' '}
+              <Text className="text-brand-green font-poppins-semibold">conditions d&apos;utilisation</Text>
               {' '}et la{' '}
               <Text className="text-brand-green font-poppins-semibold">politique de confidentialité</Text>.
             </Text>

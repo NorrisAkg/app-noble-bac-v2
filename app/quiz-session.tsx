@@ -45,7 +45,7 @@ export default function QuizSessionScreen() {
         setLoading(false);
       }
     })();
-  }, [subjectId]);
+  }, [subjectId, router]);
 
   const questions: QuizSessionQuestion[] = session?.questions ?? [];
   const total = questions.length;

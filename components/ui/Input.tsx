@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text, ViewStyle, TextInputProps } from 'react-native';
+import { View, TextInput, Text, TextInputProps } from 'react-native';
 
 interface InputProps extends TextInputProps {
   label?: string;

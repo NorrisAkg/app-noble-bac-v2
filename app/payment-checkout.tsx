@@ -57,6 +57,9 @@ export default function PaymentCheckoutScreen() {
       return true;
     });
     return () => sub.remove();
+    // handleCancel est défini plus bas et capture les refs/state au moment
+    // du clic ; mount-only suffit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Polling du statut de la transaction. S'arrete des qu'on quitte 'pending'
@@ -150,7 +153,7 @@ export default function PaymentCheckoutScreen() {
         </View>
         <View style={styles.stateBox}>
           <Text style={styles.errorText}>
-            Lien de paiement invalide. Reviens à l'écran Premium et reessaie.
+            Lien de paiement invalide. Reviens à l&apos;écran Premium et reessaie.
           </Text>
         </View>
       </View>
@@ -173,7 +176,7 @@ export default function PaymentCheckoutScreen() {
       <View style={styles.pollBanner}>
         <ActivityIndicator size="small" color="#3DBE45" />
         <Text style={styles.pollBannerText}>
-          Confirmation automatique en attente — ne ferme pas l'écran tant que tu n'as pas validé.
+          Confirmation automatique en attente — ne ferme pas l&apos;écran tant que tu n&apos;as pas validé.
         </Text>
       </View>
 

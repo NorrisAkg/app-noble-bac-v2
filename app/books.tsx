@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,31 +35,7 @@ export default function BooksLibraryScreen() {
   
   const [pickerType, setPickerType] = useState<'subject' | null>(null);
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      loadBooks();
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, selectedSubject]);
-
-  const loadInitialData = async () => {
-    try {
-      const subjData = await courseService.getSubjects();
-      setSubjects(subjData);
-      await loadBooks();
-    } catch (error) {
-      console.error("Failed to load initial library data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadBooks = async () => {
+  const loadBooks = useCallback(async () => {
     setLoading(true);
     try {
       const response = await catalogService.getBooks({
@@ -72,7 +48,31 @@ export default function BooksLibraryScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, selectedSubject]);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      const subjData = await courseService.getSubjects();
+      setSubjects(subjData);
+      await loadBooks();
+    } catch (error) {
+      console.error("Failed to load initial library data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadBooks]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      loadBooks();
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, selectedSubject, loadBooks]);
 
   const activeFiltersCount = (selectedSubject ? 1 : 0) + (searchQuery ? 1 : 0);
 

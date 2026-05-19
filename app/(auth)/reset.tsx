@@ -35,7 +35,7 @@ export default function ResetPasswordScreen() {
           e instanceof FirebaseOtpError ? e.message : getApiErrorMessage(e),
         );
       });
-  }, [phone]);
+  }, [phone, router]);
 
   const codeValid = code.length === 6;
   const passwordValid = password.length >= 8 && password === passwordConfirm;

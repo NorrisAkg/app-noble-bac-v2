@@ -1,13 +1,8 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-import '@/global.css';
-
-import { QueryProvider } from '@/providers/QueryProvider';
-import { registerAuthCleanup } from '@/services/apiClient';
-import { useAuthStore } from '@/store/useAuthStore';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -19,12 +14,15 @@ import {
   Poppins_800ExtraBold,
   Poppins_900Black,
 } from '@expo-google-fonts/poppins';
-import { useRouter, useSegments } from 'expo-router';
+import 'react-native-reanimated';
+import '@/global.css';
+
+import { QueryProvider } from '@/providers/QueryProvider';
+import { registerAuthCleanup } from '@/services/apiClient';
+import { useAuthStore } from '@/store/useAuthStore';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -48,7 +46,7 @@ export default function RootLayout() {
     // Let apiClient drop the auth state locally when /auth/refresh fails on 401.
     registerAuthCleanup(() => useAuthStore.getState().clearLocal());
     initialize();
-  }, []);
+  }, [initialize]);
 
   useEffect(() => {
     if (loaded || error) {
@@ -88,7 +86,7 @@ export default function RootLayout() {
       }
     };
     checkOnboarding();
-  }, [isAuthenticated, segments, loaded]);
+  }, [isAuthenticated, segments, loaded, router]);
 
 
   if (!loaded && !error) {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
@@ -8,8 +8,6 @@ import { Delete } from 'lucide-react-native';
 import { firebaseAuthService, FirebaseOtpError } from '@/services/firebaseAuthService';
 import { verifyOtp } from '@/services/authService';
 import { getApiErrorMessage } from '@/utils/apiError';
-
-const { width } = Dimensions.get('window');
 
 const OtpCircle = ({ filled, active }: { filled: boolean, active: boolean }) => (
   <View
@@ -46,7 +44,7 @@ export default function VerifyScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
 
   // Envoi du SMS au mount (et a chaque clic "Renvoyer le code")
-  const sendOtp = async () => {
+  const sendOtp = useCallback(async () => {
     if (!phone) return;
     setSendingOtp(true);
     setVerificationError(null);
@@ -60,7 +58,7 @@ export default function VerifyScreen() {
     } finally {
       setSendingOtp(false);
     }
-  };
+  }, [phone]);
 
   useEffect(() => {
     if (!phone) {
@@ -69,7 +67,7 @@ export default function VerifyScreen() {
       return;
     }
     sendOtp();
-  }, [phone]);
+  }, [phone, router, sendOtp]);
 
   useEffect(() => {
     if (resendIn <= 0) return;

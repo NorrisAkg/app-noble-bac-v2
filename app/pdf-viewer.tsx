@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -64,6 +64,39 @@ export default function PdfViewerScreen() {
       (d) => d.downloadable_type === downloadable.type && d.downloadable_id === downloadable.id,
     );
 
+  const handleLoadError = useCallback((err: any, premiumMessage: string) => {
+    console.error('Failed to load PDF URL:', err);
+    setError(err?.response?.status === 403 ? premiumMessage : 'Impossible de charger le document.');
+  }, []);
+
+  const loadFromBook = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      const { url } = await catalogService.downloadBook(id);
+      setPdfUrl(url);
+    } catch (err: any) {
+      handleLoadError(err, 'Cet ouvrage est réservé aux abonnés Premium.');
+    } finally {
+      setLoading(false);
+    }
+  }, [handleLoadError]);
+
+  const loadFromRevisionSheet = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      const sheet = await courseService.getRevisionSheet(id);
+      if (!sheet.signed_url) {
+        setError("Cette fiche n'est pas encore prête au téléchargement.");
+        return;
+      }
+      setPdfUrl(sheet.signed_url);
+    } catch (err: any) {
+      handleLoadError(err, 'Cette fiche est réservée aux abonnés Premium.');
+    } finally {
+      setLoading(false);
+    }
+  }, [handleLoadError]);
+
   useEffect(() => {
     if (initialUrl) {
       setLoading(false);
@@ -78,40 +111,7 @@ export default function PdfViewerScreen() {
       return;
     }
     setLoading(false);
-  }, [bookId, revisionSheetId, initialUrl]);
-
-  const loadFromBook = async (id: number) => {
-    try {
-      setLoading(true);
-      const { url } = await catalogService.downloadBook(id);
-      setPdfUrl(url);
-    } catch (err: any) {
-      handleLoadError(err, 'Cet ouvrage est réservé aux abonnés Premium.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadFromRevisionSheet = async (id: number) => {
-    try {
-      setLoading(true);
-      const sheet = await courseService.getRevisionSheet(id);
-      if (!sheet.signed_url) {
-        setError("Cette fiche n'est pas encore prête au téléchargement.");
-        return;
-      }
-      setPdfUrl(sheet.signed_url);
-    } catch (err: any) {
-      handleLoadError(err, 'Cette fiche est réservée aux abonnés Premium.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLoadError = (err: any, premiumMessage: string) => {
-    console.error('Failed to load PDF URL:', err);
-    setError(err?.response?.status === 403 ? premiumMessage : 'Impossible de charger le document.');
-  };
+  }, [bookId, revisionSheetId, initialUrl, loadFromBook, loadFromRevisionSheet]);
 
   // ─── Telechargement hors-ligne ────────────────────────────────────────────
 

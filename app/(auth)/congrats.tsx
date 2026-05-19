@@ -62,7 +62,7 @@ const TestimonialCard = ({ item }: { item: typeof TESTIMONIALS[0] }) => (
     </View>
 
     <Text className="font-poppins italic text-[13.5px] text-brand-ink-medium text-center leading-5 px-2">
-      "{item.quote}"
+      &laquo; {item.quote} &raquo;
     </Text>
   </View>
 );
