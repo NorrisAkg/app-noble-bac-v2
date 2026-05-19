@@ -17,7 +17,7 @@ export { Input } from './Input';
 export { Loader } from './Loader';
 export { Logo, LogoMini } from './Logo';
 export { PremiumLock } from './PremiumLock';
-export { SubjectIcon } from './SubjectIcon';
+export { SubjectIcon, backendSlugToSubjectKind } from './SubjectIcon';
 export type { SubjectKind } from './SubjectIcon';
 export { Toast } from './Toast';
 export type { ToastTone } from './Toast';

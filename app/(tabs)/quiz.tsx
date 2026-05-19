@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 
 import { courseService } from '@/services/courseService';
+import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
+import { C } from '@/constants/theme';
 import type { Subject } from '@/types/api';
 
 export default function QuizSubjectsScreen() {
@@ -23,37 +32,39 @@ export default function QuizSubjectsScreen() {
       const data = await courseService.getSubjects();
       setSubjects(data);
     } catch (error) {
-      console.error("Failed to load subjects:", error);
+      console.error('Failed to load subjects:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePickSubject = (subjectId: number, subjectLabel: string) => {
+  const handlePickSubject = (subject: Subject) => {
     router.push({
-      pathname: '/quiz-session',
-      params: { subjectId: subjectId.toString(), subjectLabel },
+      pathname: '/quiz-chapters',
+      params: {
+        subjectId: subject.id.toString(),
+        subjectLabel: subject.name,
+        subjectSlug: subject.icon_slug ?? '',
+      },
     });
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Status bar spacer */}
-      <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
 
-      {/* App bar */}
+      <View style={{ height: insets.top, backgroundColor: C.green }} />
+
       <View style={styles.appBar}>
         <Text style={styles.appBarTitle}>Quiz</Text>
       </View>
 
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#3DBE45" />
+          <ActivityIndicator size="large" color={C.green} />
         </View>
       ) : (
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
         >
@@ -61,7 +72,7 @@ export default function QuizSubjectsScreen() {
             Teste-toi sur toutes{'\n'}les matières
           </Text>
           <Text style={styles.headerSubtitle}>
-            Sélectionne une matière pour voir les chapitres disponibles.
+            20 questions par chapitre · explications incluses.
           </Text>
 
           <View style={styles.grid}>
@@ -70,11 +81,9 @@ export default function QuizSubjectsScreen() {
                 key={s.id}
                 style={styles.card}
                 activeOpacity={0.7}
-                onPress={() => handlePickSubject(s.id, s.name)}
+                onPress={() => handlePickSubject(s)}
               >
-                <View style={styles.iconWrap}>
-                  <Text style={styles.iconText}>{s.name.substring(0, 3).toUpperCase()}</Text>
-                </View>
+                <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
                 <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
                 <Text style={styles.cardCount}>{s.chapter_count || 0} chapitres</Text>
               </TouchableOpacity>
@@ -89,11 +98,11 @@ export default function QuizSubjectsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: C.bg,
   },
   appBar: {
     height: 64,
-    backgroundColor: '#3DBE45',
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
@@ -114,14 +123,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 22,
-    color: '#1A2027',
+    color: C.ink,
     letterSpacing: -0.5,
     lineHeight: 28,
   },
   headerSubtitle: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 13.5,
-    color: '#5A6470',
+    color: C.ink2,
     marginTop: 6,
     marginBottom: 20,
   },
@@ -140,39 +149,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 140,
-    shadowColor: '#1A2027',
+    shadowColor: C.ink,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 2,
     marginBottom: 4,
   },
-  iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#EAF7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  iconText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 14,
-    color: '#3DBE45',
-  },
   cardTitle: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 14,
-    color: '#1A2027',
+    color: C.ink,
     textAlign: 'center',
+    marginTop: 10,
     marginBottom: 2,
     width: '100%',
   },
   cardCount: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 11.5,
-    color: '#9AA3AC',
+    color: C.ink3,
     textAlign: 'center',
   },
 });

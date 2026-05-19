@@ -8,6 +8,34 @@ export type SubjectKind =
   | 'ling' | 'grec' | 'latin' | 'arabe' | 'adab' | 'port' | 'ital'
   | 'all' | 'russe' | 'chinois' | 'cg' | 'science' | 'bonus';
 
+/**
+ * Mapping `icon_slug` (backend SubjectSeeder) → `SubjectKind` (illustration locale).
+ * Slugs non listés tombent en fallback (lettre initiale).
+ */
+const BACKEND_SLUG_TO_KIND: Record<string, SubjectKind> = {
+  math: 'maths',
+  physics: 'phys',
+  biology: 'svt',
+  chemistry: 'chem',
+  philosophy: 'philo',
+  french: 'fr',
+  history: 'hg',
+  geography: 'geo',
+  english: 'eng',
+  economics: 'econ',
+  star: 'bonus',
+};
+
+/**
+ * Convertit un `icon_slug` venant du backend en `SubjectKind` exploité par
+ * `<SubjectIcon kind={...} />`. Si le slug n'est pas mappé, renvoie undefined
+ * (le composant affichera alors la tile lettre).
+ */
+export function backendSlugToSubjectKind(slug: string | null | undefined): SubjectKind | undefined {
+  if (!slug) return undefined;
+  return BACKEND_SLUG_TO_KIND[slug];
+}
+
 const SUBJECT_SOURCES: Record<SubjectKind, ImageSourcePropType> = {
   maths:   require('@/assets/images/illustrations/maths.png'),
   phys:    require('@/assets/images/illustrations/physique.png'),

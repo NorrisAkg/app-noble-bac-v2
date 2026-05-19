@@ -121,6 +121,9 @@ export default function QuizSessionScreen() {
         <View style={styles.questionHeader}>
           <Text style={styles.contextText}>{subjectLabel}</Text>
           <Text style={styles.questionText}>{q.statement}</Text>
+          <Text style={styles.hintText}>
+            Tu verras les corrections détaillées à la fin du quiz.
+          </Text>
         </View>
 
         <View style={styles.optionsContainer}>
@@ -239,6 +242,14 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     letterSpacing: -0.3,
     textAlign: 'center',
+  },
+  hintText: {
+    marginTop: 10,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
   optionsContainer: {
     gap: 10,
