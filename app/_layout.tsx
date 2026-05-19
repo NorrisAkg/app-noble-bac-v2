@@ -17,6 +17,7 @@ import {
 import 'react-native-reanimated';
 import '@/global.css';
 
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -101,6 +102,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           </Stack>
+          <OfflineBanner />
           <StatusBar style="auto" />
         </ThemeProvider>
       </QueryProvider>

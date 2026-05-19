@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -30,11 +29,10 @@ import {
 
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppBar } from '@/components/ui/AppBar';
+import { WhatsAppSheet } from '@/components/ui/WhatsAppSheet';
 import { getProfile } from '@/services/profileService';
 import { C } from '@/constants/theme';
 import type { UserProfile } from '@/types/api';
-
-const WHATSAPP_URL = 'https://wa.me/2250000000000';
 
 interface MenuItem {
   id: string;
@@ -61,6 +59,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
   const fallbackUser = useAuthStore((s) => s.user);
+
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
 
   const { data: profile, isLoading } = useQuery<UserProfile>({
     queryKey: ['profile'],
@@ -97,11 +97,7 @@ export default function ProfileScreen() {
   ];
 
   const openWhatsApp = () => {
-    Linking.openURL(WHATSAPP_URL).catch(() => {
-      // Silencieux : pas d'app WhatsApp installée → la maquette prévoit
-      // un fallback bottom sheet (cf. screens-profile-extras.jsx:396-478)
-      // qui sera implémenté en Phase 7.
-    });
+    setWhatsappOpen(true);
   };
 
   const menuItems: MenuItem[] = [
@@ -175,7 +171,7 @@ export default function ProfileScreen() {
       icon: Trash2,
       iconColor: C.danger,
       iconBg: C.dangerSoft,
-      onPress: () => router.push('/settings/privacy' as Href), // TODO Phase 7 : écran DeleteAccount dédié
+      onPress: () => router.push('/settings/delete-account' as Href),
       danger: true,
     },
   ];
@@ -280,6 +276,11 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <WhatsAppSheet
+        isOpen={whatsappOpen}
+        onClose={() => setWhatsappOpen(false)}
+      />
     </View>
   );
 }

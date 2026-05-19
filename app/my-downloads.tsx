@@ -8,15 +8,18 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Trash2, FileText, BookOpen, ScrollText } from 'lucide-react-native';
+import { ChevronLeft, Trash2, FileText, BookOpen, ScrollText, Wifi, Download } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { listDownloads, revokeDownload } from '@/services/myDownloadsService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { useOfflinePreferences } from '@/hooks/useOfflinePreferences';
+import { C } from '@/constants/theme';
 import type { OfflineDownloadableType, UserDownload } from '@/types/api';
 
 const DOWNLOADS_QUERY_KEY = ['my-downloads'] as const;
@@ -41,6 +44,22 @@ function typeLabel(type: OfflineDownloadableType): string {
       return 'Fiche de révision';
     case 'correction':
       return 'Corrigé';
+  }
+}
+
+/**
+ * Badge court coloré par type — aligné `screens-offline.jsx:161-165`.
+ * Le rouge tomato distingue les PDF/livres, le vert les fiches, le bleu
+ * les corrigés (pas de catégorie « vidéo » côté offline pour l'instant).
+ */
+function typeBadge(type: OfflineDownloadableType): { label: string; bg: string; fg: string } {
+  switch (type) {
+    case 'book':
+      return { label: 'PDF', bg: C.dangerSoft, fg: C.danger };
+    case 'revision_sheet':
+      return { label: 'FICHE', bg: C.greenSoft, fg: C.green };
+    case 'correction':
+      return { label: 'CORRIGÉ', bg: C.infoSoft, fg: C.info };
   }
 }
 
@@ -71,6 +90,8 @@ export default function MyDownloadsScreen() {
 
   const downloads = data?.downloads ?? [];
   const quota = data?.quota ?? null;
+
+  const { prefs, update: updatePrefs } = useOfflinePreferences();
 
   const revokeMutation = useMutation({
     mutationFn: (id: number) => revokeDownload(id),
@@ -122,6 +143,42 @@ export default function MyDownloadsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor="#3DBE45" />}
       >
+        {/* Préférences offline — stockées en AsyncStorage tant que
+            l'API n'expose pas /me/preferences (BACKEND_GAPS 7.2). */}
+        <View style={styles.prefsCard}>
+          <View style={styles.prefsRow}>
+            <View style={styles.prefsIconBox}>
+              <Wifi size={18} color={C.green} strokeWidth={2.2} />
+            </View>
+            <View style={styles.prefsTextCol}>
+              <Text style={styles.prefsLabel}>Télécharger en Wi-Fi uniquement</Text>
+              <Text style={styles.prefsHint}>Économise tes données mobiles</Text>
+            </View>
+            <Switch
+              value={prefs.wifiOnly}
+              onValueChange={(v) => updatePrefs({ wifiOnly: v })}
+              trackColor={{ false: C.line, true: C.green }}
+              thumbColor="#fff"
+            />
+          </View>
+          <View style={styles.prefsSeparator} />
+          <View style={styles.prefsRow}>
+            <View style={styles.prefsIconBox}>
+              <Download size={18} color={C.green} strokeWidth={2.2} />
+            </View>
+            <View style={styles.prefsTextCol}>
+              <Text style={styles.prefsLabel}>Téléchargement automatique</Text>
+              <Text style={styles.prefsHint}>Suggestions à jour sans action</Text>
+            </View>
+            <Switch
+              value={prefs.autoDownload}
+              onValueChange={(v) => updatePrefs({ autoDownload: v })}
+              trackColor={{ false: C.line, true: C.green }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
         {/* Quota card */}
         <View style={styles.quotaCard}>
           <View style={styles.quotaHeaderRow}>
@@ -176,18 +233,22 @@ interface DownloadRowProps {
 const DownloadRow: React.FC<DownloadRowProps> = ({ download, onRevoke, isRevoking }) => {
   const Icon = typeIcon(download.downloadable_type);
   const title = download.downloadable?.title ?? typeLabel(download.downloadable_type);
+  const badge = typeBadge(download.downloadable_type);
 
   return (
     <View style={styles.row}>
-      <View style={styles.rowIconWrap}>
-        <Icon size={20} color="#3DBE45" strokeWidth={2} />
+      <View style={[styles.rowIconWrap, { backgroundColor: badge.bg }]}>
+        <Icon size={20} color={badge.fg} strokeWidth={2} />
       </View>
       <View style={styles.rowInfo}>
-        <Text style={styles.rowTitle} numberOfLines={2}>
-          {title}
-        </Text>
+        <View style={styles.rowTitleRow}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
+          <View style={[styles.rowBadge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.rowBadgeText, { color: badge.fg }]}>{badge.label}</Text>
+          </View>
+        </View>
         <Text style={styles.rowMeta}>
-          {typeLabel(download.downloadable_type)} · {formatSize(download.file_size_kb)} · {formatDate(download.downloaded_at)}
+          {formatSize(download.file_size_kb)} · {formatDate(download.downloaded_at)}
         </Text>
       </View>
       <TouchableOpacity
@@ -198,9 +259,9 @@ const DownloadRow: React.FC<DownloadRowProps> = ({ download, onRevoke, isRevokin
         accessibilityLabel="Supprimer ce téléchargement"
       >
         {isRevoking ? (
-          <ActivityIndicator size="small" color="#E14B36" />
+          <ActivityIndicator size="small" color={C.danger} />
         ) : (
-          <Trash2 size={18} color="#E14B36" strokeWidth={2} />
+          <Trash2 size={18} color={C.danger} strokeWidth={2} />
         )}
       </TouchableOpacity>
     </View>
@@ -336,10 +397,26 @@ const styles = StyleSheet.create({
   rowInfo: {
     flex: 1,
   },
+  rowTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   rowTitle: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 13,
     color: '#1A2027',
+    flexShrink: 1,
+  },
+  rowBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  rowBadgeText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 9,
+    letterSpacing: 0.5,
   },
   rowMeta: {
     fontFamily: 'Poppins_400Regular',
@@ -352,5 +429,52 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Préférences offline
+  prefsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 4,
+    marginTop: 16,
+    shadowColor: '#1A2027',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  prefsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  prefsIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: C.greenSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prefsTextCol: {
+    flex: 1,
+  },
+  prefsLabel: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 13.5,
+    color: C.ink,
+  },
+  prefsHint: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 11.5,
+    color: C.ink3,
+    marginTop: 2,
+  },
+  prefsSeparator: {
+    height: 1,
+    backgroundColor: C.line,
+    marginHorizontal: 14,
   },
 });
