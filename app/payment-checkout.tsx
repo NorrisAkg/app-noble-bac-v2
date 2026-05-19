@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { getPaymentStatus } from '@/services/paymentService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
 import type { TransactionStatus } from '@/types/api';
 
 /**
@@ -46,6 +47,7 @@ export default function PaymentCheckoutScreen() {
 
   const [webViewLoading, setWebViewLoading] = useState(true);
   const [status, setStatus] = useState<TransactionStatus>('pending');
+  const [showSuccessSheet, setShowSuccessSheet] = useState(false);
   const finishedRef = useRef(false);
   const startedAtRef = useRef<number>(Date.now());
 
@@ -91,11 +93,10 @@ export default function PaymentCheckoutScreen() {
           await queryClient.invalidateQueries({ queryKey: ['profile'] });
           await queryClient.invalidateQueries({ queryKey: ['my-subscription-transactions'] });
           setStatus('confirmed');
-          Alert.alert(
-            'Paiement confirmé',
-            'Ton abonnement Premium est actif. Bonnes révisions !',
-            [{ text: 'Voir mon abonnement', onPress: () => router.replace('/my-subscription') }],
-          );
+          // Affiche le sheet « Tu es Premium ! » avec checkmark animé
+          // (aligné maquette `screens-premium.jsx:32-68`) au lieu de
+          // l'Alert.alert native.
+          setShowSuccessSheet(true);
         } else if (tx.status === 'failed' || tx.status === 'expired') {
           finishedRef.current = true;
           clearInterval(interval);
@@ -206,6 +207,14 @@ export default function PaymentCheckoutScreen() {
           </Text>
         </View>
       )}
+
+      <PremiumSuccessSheet
+        isOpen={showSuccessSheet}
+        onClose={() => {
+          setShowSuccessSheet(false);
+          router.replace('/my-subscription');
+        }}
+      />
     </View>
   );
 }

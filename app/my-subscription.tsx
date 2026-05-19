@@ -12,9 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, CheckCircle2, Clock, XCircle, AlertTriangle, Crown } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@tanstack/react-query';
 
 import { getActiveSubscription, getTransactions } from '@/services/subscriptionService';
+import { C } from '@/constants/theme';
 import type { PaymentTransaction, SubscriptionStatus, TransactionStatus } from '@/types/api';
 
 function formatDate(iso: string | null): string {
@@ -88,6 +90,12 @@ export default function MySubscriptionScreen() {
 
   const sub = activeQuery.data;
   const transactions = txQuery.data?.data ?? [];
+  // Total dépensé : somme des transactions confirmées uniquement
+  // (aligné maquette `screens-mvp-additions.jsx:182-183`).
+  const totalSpent = transactions
+    .filter((t) => t.status === 'confirmed')
+    .reduce((acc, t) => acc + t.amount_fcfa, 0);
+  const currency = transactions[0]?.currency ?? 'FCFA';
 
   const refreshing = activeQuery.isRefetching || txQuery.isRefetching;
   const refetchAll = () => {
@@ -141,11 +149,19 @@ export default function MySubscriptionScreen() {
             startedAt={sub.started_at}
             expiresAt={sub.expires_at}
             daysLeft={daysRemaining(sub.expires_at)}
-            onChange={() => router.push('/subscription-plans')}
+            onRenew={() => router.push('/subscription-plans')}
+            onExtend={() => router.push('/subscription-plans')}
           />
         )}
 
-        <Text style={styles.sectionTitle}>Historique de paiements</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Historique</Text>
+          {totalSpent > 0 && (
+            <Text style={styles.totalSpent}>
+              {formatAmount(totalSpent, currency)} dépensés
+            </Text>
+          )}
+        </View>
 
         {txQuery.isLoading ? (
           <View style={styles.stateBox}>
@@ -173,7 +189,8 @@ interface ActiveSubCardProps {
   startedAt: string | null;
   expiresAt: string | null;
   daysLeft: number;
-  onChange: () => void;
+  onRenew: () => void;
+  onExtend: () => void;
 }
 
 const ActiveSubCard: React.FC<ActiveSubCardProps> = ({
@@ -182,16 +199,28 @@ const ActiveSubCard: React.FC<ActiveSubCardProps> = ({
   startedAt,
   expiresAt,
   daysLeft,
-  onChange,
+  onRenew,
+  onExtend,
 }) => {
   const isActive = status === 'active';
+  const gradientColors: [string, string] = isActive
+    ? [C.green, C.greenDark]
+    : ['#9AA3AC', '#6F767D'];
+
   return (
-    <View style={[styles.subCard, !isActive && styles.subCardInactive]}>
+    <LinearGradient
+      colors={gradientColors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.subCard}
+    >
       <View style={styles.subCardHead}>
         <View style={styles.subCardBadge}>
-          <Text style={styles.subCardBadgeText}>{statusLabel(status).toUpperCase()}</Text>
+          <Text style={styles.subCardBadgeText}>
+            {isActive ? '✓ ACTIF' : statusLabel(status).toUpperCase()}
+          </Text>
         </View>
-        <Crown size={20} color={isActive ? '#FFB800' : '#9AA3AC'} strokeWidth={2.2} />
+        <Crown size={20} color={isActive ? '#FFB800' : '#fff'} strokeWidth={2.2} />
       </View>
       <Text style={styles.subCardLabel}>{label}</Text>
       {isActive && (
@@ -201,20 +230,42 @@ const ActiveSubCard: React.FC<ActiveSubCardProps> = ({
       )}
       <View style={styles.subDates}>
         <View style={styles.subDateBlock}>
-          <Text style={styles.subDateLabel}>Début</Text>
+          <Text style={styles.subDateLabel}>DÉBUT</Text>
           <Text style={styles.subDateValue}>{formatDate(startedAt)}</Text>
         </View>
         <View style={styles.subDateBlock}>
-          <Text style={styles.subDateLabel}>Expiration</Text>
+          <Text style={styles.subDateLabel}>EXPIRATION</Text>
           <Text style={styles.subDateValue}>{formatDate(expiresAt)}</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.subCardCta} activeOpacity={0.85} onPress={onChange}>
-        <Text style={styles.subCardCtaText}>
-          {isActive ? 'Voir les autres offres' : 'Réactiver mon abonnement'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+
+      {isActive ? (
+        <View style={styles.subCardCtaRow}>
+          <TouchableOpacity
+            style={[styles.subCardCta, styles.subCardCtaPrimary]}
+            activeOpacity={0.85}
+            onPress={onRenew}
+          >
+            <Text style={[styles.subCardCtaText, { color: C.green }]}>Renouveler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subCardCta, styles.subCardCtaSecondary]}
+            activeOpacity={0.85}
+            onPress={onExtend}
+          >
+            <Text style={styles.subCardCtaText}>Étendre scope</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.subCardCta, styles.subCardCtaPrimary, { marginTop: 16 }]}
+          activeOpacity={0.85}
+          onPress={onRenew}
+        >
+          <Text style={[styles.subCardCtaText, { color: C.green }]}>Réactiver mon abonnement</Text>
+        </TouchableOpacity>
+      )}
+    </LinearGradient>
   );
 };
 
@@ -296,11 +347,14 @@ const styles = StyleSheet.create({
 
   subCard: {
     marginTop: 20,
-    backgroundColor: '#3DBE45',
     borderRadius: 18,
     padding: 18,
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 28,
+    elevation: 4,
   },
-  subCardInactive: { backgroundColor: '#9AA3AC' },
   subCardHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -333,28 +387,50 @@ const styles = StyleSheet.create({
   },
   subDateBlock: { gap: 2 },
   subDateLabel: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Poppins_500Medium',
     fontSize: 10,
     color: 'rgba(255,255,255,0.7)',
     letterSpacing: 0.5,
   },
   subDateValue: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: '#fff' },
-  subCardCta: {
+  subCardCtaRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 16,
+  },
+  subCardCta: {
+    flex: 1,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  subCardCtaPrimary: {
+    backgroundColor: '#fff',
+  },
+  subCardCtaSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
   subCardCtaText: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: '#fff' },
 
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 22,
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 14,
     color: '#1A2027',
-    marginTop: 22,
-    marginBottom: 12,
+  },
+  totalSpent: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 12,
+    color: C.ink2,
   },
 
   txList: { gap: 8 },
