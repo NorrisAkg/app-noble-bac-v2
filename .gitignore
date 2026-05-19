@@ -37,6 +37,9 @@ yarn-error.*
 *-firebase-adminsdk-*.json
 firebase-credentials.json
 
+# test coverage artefacts (régénérés par `npm test`)
+coverage/
+
 # typescript
 *.tsbuildinfo
 
