@@ -9,6 +9,7 @@ export { CountryMap } from './CountryMap';
 export { CountryPickerSheet } from './CountryPickerSheet';
 export { CustomTabBar } from './CustomTabBar';
 export { EmptyState } from './EmptyState';
+export { GraduationCap } from './GraduationCap';
 export { Heading } from './Heading';
 export type { HeadingLevel } from './Heading';
 export { IllustrationStack, IllustrationQuiz, IllustrationAI } from './Illustrations';

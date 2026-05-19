@@ -1,25 +1,39 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Landing Screen ──────────────────────────────────────────────────────────
-// Full-bleed video background with a dark gradient overlay and CTAs.
+// Full-bleed video background avec dégradés conformes à la maquette :
+//   1. dégradé vertical foncé multi-stops (lisibilité du CTA)
+//   2. tinte verte radiale (brand)
+//   3. vignette centrale
+//
+// Au montage, on persiste `hasSeenOnboarding` pour que le RootLayout n'envoie
+// plus l'utilisateur sur le landing au prochain démarrage.
 
 export default function LandingScreen() {
   const router = useRouter();
 
-  const player = useVideoPlayer(require('@/assets/videos/landing-bg.mp4'), player => {
-    player.loop = true;
-    player.play();
+  const player = useVideoPlayer(require('@/assets/videos/landing-bg.mp4'), (p) => {
+    p.loop = true;
+    p.play();
   });
+
+  useEffect(() => {
+    AsyncStorage.setItem('hasSeenOnboarding', 'true').catch(() => {
+      // Silencieux : si le storage est inaccessible, l'utilisateur reverra
+      // le landing au prochain démarrage. Pas critique.
+    });
+  }, []);
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Video Background */}
       <VideoView
         style={styles.video}
         player={player}
@@ -27,28 +41,56 @@ export default function LandingScreen() {
         contentFit="cover"
       />
 
-      {/* Dark gradient overlay for legibility (simulated via overlapping views) */}
-      <View style={[styles.overlay, { backgroundColor: 'rgba(11,20,16,0.3)' }]} />
-      
-      {/* Soft green tint */}
-      <View style={[styles.overlay, { backgroundColor: 'rgba(61,190,69,0.08)' }]} />
+      {/* 1. Dégradé vertical foncé — 4 stops pour lisibilité haut + bas */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          'rgba(11,20,16,0.55)',
+          'rgba(11,20,16,0.30)',
+          'rgba(11,20,16,0.55)',
+          'rgba(11,20,16,0.85)',
+        ]}
+        locations={[0, 0.35, 0.7, 1]}
+        style={styles.overlay}
+      />
+
+      {/* 2. Tinte verte radiale haut-gauche — simulée par un gradient
+              elliptique. expo-linear-gradient n'a pas de RadialGradient ;
+              on approxime avec une translation diagonale. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(61,190,69,0.18)', 'rgba(61,190,69,0)']}
+        start={{ x: 0.3, y: 0.2 }}
+        end={{ x: 0.85, y: 0.75 }}
+        style={styles.overlay}
+      />
+
+      {/* 3. Vignette périphérique — assombrit les bords */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
+        locations={[0, 0.4, 1]}
+        start={{ x: 0.5, y: 0.5 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.overlay}
+      />
 
       <View style={styles.content}>
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.btnPrimary}
             activeOpacity={0.85}
             onPress={() => router.push('/(auth)/signup')}
           >
             <Text style={styles.btnPrimaryText}>Commencer</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.btnSecondary}
             activeOpacity={0.85}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Text style={styles.btnSecondaryText}>J'ai déjà un compte</Text>
+            <Text style={styles.btnSecondaryText}>J&apos;ai déjà un compte</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -66,7 +108,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    pointerEvents: 'none',
   },
   content: {
     flex: 1,

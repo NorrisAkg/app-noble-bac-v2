@@ -5,23 +5,26 @@ import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { CountryFlag } from '@/components/ui/CountryFlag';
+import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
 import { Eye, EyeOff, ChevronDown } from 'lucide-react-native';
 import { login } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getApiErrorMessage } from '@/utils/apiError';
-
-const DEFAULT_DIAL = '+227'; // Niger
+import { DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function LoginScreen() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
 
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
 
   // Build the E.164 number — strip leading zeros on the local number
-  const e164Phone = `${DEFAULT_DIAL}${phone.replace(/^0+/, '')}`;
+  const e164Phone = `${country.dial}${phone.replace(/^0+/, '')}`;
   const isValid = phone.length >= 6 && password.length >= 4;
 
   const { mutate, isPending } = useMutation({
@@ -58,8 +61,12 @@ export default function LoginScreen() {
             value={phone}
             onChangeText={setPhone}
             icon={
-              <TouchableOpacity className="flex-row items-center gap-1.5 pr-2 border-r border-line">
-                <Text className="font-poppins-semibold text-sm text-brand-ink">{DEFAULT_DIAL}</Text>
+              <TouchableOpacity
+                onPress={() => setPickerOpen(true)}
+                className="flex-row items-center gap-1.5 pr-2 border-r border-line"
+              >
+                <CountryFlag code={country.code} size={22} />
+                <Text className="font-poppins-semibold text-sm text-brand-ink ml-1">{country.dial}</Text>
                 <ChevronDown size={14} color="#5A6470" />
               </TouchableOpacity>
             }
@@ -101,6 +108,13 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CountryPickerSheet
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selected={country}
+        onSelect={setCountry}
+      />
     </View>
   );
 }

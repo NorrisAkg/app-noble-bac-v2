@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { CustomBottomSheet } from '@/components/ui/BottomSheet';
 import { Check, ChevronDown } from 'lucide-react-native';
+import { CountryFlag } from '@/components/ui/CountryFlag';
+import { CountryMap } from '@/components/ui/CountryMap';
 import { getCountries } from '@/services/referentialService';
 import { register } from '@/services/authService';
 import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
@@ -81,10 +83,6 @@ export default function SignupScreen() {
   };
 
   const availableSeries = country?.series ?? [];
-  const flagEmoji: Record<string, string> = {
-    BJ: '🇧🇯', BF: '🇧🇫', CI: '🇨🇮', GW: '🇬🇼',
-    ML: '🇲🇱', NE: '🇳🇪', SN: '🇸🇳', TG: '🇹🇬',
-  };
 
   return (
     <View className="flex-1 bg-background">
@@ -134,7 +132,8 @@ export default function SignupScreen() {
                   <ActivityIndicator size="small" color="#3DBE45" />
                 ) : (
                   <>
-                    <Text className="font-poppins-semibold text-sm text-brand-ink">
+                    {country && <CountryFlag code={country.iso_code} size={22} />}
+                    <Text className="font-poppins-semibold text-sm text-brand-ink ml-1">
                       {country ? country.phone_code : '──'}
                     </Text>
                     <ChevronDown size={14} color="#5A6470" />
@@ -216,7 +215,7 @@ export default function SignupScreen() {
                 c.id === country?.id ? 'bg-brand-green/10' : 'bg-transparent'
               }`}
             >
-              <Text className="text-2xl">{flagEmoji[c.iso_code] ?? '🌍'}</Text>
+              <CountryMap code={c.iso_code} size={32} />
               <View className="flex-1">
                 <Text className="font-poppins-semibold text-[14.5px] text-brand-ink">{c.name}</Text>
                 <Text className="font-poppins text-xs text-brand-ink-light">{c.phone_code}</Text>

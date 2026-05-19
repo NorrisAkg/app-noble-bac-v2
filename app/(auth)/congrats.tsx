@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Button } from '@/components/ui/Button';
+import { GraduationCap } from '@/components/ui/GraduationCap';
 import { Star } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -81,11 +83,14 @@ export default function CongratsScreen() {
 
       <ScrollView className="flex-1 pt-6">
         <View className="items-center px-6">
-          <View className="w-[148px] h-[148px] rounded-full border-[3px] border-brand-green bg-brand-green/10 items-center justify-center">
+          <Animated.View
+            entering={FadeIn.duration(600).springify().damping(12)}
+            className="w-[148px] h-[148px] rounded-full border-[3px] border-brand-green bg-brand-green/10 items-center justify-center"
+          >
             <Text className="absolute -top-1 -left-7 text-[28px]">🎉</Text>
             <Text className="absolute top-0 -right-8 text-[28px]">🎊</Text>
-            <Text className="text-6xl">🎓</Text>
-          </View>
+            <GraduationCap size={78} />
+          </Animated.View>
 
           <Text className="font-poppins-extrabold text-[28px] text-brand-ink mt-6 text-center">
             Félicitations !
@@ -134,7 +139,7 @@ export default function CongratsScreen() {
         className="px-5 pt-4 bg-white border-t border-line"
         style={{ paddingBottom: Math.max(insets.bottom, 16) }}
       >
-        <Button onPress={() => router.replace('/(tabs)')}>
+        <Button onPress={() => router.replace('/setup')}>
           Commencer maintenant
         </Button>
       </View>
