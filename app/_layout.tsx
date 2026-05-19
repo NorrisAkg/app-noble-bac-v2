@@ -1,10 +1,9 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import '@/global.css';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -32,7 +31,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const { initialize, isAuthenticated } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
@@ -100,7 +98,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <ThemeProvider value={DefaultTheme}>
           <Stack>
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

@@ -22,6 +22,22 @@ module.exports = {
             medium: '#5A6470',
             light: '#9AA3AC',
           },
+          danger: {
+            DEFAULT: '#E14B36',
+            soft: '#FCE9E5',
+          },
+          warning: {
+            DEFAULT: '#FFB800',
+            soft: '#FFF6E0',
+          },
+          info: {
+            DEFAULT: '#3D7BBE',
+            soft: '#E8F1FB',
+          },
+          premium: '#FFC857',
+          tomato: '#E8624C',
+          handle: '#D5DAE0',
+          muted: '#EEF1F4',
         },
         primary: {
           DEFAULT: "#3DBE45",

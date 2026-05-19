@@ -1,53 +1,30 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Charte couleurs Noble BAC UEMOA — source de vérité côté JS (au-delà du Tailwind).
+ * Aligné sur `mobile/templates/shared.jsx` (objet `C`).
+ * Mono-thème clair : pas de mode sombre.
  */
 
-import { Platform } from 'react-native';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const C = {
+  green: '#3DBE45',
+  greenDark: '#2EA037',
+  greenSoft: '#EAF7EB',
+  salmon: '#E8A090',
+  salmonDark: '#D38576',
+  salmonSoft: '#FBEDE8',
+  bg: '#F5F5F5',
+  ink: '#1A2027',
+  ink2: '#5A6470',
+  ink3: '#9AA3AC',
+  line: '#E6E8EB',
+  white: '#FFFFFF',
+  danger: '#E14B36',
+  dangerSoft: '#FCE9E5',
+  warning: '#FFB800',
+  warningSoft: '#FFF6E0',
+  info: '#3D7BBE',
+  infoSoft: '#E8F1FB',
+  premium: '#FFC857',
+  tomato: '#E8624C',
+  handle: '#D5DAE0',
+  muted: '#EEF1F4',
+} as const;

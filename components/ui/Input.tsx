@@ -24,7 +24,7 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View className={`mb-4 ${containerClassName}`}>
       {label && (
-        <Text className="font-poppins-semibold text-[12px] text-brand-ink-medium tracking-[0.3px] mb-1.5 uppercase">
+        <Text className="font-poppins-semibold text-[12px] text-brand-ink-medium tracking-[0.3px] mb-1.5">
           {label}
         </Text>
       )}

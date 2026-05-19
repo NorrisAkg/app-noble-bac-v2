@@ -5,6 +5,7 @@ interface ButtonProps {
   children: React.ReactNode;
   onPress: () => void;
   variant?: 'primary' | 'ghost';
+  shape?: 'pill' | 'rounded';
   disabled?: boolean;
   loading?: boolean;
   className?: string;
@@ -17,6 +18,7 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   onPress,
   variant = 'primary',
+  shape = 'pill',
   disabled = false,
   loading = false,
   className = '',
@@ -25,8 +27,9 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
 }) => {
   const isPrimary = variant === 'primary';
-  
-  const baseClassName = "w-full h-[52px] rounded-full flex-row items-center justify-center";
+  const radiusClass = shape === 'pill' ? 'rounded-full' : 'rounded-[12px]';
+
+  const baseClassName = `w-full h-[52px] ${radiusClass} flex-row items-center justify-center`;
   const primaryClassName = disabled 
     ? "bg-brand-green/40 shadow-none" 
     : "bg-brand-green shadow-lg shadow-brand-green/50";

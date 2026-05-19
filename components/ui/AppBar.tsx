@@ -20,7 +20,7 @@ export const AppBar: React.FC<AppBarProps> = ({ title, onBack, onClose, right })
       style={{ paddingTop: insets.top }}
     >
       <StatusBar style="light" />
-      <View className="h-[60px] flex-row items-center px-3">
+      <View className="h-16 flex-row items-center px-3">
         {(onBack || onClose) && (
           <TouchableOpacity
             onPress={onBack || onClose}
