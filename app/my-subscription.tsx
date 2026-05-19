@@ -129,7 +129,7 @@ export default function MySubscriptionScreen() {
             <TouchableOpacity
               style={styles.ctaBtn}
               activeOpacity={0.85}
-              onPress={() => router.push('/subscription-plans' as never)}
+              onPress={() => router.push('/subscription-plans')}
             >
               <Text style={styles.ctaBtnText}>Voir les offres</Text>
             </TouchableOpacity>
@@ -141,7 +141,7 @@ export default function MySubscriptionScreen() {
             startedAt={sub.started_at}
             expiresAt={sub.expires_at}
             daysLeft={daysRemaining(sub.expires_at)}
-            onChange={() => router.push('/subscription-plans' as never)}
+            onChange={() => router.push('/subscription-plans')}
           />
         )}
 

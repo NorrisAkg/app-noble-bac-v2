@@ -74,7 +74,7 @@ export default function PaymentCheckoutScreen() {
         Alert.alert(
           'Paiement en cours',
           'La confirmation prend plus de temps que prevu. Tu peux verifier le statut dans "Mon abonnement".',
-          [{ text: 'OK', onPress: () => router.replace('/my-subscription' as never) }],
+          [{ text: 'OK', onPress: () => router.replace('/my-subscription') }],
         );
         return;
       }
@@ -91,7 +91,7 @@ export default function PaymentCheckoutScreen() {
           Alert.alert(
             'Paiement confirmé',
             'Ton abonnement Premium est actif. Bonnes révisions !',
-            [{ text: 'Voir mon abonnement', onPress: () => router.replace('/my-subscription' as never) }],
+            [{ text: 'Voir mon abonnement', onPress: () => router.replace('/my-subscription') }],
           );
         } else if (tx.status === 'failed' || tx.status === 'expired') {
           finishedRef.current = true;

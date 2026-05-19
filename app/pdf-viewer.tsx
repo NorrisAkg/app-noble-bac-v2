@@ -144,7 +144,7 @@ export default function PdfViewerScreen() {
           [
             { text: 'Annuler', style: 'cancel' },
             // typedRoutes Expo Router : la route `/my-downloads` est generee au prochain build.
-            { text: 'Voir mes téléchargements', onPress: () => router.push('/my-downloads' as never) },
+            { text: 'Voir mes téléchargements', onPress: () => router.push('/my-downloads') },
           ],
         );
         return;

@@ -1,7 +1,16 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { BottomTabBarProps, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, BookOpen, Layers, CheckSquare, User } from 'lucide-react-native';
+
+// Expo-router augmente BottomTabNavigationOptions avec `href` (null = onglet
+// cache du tab bar) et tabBarTestID n'est pas dans les types officiels recents
+// de @react-navigation/bottom-tabs mais reste accepte au runtime. On declare
+// localement l'extension pour rester typed sans `any`.
+type ExpoTabOptions = BottomTabNavigationOptions & {
+  href?: string | null;
+  tabBarTestID?: string;
+};
 
 const TABS_CONFIG = {
   index: { label: 'Accueil', icon: Home },
@@ -17,7 +26,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
       {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
+        const options = descriptors[route.key].options as ExpoTabOptions;
         const isFocused = state.index === index;
 
         // Skip hidden tabs or tabs not in our config

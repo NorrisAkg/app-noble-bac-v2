@@ -58,12 +58,12 @@ export default function SubscriptionPlansScreen() {
     try {
       const { transaction, payment_url } = await initiatePayment(plan.id);
       router.push({
-        pathname: '/payment-checkout' as never,
+        pathname: '/payment-checkout',
         params: {
           transaction_id: String(transaction.id),
           payment_url: encodeURIComponent(payment_url),
         },
-      } as never);
+      });
     } catch (e) {
       Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de demarrer le paiement.'));
     } finally {
@@ -118,7 +118,7 @@ export default function SubscriptionPlansScreen() {
         {userHasActiveSub && (
           <View style={styles.activeBanner}>
             <Text style={styles.activeBannerTitle}>Tu as déjà un abonnement actif</Text>
-            <TouchableOpacity onPress={() => router.replace('/my-subscription' as never)}>
+            <TouchableOpacity onPress={() => router.replace('/my-subscription')}>
               <Text style={styles.activeBannerLink}>Voir mon abonnement →</Text>
             </TouchableOpacity>
           </View>

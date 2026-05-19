@@ -115,14 +115,14 @@ export default function ProfileScreen() {
           {profile?.is_premium === true ? (
             <TouchableOpacity
               style={styles.premiumBadge}
-              onPress={() => router.push('/my-subscription' as never)}
+              onPress={() => router.push('/my-subscription')}
             >
               <Text style={styles.premiumText}>MEMBRE PREMIUM</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={styles.upgradeBadge}
-              onPress={() => router.push('/subscription-plans' as never)}
+              onPress={() => router.push('/subscription-plans')}
             >
               <Text style={styles.upgradeText}>DEVENIR PREMIUM</Text>
             </TouchableOpacity>
