@@ -13,7 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera, Check } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { C } from '@/constants/theme';
 import { getProfile, updateProfile } from '@/services/profileService';
 import { getApiErrorMessage } from '@/utils/apiError';
 import type { UpdateProfilePayload, UserProfile } from '@/types/api';
@@ -100,14 +102,20 @@ export default function EditProfileScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Avatar Edit */}
+        {/* Avatar Edit — gradient `135deg green→greenDark` aligné maquette
+            `screens-profile-extras.jsx:33`. */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
+            <LinearGradient
+              colors={[C.green, C.greenDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatar}
+            >
               <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            </LinearGradient>
             <TouchableOpacity style={styles.cameraBtn}>
-              <Camera size={16} color="#3DBE45" />
+              <Camera size={16} color={C.green} />
             </TouchableOpacity>
           </View>
           <Text style={styles.avatarHint}>Touche la photo pour la changer</Text>

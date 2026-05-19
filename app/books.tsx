@@ -12,16 +12,41 @@ import { useDownloadedSet } from '@/hooks/useDownloadedSet';
 import type { Book, Subject } from '@/types/api';
 import { FilterSheet } from '@/components/books/FilterSheet';
 
-// Fallback gradient colors for book covers
-const BOOK_GRADIENTS: Record<string, [string, string]> = {
-  maths: ['#3DBE45', '#2EA037'],
-  phys: ['#E8A090', '#D38576'],
-  svt: ['#3DBE45', '#2EA037'],
-  fr: ['#E8A090', '#D38576'],
-  hg: ['#3DBE45', '#2EA037'],
-  philo: ['#E8A090', '#D38576'],
-  angl: ['#3DBE45', '#2EA037'],
-};
+/**
+ * Palette pour les couvertures de livres quand `book.cover_url` est absent.
+ * Le backend ne donne ni l'icon_slug ni un kind pour les livres ; on déduit
+ * la palette à partir du nom de matière via une fonction déterministe.
+ *
+ * Le bug précédent (`BOOK_GRADIENTS[book.subject?.id ? 'maths' : 'phys']`)
+ * faisait que TOUS les livres avec un subject prenaient maths et tous les
+ * autres prenaient phys — sans aucun rapport avec la matière réelle.
+ */
+const COVER_PALETTES: [string, string][] = [
+  ['#3DBE45', '#2EA037'], // green
+  ['#E8A090', '#D38576'], // salmon
+  ['#3D7BBE', '#2C5A8C'], // info blue
+  ['#FFB876', '#E8624C'], // tomato
+  ['#7B5BD6', '#5B41A8'], // violet (utilisé dans Courses)
+];
+
+/**
+ * Hash léger d'une chaîne, pour indexer COVER_PALETTES de façon
+ * déterministe (même livre = même couleur entre deux rendus).
+ */
+function pickCoverPalette(subjectName: string | undefined | null): [string, string] {
+  const key = (subjectName ?? '').toLowerCase();
+  if (key.startsWith('math')) return COVER_PALETTES[0];
+  if (key.startsWith('phys')) return COVER_PALETTES[1];
+  if (key.startsWith('svt') || key.startsWith('bio')) return COVER_PALETTES[0];
+  if (key.startsWith('fr')) return COVER_PALETTES[1];
+  if (key.startsWith('hist')) return COVER_PALETTES[2];
+  if (key.startsWith('philo')) return COVER_PALETTES[4];
+  if (key.startsWith('angl')) return COVER_PALETTES[2];
+  // Fallback : hash simple sur les charcodes du nom.
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return COVER_PALETTES[h % COVER_PALETTES.length];
+}
 
 export default function BooksLibraryScreen() {
   const router = useRouter();
@@ -230,9 +255,10 @@ const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress
 };
 
 const BookCover: React.FC<{ book: Book; isDownloaded?: boolean }> = ({ book, isDownloaded }) => {
+  const [coverPrimary] = pickCoverPalette(book.subject?.name);
   return (
     <View style={styles.coverContainer}>
-      <View style={[styles.coverColor, { backgroundColor: BOOK_GRADIENTS[book.subject?.id ? 'maths' : 'phys'][0] }]} />
+      <View style={[styles.coverColor, { backgroundColor: coverPrimary }]} />
 
       {book.cover_url ? (
         <Image

@@ -10,14 +10,23 @@ import { verifyOtp } from '@/services/authService';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 const OtpCircle = ({ filled, active }: { filled: boolean, active: boolean }) => (
+  // Active state : anneau visible 4px aligné maquette `screens-verify-congrats.jsx:20`
+  // (`boxShadow: 0 0 0 4px greenSoft`). Reproduit en React Native via un View
+  // wrapper coloré greenSoft + le cercle blanc interne plus petit.
   <View
-    className={`w-[46px] h-[46px] rounded-full border-2 items-center justify-center bg-white ${
-      filled || active ? 'border-brand-green' : 'border-[#D5DAE0]'
-    } ${active ? 'shadow-sm shadow-brand-green' : ''}`}
+    className={`items-center justify-center rounded-full ${
+      active ? 'bg-brand-green/20 w-[54px] h-[54px]' : 'w-[46px] h-[46px]'
+    }`}
   >
-    {filled && (
-      <View className="w-3 h-3 rounded-full bg-brand-green" />
-    )}
+    <View
+      className={`w-[46px] h-[46px] rounded-full border-2 items-center justify-center bg-white ${
+        filled || active ? 'border-brand-green' : 'border-[#D5DAE0]'
+      }`}
+    >
+      {filled && (
+        <View className="w-3 h-3 rounded-full bg-brand-green" />
+      )}
+    </View>
   </View>
 );
 
@@ -158,6 +167,7 @@ export default function VerifyScreen() {
           onPress={handleVerify}
           disabled={!isFilled || !verificationId || isPending}
           loading={isPending}
+          shape="rounded"
           className={!isFilled ? 'bg-[#C7CCD2]' : ''}
         >
           VÉRIFIER
@@ -178,7 +188,7 @@ export default function VerifyScreen() {
         </View>
       </View>
 
-      <View className="bg-[#ECEEF0] p-1.5 pb-8">
+      <View className="bg-[#ECEEF0] p-1.5 pb-3">
         {[
           ['1', '2', '3'],
           ['4', '5', '6'],

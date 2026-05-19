@@ -1,14 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronLeft, Share2, Bookmark, Lock } from 'lucide-react-native';
+import { ChevronLeft, Lock } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { TexRenderer } from '@/components/courses/TexRenderer';
 import { courseService } from '@/services/courseService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { C } from '@/constants/theme';
 
 export default function CourseReaderScreen() {
   const insets = useSafeAreaInsets();
@@ -50,27 +51,24 @@ export default function CourseReaderScreen() {
           </Text>
         </View>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Bookmark color="#fff" size={20} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Share2 color="#fff" size={20} />
-          </TouchableOpacity>
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        showsVerticalScrollIndicator={false}
+      >
         {status === 'loading' && (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#3DBE45" />
+            <ActivityIndicator size="large" color={C.green} />
             <Text style={styles.helperText}>Chargement de la leçon…</Text>
           </View>
         )}
 
         {status === 'forbidden' && (
           <View style={styles.centered}>
-            <Lock size={36} color="#9AA3AC" />
+            <Lock size={36} color={C.ink3} />
             <Text style={styles.errorTitle}>Contenu Premium</Text>
             <Text style={styles.errorText}>
               Cette leçon est réservée aux abonnés Premium. Active ton abonnement pour y accéder.
@@ -88,7 +86,32 @@ export default function CourseReaderScreen() {
           </View>
         )}
 
-        {status === 'ready' && lesson?.content && <TexRenderer content={lesson.content} />}
+        {status === 'ready' && lesson?.content && (
+          <>
+            <TexRenderer content={lesson.content} />
+
+            {/* Carte CTA fin de leçon — aligné `templates/screens-course-reader.jsx:186-219`.
+                Remplace l'ancien FAB noir flottant 🎯 par une vraie call-to-action intégrée. */}
+            <View style={styles.testCard}>
+              <View style={styles.testIcon}>
+                <Text style={styles.testEmoji}>🎯</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.testTitle}>Tester vos acquis</Text>
+                <Text style={styles.testDesc}>
+                  Quelques questions pour valider la leçon.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/quiz')}
+                activeOpacity={0.85}
+                style={styles.testBtn}
+              >
+                <Text style={styles.testBtnText}>Commencer</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {status === 'ready' && !lesson?.content && (
           <View style={styles.centered}>
@@ -96,15 +119,7 @@ export default function CourseReaderScreen() {
             <Text style={styles.errorText}>Le contenu de cette leçon n&apos;est pas encore disponible.</Text>
           </View>
         )}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.quizFab, { bottom: insets.bottom + 20 }]}
-        activeOpacity={0.9}
-        onPress={() => router.push('/(tabs)/quiz')}
-      >
-        <Text style={styles.quizFabText}>🎯 Faire le Quiz</Text>
-      </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -142,16 +157,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 16,
     color: '#fff',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   content: {
     flex: 1,
@@ -194,25 +199,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
   },
-  quizFab: {
-    position: 'absolute',
-    right: 20,
-    backgroundColor: '#1A2027',
-    paddingHorizontal: 20,
-    height: 48,
-    borderRadius: 24,
+  testCard: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    shadowColor: C.ink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
   },
-  quizFabText: {
+  testIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.salmonSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testEmoji: {
+    fontSize: 24,
+  },
+  testTitle: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 14,
+    color: C.ink,
+    letterSpacing: -0.2,
+  },
+  testDesc: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: C.ink3,
+    marginTop: 2,
+  },
+  testBtn: {
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 19,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testBtnText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 12.5,
     color: '#fff',
   },
 });

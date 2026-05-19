@@ -63,10 +63,10 @@ export default function SplashScreen() {
       <View style={styles.content}>
         {/* Logo block */}
         <Animated.View style={[styles.logoBox, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-          <Image 
-            source={require('@/assets/images/icon.png')} 
-            style={{ width: 92, height: 92 }} 
-            contentFit="contain" 
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={{ width: 92, height: 92 }}
+            contentFit="contain"
           />
         </Animated.View>
 
