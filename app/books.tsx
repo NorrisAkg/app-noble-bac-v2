@@ -1,16 +1,28 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronLeft, Search, X, ChevronDown, Check } from 'lucide-react-native';
+import { Search, X, ChevronDown, Check } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
+import { AppBar } from '@/components/ui/AppBar';
+import { Toast, type ToastTone } from '@/components/ui/Toast';
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
 import { useDownloadedSet } from '@/hooks/useDownloadedSet';
+import { getApiErrorMessage } from '@/utils/apiError';
+import { C } from '@/constants/theme';
 import type { Book, Subject } from '@/types/api';
 import { FilterSheet } from '@/components/books/FilterSheet';
+
+type PickerType = 'subject' | 'author' | null;
+
+interface ToastState {
+  visible: boolean;
+  message: string;
+  tone: ToastTone;
+}
 
 /**
  * Palette pour les couvertures de livres quand `book.cover_url` est absent.
@@ -48,6 +60,8 @@ function pickCoverPalette(subjectName: string | undefined | null): [string, stri
   return COVER_PALETTES[h % COVER_PALETTES.length];
 }
 
+const INITIAL_TOAST: ToastState = { visible: false, message: '', tone: 'info' };
+
 export default function BooksLibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -57,8 +71,19 @@ export default function BooksLibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  
-  const [pickerType, setPickerType] = useState<'subject' | null>(null);
+  // Filtre `Auteur` aligné maquette `screens-profile-extras.jsx:549-553`.
+  // Le backend `ListBooksRequest` n'expose pas `?author=`, donc on filtre
+  // localement sur le résultat de l'API (limité par la pagination max
+  // `per_page=50`). À migrer vers un filtre serveur quand l'API exposera
+  // un paramètre dédié.
+  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
+
+  const [pickerType, setPickerType] = useState<PickerType>(null);
+  const [toast, setToast] = useState<ToastState>(INITIAL_TOAST);
+
+  const showError = useCallback((message: string) => {
+    setToast({ visible: true, message, tone: 'error' });
+  }, []);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
@@ -69,11 +94,12 @@ export default function BooksLibraryScreen() {
       });
       setBooks(response.data);
     } catch (error) {
-      console.error("Failed to load books:", error);
+      console.error('Failed to load books:', error);
+      showError(getApiErrorMessage(error, 'Impossible de charger la bibliothèque.'));
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedSubject]);
+  }, [searchQuery, selectedSubject, showError]);
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -81,11 +107,12 @@ export default function BooksLibraryScreen() {
       setSubjects(subjData);
       await loadBooks();
     } catch (error) {
-      console.error("Failed to load initial library data:", error);
+      console.error('Failed to load initial library data:', error);
+      showError(getApiErrorMessage(error, 'Impossible de charger les matières.'));
     } finally {
       setLoading(false);
     }
-  }, [loadBooks]);
+  }, [loadBooks, showError]);
 
   useEffect(() => {
     loadInitialData();
@@ -99,11 +126,31 @@ export default function BooksLibraryScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, selectedSubject, loadBooks]);
 
-  const activeFiltersCount = (selectedSubject ? 1 : 0) + (searchQuery ? 1 : 0);
+  // Liste des auteurs uniques dérivée du jeu de livres actuel, triée alpha.
+  // Filtre les valeurs null/empty pour ne pas polluer le picker.
+  const availableAuthors = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of books) {
+      if (b.author && b.author.trim().length > 0) set.add(b.author.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [books]);
+
+  // Filtrage local par auteur. Si le filtre est inactif, on garde tout.
+  const filteredBooks = useMemo(() => {
+    if (!selectedAuthor) return books;
+    return books.filter((b) => b.author === selectedAuthor);
+  }, [books, selectedAuthor]);
+
+  const activeFiltersCount =
+    (selectedSubject ? 1 : 0) +
+    (selectedAuthor ? 1 : 0) +
+    (searchQuery ? 1 : 0);
 
   const resetFilters = () => {
     setSearchQuery('');
     setSelectedSubject(null);
+    setSelectedAuthor(null);
   };
 
   const handleOpenBook = (book: Book) => {
@@ -123,16 +170,7 @@ export default function BooksLibraryScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Status bar spacer */}
-      <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
-
-      {/* App bar */}
-      <View style={styles.appBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronLeft size={24} color="#fff" strokeWidth={2.4} />
-        </TouchableOpacity>
-        <Text style={styles.appBarTitle}>Bibliothèque</Text>
-      </View>
+      <AppBar title="Bibliothèque" onBack={() => router.back()} />
 
       <View style={styles.headerArea}>
         {/* Search Bar */}
@@ -152,12 +190,18 @@ export default function BooksLibraryScreen() {
           )}
         </View>
 
-        {/* Filter Pills */}
+        {/* Filter Pills — 2 filtres alignés maquette (Matière + Auteur) */}
         <View style={styles.filtersRow}>
           <FilterPill
             label="Matière"
             value={selectedSubject?.name || null}
             onPress={() => setPickerType('subject')}
+          />
+          <FilterPill
+            label="Auteur"
+            value={selectedAuthor}
+            onPress={() => setPickerType('author')}
+            disabled={availableAuthors.length === 0}
           />
           {activeFiltersCount > 0 && (
             <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
@@ -166,21 +210,22 @@ export default function BooksLibraryScreen() {
           )}
           <View style={{ flex: 1 }} />
           <Text style={styles.countText}>
-            {books.length} ouvrage{books.length > 1 ? 's' : ''}
+            {filteredBooks.length} ouvrage{filteredBooks.length > 1 ? 's' : ''}
           </Text>
         </View>
       </View>
 
-      {/* Grid */}
-      <ScrollView 
+      {/* Grid — utilise filteredBooks (filtre Auteur côté client appliqué
+          au-dessus de la réponse API filtrée par search + subject). */}
+      <ScrollView
         contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
       >
-        {loading && books.length === 0 ? (
-          <ActivityIndicator size="large" color="#3DBE45" style={{ marginTop: 40 }} />
+        {loading && filteredBooks.length === 0 ? (
+          <ActivityIndicator size="large" color={C.green} style={{ marginTop: 40 }} />
         ) : (
           <View style={styles.gridInner}>
-            {books.map((book) => (
+            {filteredBooks.map((book) => (
               <BookCard
                 key={book.id}
                 book={book}
@@ -190,7 +235,7 @@ export default function BooksLibraryScreen() {
           </View>
         )}
 
-        {!loading && books.length === 0 && (
+        {!loading && filteredBooks.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Aucun livre ne correspond à tes filtres.</Text>
             <TouchableOpacity onPress={resetFilters} style={styles.emptyResetBtn}>
@@ -205,29 +250,70 @@ export default function BooksLibraryScreen() {
         isOpen={pickerType === 'subject'}
         onClose={() => setPickerType(null)}
         title="Choisir une matière"
-        options={subjects.map(s => s.name)}
-        selectedValue={selectedSubject?.name || 'Toutes'}
+        allLabel="Toutes les matières"
+        options={subjects.map((s) => s.name)}
+        selectedValue={selectedSubject?.name ?? null}
         onSelect={(val) => {
-          const found = subjects.find(s => s.name === val);
-          setSelectedSubject(found || null);
+          if (val === null) {
+            setSelectedSubject(null);
+            return;
+          }
+          const found = subjects.find((s) => s.name === val);
+          setSelectedSubject(found ?? null);
         }}
+      />
+
+      <FilterSheet
+        isOpen={pickerType === 'author'}
+        onClose={() => setPickerType(null)}
+        title="Choisir un auteur"
+        allLabel="Tous les auteurs"
+        options={availableAuthors}
+        selectedValue={selectedAuthor}
+        onSelect={(val) => setSelectedAuthor(val)}
+      />
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        tone={toast.tone}
+        onHide={() => setToast((t) => ({ ...t, visible: false }))}
       />
     </View>
   );
 }
 
-const FilterPill = ({ label, value, onPress }: { label: string; value: string | null; onPress: () => void }) => {
+interface FilterPillProps {
+  label: string;
+  value: string | null;
+  onPress: () => void;
+  disabled?: boolean;
+}
+
+const FilterPill: React.FC<FilterPillProps> = ({ label, value, onPress, disabled }) => {
   const active = !!value;
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={[styles.pill, active && styles.pillActive]}
-      activeOpacity={0.7}
+      style={[styles.pill, active && styles.pillActive, disabled && styles.pillDisabled]}
+      activeOpacity={disabled ? 1 : 0.7}
+      disabled={disabled}
     >
-      <Text style={[styles.pillText, active && styles.pillTextActive]}>
+      <Text
+        style={[
+          styles.pillText,
+          active && styles.pillTextActive,
+          disabled && styles.pillTextDisabled,
+        ]}
+        numberOfLines={1}
+      >
         {active ? value : label}
       </Text>
-      <ChevronDown size={14} color={active ? '#fff' : '#5A6470'} style={{ marginLeft: 4 }} />
+      <ChevronDown
+        size={14}
+        color={active ? '#fff' : disabled ? C.ink3 : C.ink2}
+        style={{ marginLeft: 4 }}
+      />
     </TouchableOpacity>
   );
 };
@@ -240,6 +326,10 @@ const FilterPill = ({ label, value, onPress }: { label: string; value: string | 
 const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress }) => {
   const downloaded = useDownloadedSet();
   const isDownloaded = downloaded.isDownloaded('book', book.id);
+  // Fallback gracieux si l'auteur ou la matière sont null côté backend
+  // (vu sur certains livres legacy). Évite l'affichage `null · undefined`.
+  const authorLabel = book.author?.trim() || '—';
+  const subjectLabel = book.subject?.name?.trim() || '—';
 
   return (
     <TouchableOpacity style={styles.bookCard} activeOpacity={0.8} onPress={onPress}>
@@ -248,7 +338,7 @@ const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress
         {book.title}
       </Text>
       <Text style={styles.bookMeta} numberOfLines={1}>
-        {book.author} · {book.subject?.name}
+        {authorLabel} · {subjectLabel}
       </Text>
     </TouchableOpacity>
   );
@@ -297,36 +387,12 @@ const BookCover: React.FC<{ book: Book; isDownloaded?: boolean }> = ({ book, isD
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  appBar: {
-    height: 64,
-    backgroundColor: '#3DBE45',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appBarTitle: {
-    position: 'absolute',
-    left: 56,
-    right: 56,
-    textAlign: 'center',
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 17,
-    color: '#fff',
+    backgroundColor: C.bg,
   },
   headerArea: {
     padding: 16,
     paddingBottom: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: C.bg,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -372,16 +438,23 @@ const styles = StyleSheet.create({
     borderColor: '#E6E8EB',
   },
   pillActive: {
-    backgroundColor: '#3DBE45',
-    borderColor: '#3DBE45',
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  pillDisabled: {
+    opacity: 0.5,
   },
   pillText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 12,
-    color: '#1A2027',
+    color: C.ink,
+    maxWidth: 140,
   },
   pillTextActive: {
     color: '#fff',
+  },
+  pillTextDisabled: {
+    color: C.ink3,
   },
   resetBtn: {
     height: 32,

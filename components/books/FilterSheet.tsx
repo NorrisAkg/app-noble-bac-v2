@@ -1,15 +1,31 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { CustomBottomSheet } from '@/components/ui/BottomSheet';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Check } from 'lucide-react-native';
+import { CustomBottomSheet } from '@/components/ui/BottomSheet';
+import { C } from '@/constants/theme';
 
 interface FilterSheetProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  /**
+   * Liste des valeurs filtrables (sans option « Toutes » — celle-ci est
+   * ajoutée automatiquement en tête de liste pour permettre de
+   * réinitialiser depuis le sheet).
+   */
   options: string[];
+  /** Valeur sélectionnée actuelle, ou `null` si « Toutes » est actif. */
   selectedValue: string | null;
+  /**
+   * Callback. Reçoit `null` quand l'utilisateur tape sur « Toutes »,
+   * sinon la valeur exacte sélectionnée.
+   */
   onSelect: (value: string | null) => void;
+  /**
+   * Libellé de l'option « Toutes » (ex. « Toutes les matières »,
+   * « Tous les auteurs »). Par défaut « Toutes les valeurs ».
+   */
+  allLabel?: string;
 }
 
 export function FilterSheet({
@@ -19,39 +35,51 @@ export function FilterSheet({
   options,
   selectedValue,
   onSelect,
+  allLabel = 'Toutes les valeurs',
 }: FilterSheetProps) {
+  const renderRow = (label: string, value: string | null) => {
+    const isSelected = selectedValue === value;
+    return (
+      <TouchableOpacity
+        key={label}
+        style={[styles.row, isSelected && styles.rowSelected]}
+        onPress={() => {
+          onSelect(value);
+          onClose();
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.circle, isSelected && styles.circleSelected]}>
+          {isSelected && <View style={styles.dot} />}
+        </View>
+        <Text
+          style={[styles.label, isSelected && styles.labelSelected]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        {isSelected && <Check size={18} color={C.green} style={styles.checkMark} />}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <CustomBottomSheet isOpen={isOpen} onClose={onClose} title={title}>
-      {options.map((option) => {
-        const isSelected = selectedValue === option;
-        
-        return (
-          <TouchableOpacity
-            key={option}
-            style={[styles.row, isSelected && styles.rowSelected]}
-            onPress={() => {
-              onSelect(option);
-              onClose();
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.circle, isSelected && styles.circleSelected]}>
-              {isSelected && <View style={styles.dot} />}
-            </View>
-            <Text style={[styles.label, isSelected && styles.labelSelected]}>
-              {option === 'all' 
-                ? (title.includes('matière') ? 'Toutes les matières' : 'Tous les auteurs') 
-                : option}
-            </Text>
-            {isSelected && <Check size={18} color="#3DBE45" style={{ marginLeft: 'auto' }} />}
-          </TouchableOpacity>
-        );
-      })}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {renderRow(allLabel, null)}
+        {options.map((option) => renderRow(option, option))}
+      </ScrollView>
     </CustomBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: 12,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -63,20 +91,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowSelected: {
-    backgroundColor: '#EAF7EB', // C.greenSoft
+    backgroundColor: C.greenSoft,
   },
   circle: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#E6E8EB',
+    borderColor: C.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleSelected: {
-    borderColor: '#3DBE45',
-    backgroundColor: '#3DBE45',
+    borderColor: C.green,
+    backgroundColor: C.green,
   },
   dot: {
     width: 8,
@@ -87,10 +115,14 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 14,
-    color: '#1A2027',
+    color: C.ink,
+    flex: 1,
   },
   labelSelected: {
     fontFamily: 'Poppins_600SemiBold',
-    color: '#3DBE45',
+    color: C.green,
+  },
+  checkMark: {
+    marginLeft: 'auto',
   },
 });
