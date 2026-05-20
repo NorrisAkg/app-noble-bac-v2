@@ -18,6 +18,7 @@ import 'react-native-reanimated';
 import '@/global.css';
 
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
+import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -97,14 +98,16 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryProvider>
-        <ThemeProvider value={DefaultTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <OfflineBanner />
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <PremiumGateProvider>
+          <ThemeProvider value={DefaultTheme}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+            <OfflineBanner />
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </PremiumGateProvider>
       </QueryProvider>
     </GestureHandlerRootView>
   );

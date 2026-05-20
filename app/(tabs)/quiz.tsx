@@ -17,6 +17,7 @@ import { courseService } from '@/services/courseService';
 import { quizService, type QuizSessionHistoryItem } from '@/services/quizService';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
 import { C } from '@/constants/theme';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import type { Subject } from '@/types/api';
 
 interface SubjectQuizStats {
@@ -61,13 +62,18 @@ export default function QuizSubjectsScreen() {
     return result;
   }, [historyPage]);
 
+  const { guard } = usePremiumGate();
+
   const handlePickSubject = (subject: Subject) => {
-    router.push({
-      pathname: '/quiz-session',
-      params: {
-        subjectId: subject.id.toString(),
-        subjectLabel: subject.name,
-      },
+    // Quiz est 100% Premium (RM-QUIZ-05). Gate systématique.
+    guard({ is_free: false, title: 'le quiz' }, () => {
+      router.push({
+        pathname: '/quiz-session',
+        params: {
+          subjectId: subject.id.toString(),
+          subjectLabel: subject.name,
+        },
+      });
     });
   };
 

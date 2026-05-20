@@ -14,6 +14,7 @@ import type { Chapter, Lesson, Subject } from '@/types/api';
 import { SubjectChips } from '@/components/courses/SubjectChips';
 import { TabChips } from '@/components/courses/TabChips';
 import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 
 type CourseTabKey = 'cours' | 'fiches' | 'videos';
 
@@ -75,11 +76,17 @@ export default function CoursesScreen() {
 
   const subjectLabel = selectedSubject?.label ?? '';
 
+  const { guard } = usePremiumGate();
+
   // Tap d'une carte chapitre côté Fiches : on charge la liste des fiches du
   // chapitre et on ouvre la première dans le pdf-viewer. Mêmes principes pour
   // les vidéos. Le backend MVP ne fournit pas de "fiche principale" — on prend
   // simplement la première publiée.
-  const handleOpenChapterSheet = async (chapter: Chapter) => {
+  //
+  // Les fiches et vidéos sont 100% Premium par défaut (RM-ACC-07). On gate
+  // donc avant le fetch ; en cas d'override admin `is_free=true` sur l'item
+  // récupéré, le filet 403 du pdf-viewer/chapter-video reste en place.
+  const openFirstRevisionSheet = async (chapter: Chapter) => {
     if (openingChapterId) return;
     setOpeningChapterId(chapter.id);
     try {
@@ -103,7 +110,11 @@ export default function CoursesScreen() {
     }
   };
 
-  const handleOpenChapterVideo = async (chapter: Chapter) => {
+  const handleOpenChapterSheet = (chapter: Chapter) => {
+    guard({ is_free: false, title: 'cette fiche' }, () => openFirstRevisionSheet(chapter));
+  };
+
+  const openFirstChapterVideo = async (chapter: Chapter) => {
     if (openingChapterId) return;
     setOpeningChapterId(chapter.id);
     try {
@@ -125,6 +136,10 @@ export default function CoursesScreen() {
     } finally {
       setOpeningChapterId(null);
     }
+  };
+
+  const handleOpenChapterVideo = (chapter: Chapter) => {
+    guard({ is_free: false, title: 'cette vidéo' }, () => openFirstChapterVideo(chapter));
   };
 
   return (
@@ -244,10 +259,16 @@ function ChapterAccordion({ chapter, open, onToggle, subjectLabel, router }: Cha
     enabled: open,
   });
 
+  const { guard } = usePremiumGate();
+
   const handleOpenLesson = (lesson: Lesson) => {
-    router.push({
-      pathname: '/course-reader',
-      params: { lessonId: String(lesson.id), subject: subjectLabel },
+    // Lesson est free si is_free=true OU order=1 (RM-COURS-05). Le helper
+    // isResourceFree gère les deux cas via le type Gatedresource.
+    guard(lesson, () => {
+      router.push({
+        pathname: '/course-reader',
+        params: { lessonId: String(lesson.id), subject: subjectLabel },
+      });
     });
   };
 

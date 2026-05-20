@@ -11,6 +11,7 @@ import { Toast, type ToastTone } from '@/components/ui/Toast';
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
 import { useDownloadedSet } from '@/hooks/useDownloadedSet';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { C } from '@/constants/theme';
 import type { Book, Subject } from '@/types/api';
@@ -153,16 +154,18 @@ export default function BooksLibraryScreen() {
     setSelectedAuthor(null);
   };
 
+  const { guard } = usePremiumGate();
+
   const handleOpenBook = (book: Book) => {
-    // Navigate to PDF viewer
-    // We'll need a signed URL for the PDF in the next step
-    router.push({
-      pathname: '/pdf-viewer',
-      params: { 
-        bookId: book.id.toString(),
-        title: book.title,
-        subject: book.subject?.name || ''
-      }
+    guard(book, () => {
+      router.push({
+        pathname: '/pdf-viewer',
+        params: {
+          bookId: book.id.toString(),
+          title: book.title,
+          subject: book.subject?.name || '',
+        },
+      });
     });
   };
 

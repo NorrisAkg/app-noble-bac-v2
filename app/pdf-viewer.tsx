@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
 import { declareDownload, listDownloads } from '@/services/myDownloadsService';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 import type { OfflineDownloadableType, QuotaExceededErrorPayload } from '@/types/api';
 
@@ -39,6 +40,8 @@ export default function PdfViewerScreen() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(initialUrl || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { show: showPremium } = usePremiumGate();
 
   // Identification polymorphe pour le bouton "Telecharger hors-ligne".
   // Les corriges (signed-url depuis Library) n'ont pas encore d'ID expose
@@ -64,10 +67,17 @@ export default function PdfViewerScreen() {
       (d) => d.downloadable_type === downloadable.type && d.downloadable_id === downloadable.id,
     );
 
-  const handleLoadError = useCallback((err: any, premiumMessage: string) => {
+  const handleLoadError = useCallback((err: any, resourceLabel: string) => {
     console.error('Failed to load PDF URL:', err);
-    setError(err?.response?.status === 403 ? premiumMessage : 'Impossible de charger le document.');
-  }, []);
+    // Filet 403 : si l'API refuse (Premium requis ou scope hors abonnement),
+    // on ouvre le PremiumLockSheet global et on ferme le viewer.
+    if (err?.response?.status === 403) {
+      showPremium(resourceLabel);
+      if (router.canGoBack()) router.back();
+      return;
+    }
+    setError('Impossible de charger le document.');
+  }, [showPremium, router]);
 
   const loadFromBook = useCallback(async (id: number) => {
     try {
@@ -75,7 +85,7 @@ export default function PdfViewerScreen() {
       const { url } = await catalogService.downloadBook(id);
       setPdfUrl(url);
     } catch (err: any) {
-      handleLoadError(err, 'Cet ouvrage est réservé aux abonnés Premium.');
+      handleLoadError(err, 'ce livre');
     } finally {
       setLoading(false);
     }
@@ -91,7 +101,7 @@ export default function PdfViewerScreen() {
       }
       setPdfUrl(sheet.signed_url);
     } catch (err: any) {
-      handleLoadError(err, 'Cette fiche est réservée aux abonnés Premium.');
+      handleLoadError(err, 'cette fiche');
     } finally {
       setLoading(false);
     }

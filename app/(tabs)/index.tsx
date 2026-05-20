@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Modal, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Search, Bell } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { QuickAction } from '@/components/home/QuickAction';
 import { BookCover } from '@/components/home/BookCover';
 import { daysUntilBac, getNextBacDate } from '@/constants/bacDates';
@@ -78,21 +79,18 @@ export default function HomeScreen() {
   });
   const books: Book[] = booksQuery.data?.data ?? [];
 
-  // Premium gate sheet (tapped on locked book)
-  const [premiumBook, setPremiumBook] = useState<Book | null>(null);
+  const { guard } = usePremiumGate();
 
   const firstName = user?.first_name ?? 'Étudiant';
   const initials = firstName[0]?.toUpperCase() ?? 'E';
 
   const handleBookPress = (book: Book) => {
-    if (book.is_free) {
+    guard(book, () => {
       router.push({
         pathname: '/pdf-viewer',
         params: { bookId: String(book.id), title: book.title, subject: book.subject?.name ?? '' },
       });
-    } else {
-      setPremiumBook(book);
-    }
+    });
   };
 
   return (
@@ -239,75 +237,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* ── PREMIUM GATE BOTTOM SHEET ────────────────────────── */}
-      <Modal
-        visible={!!premiumBook}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPremiumBook(null)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setPremiumBook(null)}
-        >
-          <TouchableOpacity activeOpacity={1} style={styles.sheetCard}>
-            <View style={styles.sheetHandle} />
-
-            {/* Premium badge */}
-            <View style={styles.premiumBadge}>
-              <Text style={{ fontSize: 12 }}>⭐</Text>
-              <Text style={styles.premiumBadgeText}>Contenu Premium</Text>
-            </View>
-
-            {/* Book cover preview */}
-            {premiumBook && (
-              <View style={{ marginTop: 18 }}>
-                <BookCover
-                  book={{
-                    title: premiumBook.title,
-                    subject: premiumBook.subject?.name ?? 'Général',
-                    color: bookColors(premiumBook).color,
-                    accent: bookColors(premiumBook).accent,
-                    free: premiumBook.is_free,
-                  }}
-                  onPress={() => {}}
-                />
-              </View>
-            )}
-
-            <Text style={styles.sheetTitle}>{premiumBook?.title}</Text>
-            <Text style={styles.sheetBody}>
-              Débloquez la bibliothèque complète, les corrigés détaillés et tous les livres avec un abonnement Premium.
-            </Text>
-
-            {/* Features list */}
-            <View style={styles.featureList}>
-              {['Tous les livres et fiches', 'Corrigés des annales', 'Téléchargements hors-ligne illimités'].map((f) => (
-                <View key={f} style={styles.featureRow}>
-                  <View style={styles.featureCheck}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Poppins_700Bold' }}>✓</Text>
-                  </View>
-                  <Text style={styles.featureText}>{f}</Text>
-                </View>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              style={styles.premiumBtn}
-              onPress={() => {
-                setPremiumBook(null);
-                router.push('/subscription-plans');
-              }}
-            >
-              <Text style={styles.premiumBtnText}>Voir les offres Premium</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.laterBtn} onPress={() => setPremiumBook(null)}>
-              <Text style={styles.laterBtnText}>Plus tard</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      {/* Premium gate handled globally via PremiumGateProvider (cf. _layout.tsx). */}
     </View>
   );
 }

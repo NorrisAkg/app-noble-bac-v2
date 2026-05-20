@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
-import { ChevronLeft, Lock } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { courseService } from '@/services/courseService';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 export default function ChapterVideoScreen() {
@@ -26,6 +27,16 @@ export default function ChapterVideoScreen() {
   });
 
   const isForbidden = (error as any)?.response?.status === 403;
+
+  const { show: showPremium } = usePremiumGate();
+
+  // Filet 403 : bascule sur le PremiumLockSheet global et ferme le viewer.
+  useEffect(() => {
+    if (isForbidden) {
+      showPremium('cette vidéo');
+      if (router.canGoBack()) router.back();
+    }
+  }, [isForbidden, showPremium, router]);
 
   const embedHtml = video
     ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#000;height:100%}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube.com/embed/${encodeURIComponent(
@@ -57,15 +68,7 @@ export default function ChapterVideoScreen() {
           </View>
         )}
 
-        {!isLoading && isForbidden && (
-          <View style={styles.centered}>
-            <Lock size={36} color="#9AA3AC" />
-            <Text style={styles.errorTitle}>Vidéo Premium</Text>
-            <Text style={styles.errorText}>
-              Cette vidéo est réservée aux abonnés Premium.
-            </Text>
-          </View>
-        )}
+        {/* isForbidden géré via useEffect ci-dessus : showPremium + router.back */}
 
         {!isLoading && !isForbidden && error && (
           <View style={styles.centered}>

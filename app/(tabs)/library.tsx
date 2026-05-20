@@ -19,6 +19,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CustomBottomSheet } from '@/components/ui/BottomSheet';
 import { DiamondIcon } from '@/components/ui/DiamondIcon';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { courseService } from '@/services/courseService';
 import { catalogService } from '@/services/catalogService';
 import { getProfile } from '@/services/profileService';
@@ -107,6 +108,8 @@ export default function LibraryScreen() {
 
   // ─── Actions PDF / videos ─────────────────────────────────────────────────
 
+  const { guard, show: showPremium } = usePremiumGate();
+
   const openPdfMutation = useMutation({
     mutationFn: async ({ examId, kind }: { examId: number; kind: 'epreuve' | 'corrige' }) => {
       return kind === 'corrige'
@@ -124,9 +127,26 @@ export default function LibraryScreen() {
       });
     },
     onError: (err) => {
+      // Filet 403 : si le backend refuse (ex. corrige hors scope), on bascule
+      // vers le PremiumLockSheet plutôt qu'un Alert opaque.
+      const status =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 403) {
+        showPremium('ce corrigé');
+        return;
+      }
       Alert.alert('Impossible d’ouvrir le document', getApiErrorMessage(err));
     },
   });
+
+  const openCorrige = (examId: number) => {
+    // Le corrigé est toujours Premium (RM-ACC-02). On gate avant le fetch.
+    guard({ is_free: false, title: 'ce corrigé' }, () => {
+      openPdfMutation.mutate({ examId, kind: 'corrige' });
+    });
+  };
 
   const videosQuery = useQuery({
     queryKey: ['catalog', 'videos', examForYear?.id],
@@ -136,13 +156,17 @@ export default function LibraryScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const openYoutubeVideo = async (video: ExamVideoItem) => {
-    const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('Vidéo indisponible', 'Impossible d’ouvrir YouTube.');
-    }
+  const openYoutubeVideo = (video: ExamVideoItem) => {
+    // Les vidéos d'épreuve suivent leur flag is_free. is_free=true → libre,
+    // sinon Premium gated.
+    guard(video, async () => {
+      const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
+      try {
+        await Linking.openURL(url);
+      } catch {
+        Alert.alert('Vidéo indisponible', 'Impossible d’ouvrir YouTube.');
+      }
+    });
   };
 
   // ─── Rendu ────────────────────────────────────────────────────────────────
@@ -289,7 +313,7 @@ export default function LibraryScreen() {
               extra={`${examForYear.series.name} · ${examForYear.country.name}`}
               kind="pdf-green"
               loading={openPdfMutation.isPending}
-              onOpen={() => openPdfMutation.mutate({ examId: examForYear.id, kind: 'corrige' })}
+              onOpen={() => openCorrige(examForYear.id)}
             />
           )}
 

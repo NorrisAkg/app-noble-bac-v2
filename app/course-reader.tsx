@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronLeft, Lock } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { TexRenderer } from '@/components/courses/TexRenderer';
 import { courseService } from '@/services/courseService';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { C } from '@/constants/theme';
 
@@ -32,6 +33,17 @@ export default function CourseReaderScreen() {
     : error
     ? ((error as any)?.response?.status === 403 ? 'forbidden' : 'error')
     : 'ready';
+
+  const { show: showPremium } = usePremiumGate();
+
+  // Filet 403 : si la leçon refuse l'accès (Premium requis), on bascule
+  // sur le PremiumLockSheet global et on referme le reader.
+  useEffect(() => {
+    if (status === 'forbidden') {
+      showPremium('cette leçon');
+      if (router.canGoBack()) router.back();
+    }
+  }, [status, showPremium, router]);
 
   return (
     <View style={styles.container}>
@@ -66,15 +78,7 @@ export default function CourseReaderScreen() {
           </View>
         )}
 
-        {status === 'forbidden' && (
-          <View style={styles.centered}>
-            <Lock size={36} color={C.ink3} />
-            <Text style={styles.errorTitle}>Contenu Premium</Text>
-            <Text style={styles.errorText}>
-              Cette leçon est réservée aux abonnés Premium. Active ton abonnement pour y accéder.
-            </Text>
-          </View>
-        )}
+        {/* status === 'forbidden' géré via useEffect ci-dessus : showPremium + router.back */}
 
         {status === 'error' && (
           <View style={styles.centered}>
