@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text } from 'react-native';
 import BottomSheet, {
   BottomSheetBackdrop,
@@ -20,41 +20,32 @@ export const CustomBottomSheet: React.FC<BottomSheetProps> = ({
   snapPoints = ['50%', '75%'],
   title,
 }) => {
-  const bottomSheetRef = useRef<BottomSheet>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      bottomSheetRef.current?.expand();
-    } else {
-      bottomSheetRef.current?.close();
-    }
-  }, [isOpen]);
-
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
         {...props}
-        // Only appear when sheet is open (index >= 0)
         disappearsOnIndex={-1}
         appearsOnIndex={0}
         opacity={0.5}
-        // Critical: don't block touches when the sheet is closed
         pressBehavior="close"
       />
     ),
     []
   );
 
+  // @gorhom/bottom-sheet v5 + Fabric (New Architecture) garde un container
+  // plein écran qui intercepte les touches lorsque le sheet est fermé, même
+  // avec index=-1 et enableOverDrag=false. Ne monter le composant que quand
+  // isOpen=true évite le bug et garde l'animation slide-in propre.
+  if (!isOpen) return null;
+
   return (
     <BottomSheet
-      ref={bottomSheetRef}
-      // Start fully closed
-      index={-1}
+      index={0}
       snapPoints={snapPoints}
       enablePanDownToClose
       onClose={onClose}
       backdropComponent={renderBackdrop}
-      // Prevent the closed sheet from intercepting any touch events
       enableOverDrag={false}
       handleIndicatorStyle={{ backgroundColor: '#D5DAE0', width: 40 }}
       backgroundStyle={{ borderTopLeftRadius: 20, borderTopRightRadius: 20 }}
