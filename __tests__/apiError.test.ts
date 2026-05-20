@@ -37,19 +37,24 @@ describe('getApiErrorMessage', () => {
     );
   });
 
-  it('renvoie le fallback par defaut si erreur non-axios', () => {
-    expect(getApiErrorMessage(new Error('boom'))).toBe('Une erreur est survenue.');
+  it('remonte le message d\'une Error JS classique (préféré au fallback)', () => {
+    expect(getApiErrorMessage(new Error('boom'))).toBe('boom');
   });
 
-  it('utilise le fallback custom si fourni', () => {
-    expect(getApiErrorMessage(new Error('boom'), 'Échec téléchargement')).toBe(
+  it('utilise le fallback custom uniquement si aucun message exploitable', () => {
+    // Une string brute n'a pas de `message` → fallback custom utilisé.
+    expect(getApiErrorMessage('non-error-thrown', 'Échec téléchargement')).toBe(
       'Échec téléchargement'
     );
   });
 
-  it('renvoie fallback si response existe mais sans message serveur', () => {
+  it('renvoie "Erreur serveur (HTTP X)" si response existe mais sans message serveur', () => {
     const error = buildAxiosError({ status: 500, data: { code: 'X' } });
-    expect(getApiErrorMessage(error, 'Erreur perso')).toBe('Erreur perso');
+    expect(getApiErrorMessage(error)).toBe('Erreur serveur (HTTP 500).');
+  });
+
+  it('renvoie le fallback générique si erreur non-Error et non-axios', () => {
+    expect(getApiErrorMessage(undefined)).toBe('Une erreur est survenue.');
   });
 });
 
