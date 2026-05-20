@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, ActivityIndicator,
+  TouchableOpacity, RefreshControl, Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, FileText, Video, BookOpen, Lock } from 'lucide-react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ChevronDown, BookOpen, Lock } from 'lucide-react-native';
 
 import { courseService } from '@/services/courseService';
-import type { Chapter, Lesson, RevisionSheetListItem, ChapterVideoListItem, Subject } from '@/types/api';
+import type { Chapter, Lesson, Subject } from '@/types/api';
 import { SubjectChips } from '@/components/courses/SubjectChips';
 import { TabChips } from '@/components/courses/TabChips';
+import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
 
 type CourseTabKey = 'cours' | 'fiches' | 'videos';
 
@@ -28,11 +32,14 @@ interface SubjectChip {
 export default function CoursesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const { data: apiSubjects, isLoading: subjectsLoading } = useQuery({
+  const subjectsQuery = useQuery({
     queryKey: ['courses', 'subjects'],
     queryFn: courseService.getSubjects,
   });
+  const apiSubjects = subjectsQuery.data;
+  const subjectsLoading = subjectsQuery.isLoading;
 
   const subjects: SubjectChip[] = (apiSubjects ?? []).map((s: Subject) => ({
     k: String(s.id),
@@ -42,6 +49,7 @@ export default function CoursesScreen() {
 
   const [selectedSubject, setSelectedSubject] = useState<SubjectChip | null>(null);
   const [tab, setTab] = useState<CourseTabKey>('cours');
+  const [openingChapterId, setOpeningChapterId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!selectedSubject && subjects.length > 0) {
@@ -49,17 +57,75 @@ export default function CoursesScreen() {
     }
   }, [subjects, selectedSubject]);
 
-  const { data: chapters, isLoading: chaptersLoading } = useQuery({
+  const chaptersQuery = useQuery({
     queryKey: ['courses', 'chapters', selectedSubject?.id],
     queryFn: () => courseService.getChapters(selectedSubject!.id),
     enabled: !!selectedSubject,
   });
+  const chapters = chaptersQuery.data;
+  const chaptersLoading = chaptersQuery.isLoading;
 
+  // Pour le tab `cours`, on garde la 1re section ouverte par défaut quand la
+  // liste change (changement de matière). Pour les autres tabs (flat list),
+  // pas d'état d'ouverture nécessaire.
   const [openChapterId, setOpenChapterId] = useState<number | null>(null);
-
   useEffect(() => {
     setOpenChapterId(chapters && chapters.length > 0 ? chapters[0].id : null);
-  }, [chapters, tab]);
+  }, [chapters]);
+
+  const subjectLabel = selectedSubject?.label ?? '';
+
+  // Tap d'une carte chapitre côté Fiches : on charge la liste des fiches du
+  // chapitre et on ouvre la première dans le pdf-viewer. Mêmes principes pour
+  // les vidéos. Le backend MVP ne fournit pas de "fiche principale" — on prend
+  // simplement la première publiée.
+  const handleOpenChapterSheet = async (chapter: Chapter) => {
+    if (openingChapterId) return;
+    setOpeningChapterId(chapter.id);
+    try {
+      const sheets = await queryClient.fetchQuery({
+        queryKey: ['courses', 'revision-sheets', chapter.id],
+        queryFn: () => courseService.getRevisionSheetsByChapter(chapter.id),
+      });
+      const first = sheets[0];
+      if (!first) {
+        Alert.alert('Pas de fiche', 'Aucune fiche disponible pour ce chapitre.');
+        return;
+      }
+      router.push({
+        pathname: '/pdf-viewer',
+        params: { revisionSheetId: String(first.id), title: first.title, subject: subjectLabel },
+      });
+    } catch {
+      Alert.alert('Erreur', 'Impossible de charger les fiches de ce chapitre.');
+    } finally {
+      setOpeningChapterId(null);
+    }
+  };
+
+  const handleOpenChapterVideo = async (chapter: Chapter) => {
+    if (openingChapterId) return;
+    setOpeningChapterId(chapter.id);
+    try {
+      const videos = await queryClient.fetchQuery({
+        queryKey: ['courses', 'chapter-videos', chapter.id],
+        queryFn: () => courseService.getChapterVideosByChapter(chapter.id),
+      });
+      const first = videos[0];
+      if (!first) {
+        Alert.alert('Pas de vidéo', 'Aucune vidéo disponible pour ce chapitre.');
+        return;
+      }
+      router.push({
+        pathname: '/chapter-video',
+        params: { videoId: String(first.id), title: first.title, subject: subjectLabel },
+      });
+    } catch {
+      Alert.alert('Erreur', 'Impossible de charger les vidéos de ce chapitre.');
+    } finally {
+      setOpeningChapterId(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -68,7 +134,17 @@ export default function CoursesScreen() {
       <View style={{ height: insets.top, backgroundColor: '#3DBE45' }} />
 
       <View style={styles.appBar}>
-        <Text style={styles.appBarTitle}>{selectedSubject?.label ?? 'Cours'}</Text>
+        <TouchableOpacity
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={22} color="#fff" strokeWidth={2.4} />
+        </TouchableOpacity>
+        <Text style={styles.appBarTitle} numberOfLines={1}>
+          {selectedSubject?.label ?? 'Cours'}
+        </Text>
       </View>
 
       <View style={{ flex: 1 }}>
@@ -90,6 +166,16 @@ export default function CoursesScreen() {
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollInner}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={subjectsQuery.isRefetching || chaptersQuery.isRefetching}
+              onRefresh={() => {
+                subjectsQuery.refetch();
+                if (selectedSubject) chaptersQuery.refetch();
+              }}
+              tintColor="#3DBE45"
+            />
+          }
         >
           {chaptersLoading && (
             <ActivityIndicator size="large" color="#3DBE45" style={{ marginTop: 40 }} />
@@ -101,15 +187,40 @@ export default function CoursesScreen() {
             </View>
           )}
 
-          {!chaptersLoading && chapters && chapters.map((chapter) => (
+          {/* Cours : accordéon avec liste de leçons par chapitre. */}
+          {!chaptersLoading && chapters && tab === 'cours' && chapters.map((chapter) => (
             <ChapterAccordion
               key={chapter.id}
               chapter={chapter}
-              tab={tab}
               open={openChapterId === chapter.id}
               onToggle={() => setOpenChapterId(openChapterId === chapter.id ? null : chapter.id)}
-              subjectLabel={selectedSubject?.label ?? ''}
+              subjectLabel={subjectLabel}
               router={router}
+            />
+          ))}
+
+          {/* Fiches / Vidéos : liste plate de chapitres (aligné maquette
+              `screens-courses.jsx:362-385`). Le tap charge la 1re fiche /
+              1re vidéo et navigue directement vers le viewer. */}
+          {!chaptersLoading && chapters && tab === 'fiches' && chapters.map((chapter) => (
+            <ChapterRowCard
+              key={chapter.id}
+              title={chapter.title}
+              subtitle={`Chapitre ${chapter.order} · fiche PDF`}
+              mode="pdf"
+              loading={openingChapterId === chapter.id}
+              onClick={() => handleOpenChapterSheet(chapter)}
+            />
+          ))}
+
+          {!chaptersLoading && chapters && tab === 'videos' && chapters.map((chapter) => (
+            <ChapterRowCard
+              key={chapter.id}
+              title={chapter.title}
+              subtitle={`Chapitre ${chapter.order} · vidéo du chapitre`}
+              mode="video"
+              loading={openingChapterId === chapter.id}
+              onClick={() => handleOpenChapterVideo(chapter)}
             />
           ))}
         </ScrollView>
@@ -120,50 +231,23 @@ export default function CoursesScreen() {
 
 interface ChapterAccordionProps {
   chapter: Chapter;
-  tab: CourseTabKey;
   open: boolean;
   onToggle: () => void;
   subjectLabel: string;
   router: ReturnType<typeof useRouter>;
 }
 
-function ChapterAccordion({ chapter, tab, open, onToggle, subjectLabel, router }: ChapterAccordionProps) {
+function ChapterAccordion({ chapter, open, onToggle, subjectLabel, router }: ChapterAccordionProps) {
   const { data: lessons, isLoading: lessonsLoading } = useQuery({
     queryKey: ['courses', 'lessons', chapter.id],
     queryFn: () => courseService.getLessons(chapter.id),
-    enabled: open && tab === 'cours',
-  });
-
-  const { data: sheets, isLoading: sheetsLoading } = useQuery({
-    queryKey: ['courses', 'revision-sheets', chapter.id],
-    queryFn: () => courseService.getRevisionSheetsByChapter(chapter.id),
-    enabled: open && tab === 'fiches',
-  });
-
-  const { data: videos, isLoading: videosLoading } = useQuery({
-    queryKey: ['courses', 'chapter-videos', chapter.id],
-    queryFn: () => courseService.getChapterVideosByChapter(chapter.id),
-    enabled: open && tab === 'videos',
+    enabled: open,
   });
 
   const handleOpenLesson = (lesson: Lesson) => {
     router.push({
       pathname: '/course-reader',
       params: { lessonId: String(lesson.id), subject: subjectLabel },
-    });
-  };
-
-  const handleOpenSheet = (sheet: RevisionSheetListItem) => {
-    router.push({
-      pathname: '/pdf-viewer',
-      params: { revisionSheetId: String(sheet.id), title: sheet.title, subject: subjectLabel },
-    });
-  };
-
-  const handleOpenVideo = (video: ChapterVideoListItem) => {
-    router.push({
-      pathname: '/chapter-video',
-      params: { videoId: String(video.id), title: video.title, subject: subjectLabel },
     });
   };
 
@@ -175,113 +259,61 @@ function ChapterAccordion({ chapter, tab, open, onToggle, subjectLabel, router }
           <Text style={accordionStyles.title} numberOfLines={2}>{chapter.title}</Text>
         </View>
         <View style={[accordionStyles.chevron, open && accordionStyles.chevronOpen]}>
-          <ChevronDown size={18} color="#5A6470" />
+          <ChevronDown size={16} color="#7B5BD6" strokeWidth={2.4} />
         </View>
       </TouchableOpacity>
 
       {open && (
         <View style={accordionStyles.body}>
-          {tab === 'cours' && (
-            <ChapterContentList
-              loading={lessonsLoading}
-              items={(lessons ?? []).map((l) => ({
-                id: l.id,
-                title: l.title,
-                subtitle: l.duration_minutes ? `${l.duration_minutes} min` : null,
-                isFree: l.is_free,
-                icon: 'lesson',
-                onPress: () => handleOpenLesson(l),
-              }))}
-              emptyLabel="Aucune leçon pour ce chapitre."
-            />
-          )}
-          {tab === 'fiches' && (
-            <ChapterContentList
-              loading={sheetsLoading}
-              items={(sheets ?? []).map((s) => ({
-                id: s.id,
-                title: s.title,
-                subtitle: s.file_size_kb ? `${Math.round(s.file_size_kb / 100) / 10} Mo` : null,
-                isFree: s.is_free,
-                icon: 'sheet',
-                onPress: () => handleOpenSheet(s),
-              }))}
-              emptyLabel="Aucune fiche pour ce chapitre."
-            />
-          )}
-          {tab === 'videos' && (
-            <ChapterContentList
-              loading={videosLoading}
-              items={(videos ?? []).map((v) => ({
-                id: v.id,
-                title: v.title,
-                subtitle: v.duration_sec ? formatDuration(v.duration_sec) : null,
-                isFree: v.is_free,
-                icon: 'video',
-                onPress: () => handleOpenVideo(v),
-              }))}
-              emptyLabel="Aucune vidéo pour ce chapitre."
-            />
-          )}
+          <LessonList
+            loading={lessonsLoading}
+            lessons={lessons ?? []}
+            onPress={handleOpenLesson}
+          />
         </View>
       )}
     </View>
   );
 }
 
-interface ContentItem {
-  id: number;
-  title: string;
-  subtitle: string | null;
-  isFree: boolean;
-  icon: 'lesson' | 'sheet' | 'video';
-  onPress: () => void;
-}
-
-function ChapterContentList({
+function LessonList({
   loading,
-  items,
-  emptyLabel,
+  lessons,
+  onPress,
 }: {
   loading: boolean;
-  items: ContentItem[];
-  emptyLabel: string;
+  lessons: Lesson[];
+  onPress: (lesson: Lesson) => void;
 }) {
   if (loading) {
     return <ActivityIndicator size="small" color="#3DBE45" style={{ marginVertical: 16 }} />;
   }
-  if (items.length === 0) {
-    return <Text style={accordionStyles.empty}>{emptyLabel}</Text>;
+  if (lessons.length === 0) {
+    return <Text style={accordionStyles.empty}>Aucune leçon pour ce chapitre.</Text>;
   }
   return (
     <View style={{ gap: 8 }}>
-      {items.map((item) => (
+      {lessons.map((lesson) => (
         <TouchableOpacity
-          key={item.id}
-          onPress={item.onPress}
+          key={lesson.id}
+          onPress={() => onPress(lesson)}
           activeOpacity={0.7}
           style={accordionStyles.row}
         >
           <View style={accordionStyles.rowIcon}>
-            {item.icon === 'lesson' && <BookOpen size={16} color="#3DBE45" />}
-            {item.icon === 'sheet' && <FileText size={16} color="#3DBE45" />}
-            {item.icon === 'video' && <Video size={16} color="#3DBE45" />}
+            <BookOpen size={16} color="#3DBE45" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={accordionStyles.rowTitle} numberOfLines={1}>{item.title}</Text>
-            {item.subtitle && <Text style={accordionStyles.rowSubtitle}>{item.subtitle}</Text>}
+            <Text style={accordionStyles.rowTitle} numberOfLines={1}>{lesson.title}</Text>
+            {lesson.duration_minutes ? (
+              <Text style={accordionStyles.rowSubtitle}>{lesson.duration_minutes} min</Text>
+            ) : null}
           </View>
-          {!item.isFree && <Lock size={14} color="#9AA3AC" />}
+          {!lesson.is_free && <Lock size={14} color="#9AA3AC" />}
         </TouchableOpacity>
       ))}
     </View>
   );
-}
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return s === 0 ? `${m} min` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
@@ -292,11 +324,21 @@ const styles = StyleSheet.create({
   appBar: {
     height: 64,
     backgroundColor: '#3DBE45',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
   },
   appBarTitle: {
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 44, // compense la largeur du backBtn pour centrer le titre
     fontFamily: 'Poppins_700Bold',
     fontSize: 17,
     color: '#fff',
@@ -359,10 +401,10 @@ const accordionStyles = StyleSheet.create({
     lineHeight: 19,
   },
   chevron: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F5F5F5',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#EFEAFB',
     alignItems: 'center',
     justifyContent: 'center',
   },

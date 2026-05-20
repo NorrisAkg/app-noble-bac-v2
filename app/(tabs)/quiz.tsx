@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -27,28 +28,19 @@ export default function QuizSubjectsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState(true);
+  const subjectsQuery = useQuery({
+    queryKey: ['courses', 'subjects'],
+    queryFn: courseService.getSubjects,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const subjects: Subject[] = subjectsQuery.data ?? [];
+  const loading = subjectsQuery.isLoading;
 
-  useEffect(() => {
-    loadSubjects();
-  }, []);
-
-  const loadSubjects = async () => {
-    try {
-      const data = await courseService.getSubjects();
-      setSubjects(data);
-    } catch (error) {
-      console.error('Failed to load subjects:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const { data: historyPage } = useQuery({
+  const historyQuery = useQuery({
     queryKey: ['quiz', 'history', 'first-page'],
     queryFn: () => quizService.getHistory(1, 50),
   });
+  const historyPage = historyQuery.data;
 
   const statsBySubject = useMemo<Record<number, SubjectQuizStats>>(() => {
     const items: QuizSessionHistoryItem[] = historyPage?.data ?? [];
@@ -97,6 +89,16 @@ export default function QuizSubjectsScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={subjectsQuery.isRefetching || historyQuery.isRefetching}
+              onRefresh={() => {
+                subjectsQuery.refetch();
+                historyQuery.refetch();
+              }}
+              tintColor={C.green}
+            />
+          }
         >
           <Text style={styles.headerTitle}>
             Teste-toi sur toutes{'\n'}les matières

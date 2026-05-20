@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -41,17 +42,19 @@ export default function LibraryScreen() {
   const [year, setYear] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const { data: profile } = useQuery<UserProfile>({
+  const profileQuery = useQuery<UserProfile>({
     queryKey: ['profile'],
     queryFn: getProfile,
     staleTime: 5 * 60 * 1000,
   });
+  const profile = profileQuery.data;
 
-  const { data: subjects = [] } = useQuery<Subject[]>({
+  const subjectsQuery = useQuery<Subject[]>({
     queryKey: ['subjects'],
     queryFn: courseService.getSubjects,
     staleTime: 24 * 60 * 60 * 1000,
   });
+  const subjects = useMemo<Subject[]>(() => subjectsQuery.data ?? [], [subjectsQuery.data]);
 
   // Selection initiale : 1er sujet des qu'ils arrivent.
   useEffect(() => {
@@ -232,6 +235,21 @@ export default function LibraryScreen() {
         <ScrollView
           contentContainerStyle={[styles.contentScroll, { paddingBottom: insets.bottom + 110 }]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={
+                profileQuery.isRefetching ||
+                subjectsQuery.isRefetching ||
+                examsQuery.isRefetching
+              }
+              onRefresh={() => {
+                profileQuery.refetch();
+                subjectsQuery.refetch();
+                if (subjectId != null) examsQuery.refetch();
+              }}
+              tintColor="#3DBE45"
+            />
+          }
         >
           {isLoadingExams && (
             <View style={styles.stateBox}>

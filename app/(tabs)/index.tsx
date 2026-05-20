@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, Modal, ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,11 +59,12 @@ export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
 
   // Profil enrichi pour le countdown localise par pays UEMOA.
-  const { data: profile } = useQuery<UserProfile>({
+  const profileQuery = useQuery<UserProfile>({
     queryKey: ['profile'],
     queryFn: getProfile,
     staleTime: 5 * 60 * 1000,
   });
+  const profile = profileQuery.data;
 
   const countryCode = profile?.country.code ?? null;
   const days = useMemo(() => daysUntilBac(countryCode), [countryCode]);
@@ -153,6 +155,16 @@ export default function HomeScreen() {
         style={{ flex: 1, marginTop: -36 }}
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={profileQuery.isRefetching || booksQuery.isRefetching}
+            onRefresh={() => {
+              profileQuery.refetch();
+              booksQuery.refetch();
+            }}
+            tintColor="#3DBE45"
+          />
+        }
       >
         {/* Quick actions */}
         <View style={styles.quickRow}>

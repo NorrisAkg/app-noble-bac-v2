@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -62,11 +63,13 @@ export default function ProfileScreen() {
 
   const [whatsappOpen, setWhatsappOpen] = useState(false);
 
-  const { data: profile, isLoading } = useQuery<UserProfile>({
+  const profileQuery = useQuery<UserProfile>({
     queryKey: ['profile'],
     queryFn: getProfile,
     staleTime: 5 * 60 * 1000,
   });
+  const profile = profileQuery.data;
+  const isLoading = profileQuery.isLoading;
 
   const displayName =
     profile != null
@@ -184,6 +187,13 @@ export default function ProfileScreen() {
       <ScrollView
         contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={profileQuery.isRefetching}
+            onRefresh={() => profileQuery.refetch()}
+            tintColor={C.green}
+          />
+        }
       >
         {isLoading && profile == null && (
           <View style={styles.loaderRow}>
