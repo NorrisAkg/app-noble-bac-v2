@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,14 +14,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 //
 // Au montage, on persiste `hasSeenOnboarding` pour que le RootLayout n'envoie
 // plus l'utilisateur sur le landing au prochain démarrage.
+//
+// expo-video v3 + Fabric peut emettre "Cannot use shared object that was
+// already released" si le hook useVideoPlayer et le VideoView n'ont pas le
+// meme cycle de vie (race au mount / re-render). On isole donc le player +
+// la view dans un sous-composant VideoBackground monte uniquement quand le
+// screen est focuse, ce qui aligne strictement leurs durees de vie.
 
-export default function LandingScreen() {
-  const router = useRouter();
-
+function VideoBackground() {
   const player = useVideoPlayer(require('@/assets/videos/landing-bg.mp4'), (p) => {
     p.loop = true;
     p.play();
   });
+
+  return (
+    <VideoView
+      style={styles.video}
+      player={player}
+      nativeControls={false}
+      contentFit="cover"
+    />
+  );
+}
+
+export default function LandingScreen() {
+  const router = useRouter();
+  const [isFocused, setIsFocused] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, []),
+  );
 
   useEffect(() => {
     AsyncStorage.setItem('hasSeenOnboarding', 'true').catch(() => {
@@ -34,12 +59,7 @@ export default function LandingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <VideoView
-        style={styles.video}
-        player={player}
-        nativeControls={false}
-        contentFit="cover"
-      />
+      {isFocused && <VideoBackground />}
 
       {/* 1. Dégradé vertical foncé — 4 stops pour lisibilité haut + bas */}
       <LinearGradient
