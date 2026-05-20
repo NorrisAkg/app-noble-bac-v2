@@ -1,33 +1,51 @@
 import React from 'react';
 import { TouchableOpacity, View, Text, ScrollView } from 'react-native';
 import { Check } from 'lucide-react-native';
-import { COUNTRIES, type Country } from '@/constants/countries';
 import { C } from '@/constants/theme';
 import { CustomBottomSheet } from './BottomSheet';
 import { CountryMap } from './CountryMap';
 
+/**
+ * Description normalisée d'un pays affichable dans le picker.
+ * Aligne les deux sources (`constants/countries` pour le login, API
+ * `getCountries` pour le signup) sur une même forme afin de garantir une UI
+ * cohérente entre les écrans.
+ */
+export interface CountryPickerOption {
+  /** Identifiant stable (peut être un id base ou un code ISO). */
+  key: string;
+  /** ISO-3166 alpha-2 — utilisé pour afficher carte et drapeau (BJ, SN, …). */
+  code: string;
+  /** Libellé affiché (ex: "Bénin"). */
+  name: string;
+  /** Indicatif téléphonique au format E.164 (ex: "+229"). */
+  dial: string;
+}
+
 interface CountryPickerSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  selected?: Country | null;
-  onSelect: (country: Country) => void;
+  options: CountryPickerOption[];
+  selectedKey?: string | null;
+  onSelect: (option: CountryPickerOption) => void;
   title?: string;
 }
 
 export const CountryPickerSheet: React.FC<CountryPickerSheetProps> = ({
   isOpen,
   onClose,
-  selected,
+  options,
+  selectedKey,
   onSelect,
   title = 'Choisis ton pays',
 }) => (
   <CustomBottomSheet isOpen={isOpen} onClose={onClose} title={title} snapPoints={['70%']}>
     <ScrollView contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
-      {COUNTRIES.map((c) => {
-        const active = selected?.code === c.code;
+      {options.map((c) => {
+        const active = selectedKey === c.key;
         return (
           <TouchableOpacity
-            key={c.code}
+            key={c.key}
             activeOpacity={0.7}
             onPress={() => {
               onSelect(c);

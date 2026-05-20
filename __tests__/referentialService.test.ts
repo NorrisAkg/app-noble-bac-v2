@@ -10,19 +10,21 @@ const countriesFixture: Country[] = [
   {
     id: '1',
     name: 'Sénégal',
-    iso_code: 'SN',
+    code: 'SN',
     phone_code: '+221',
-    currency_code: 'XOF',
-    cinetpay_supported: true,
-    series: [{ id: '10', name: 'S1' }],
+    flag_emoji: '🇸🇳',
+    payment_enabled: true,
+    is_active: true,
+    series: [{ id: '10', code: 'S1', label: 'Bac S1' }],
   },
   {
     id: '2',
     name: "Côte d'Ivoire",
-    iso_code: 'CI',
+    code: 'CI',
     phone_code: '+225',
-    currency_code: 'XOF',
-    cinetpay_supported: true,
+    flag_emoji: '🇨🇮',
+    payment_enabled: true,
+    is_active: true,
     series: [],
   },
 ];
@@ -42,7 +44,7 @@ describe('referentialService', () => {
     expect(mockedApiClient.get).toHaveBeenCalledWith('/countries');
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('Sénégal');
-    expect(result[1].iso_code).toBe('CI');
+    expect(result[1].code).toBe('CI');
   });
 
   it('propage l\'erreur axios telle quelle', async () => {

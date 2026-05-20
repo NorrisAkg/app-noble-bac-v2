@@ -10,7 +10,7 @@ import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
 import { ChevronDown } from 'lucide-react-native';
 import { requestPasswordReset } from '@/services/authService';
 import { getApiErrorMessage } from '@/utils/apiError';
-import { DEFAULT_COUNTRY, type Country } from '@/constants/countries';
+import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -89,8 +89,12 @@ export default function ForgotPasswordScreen() {
       <CountryPickerSheet
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        selected={country}
-        onSelect={setCountry}
+        options={COUNTRIES.map((c) => ({ key: c.code, code: c.code, name: c.name, dial: c.dial }))}
+        selectedKey={country.code}
+        onSelect={(opt) => {
+          const next = COUNTRIES.find((c) => c.code === opt.key);
+          if (next) setCountry(next);
+        }}
       />
     </View>
   );

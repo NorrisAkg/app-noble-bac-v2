@@ -42,7 +42,7 @@ export default function SetupScreen() {
   // Pré-sélectionne le pays + série du compte fraîchement créé.
   useEffect(() => {
     if (!profile || !countries.length || selectedCountry) return;
-    const current = countries.find((c) => c.iso_code === profile.country.code);
+    const current = countries.find((c) => c.code === profile.country.code);
     if (current) {
       setSelectedCountry(current);
       const currentSeries = current.series.find((s) => s.id === String(profile.series.id));
@@ -54,7 +54,7 @@ export default function SetupScreen() {
   const isDifferentCountry =
     selectedCountry !== null &&
     registeredCountryCode !== undefined &&
-    selectedCountry.iso_code !== registeredCountryCode;
+    selectedCountry.code !== registeredCountryCode;
 
   const updateMutation = useMutation({
     mutationFn: (seriesId: number) => updateProfile({ series_id: seriesId }),
@@ -165,7 +165,7 @@ const CountryStep: React.FC<CountryStepProps> = ({ countries, onSelect }) => (
               elevation: 2,
             }}
           >
-            <CountryMap code={c.iso_code} size={84} />
+            <CountryMap code={c.code} size={84} />
             <Text className="font-poppins-semibold text-[13.5px] text-brand-ink mt-2.5">
               {c.name}
             </Text>
@@ -199,7 +199,7 @@ const SeriesStep: React.FC<SeriesStepProps> = ({ country, onModify, selected, on
         marginBottom: 22,
       }}
     >
-      <CountryMap code={country.iso_code} size={32} />
+      <CountryMap code={country.code} size={32} />
       <View style={{ flex: 1 }}>
         <Text
           style={{
@@ -265,7 +265,7 @@ const SeriesStep: React.FC<SeriesStepProps> = ({ country, onModify, selected, on
                   color: C.salmonDark,
                 }}
               >
-                {s.name.slice(0, 2)}
+                {s.code.slice(0, 2)}
               </Text>
             </View>
             <Text
@@ -276,7 +276,7 @@ const SeriesStep: React.FC<SeriesStepProps> = ({ country, onModify, selected, on
                 color: active ? '#fff' : C.ink,
               }}
             >
-              Bac {s.name}
+              Bac {s.label}
             </Text>
             {active && <Check size={20} color="#fff" strokeWidth={2.6} />}
           </TouchableOpacity>

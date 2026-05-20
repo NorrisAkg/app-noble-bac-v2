@@ -11,7 +11,7 @@ import { Eye, EyeOff, ChevronDown } from 'lucide-react-native';
 import { login } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getApiErrorMessage } from '@/utils/apiError';
-import { DEFAULT_COUNTRY, type Country } from '@/constants/countries';
+import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -112,8 +112,12 @@ export default function LoginScreen() {
       <CountryPickerSheet
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        selected={country}
-        onSelect={setCountry}
+        options={COUNTRIES.map((c) => ({ key: c.code, code: c.code, name: c.name, dial: c.dial }))}
+        selectedKey={country.code}
+        onSelect={(opt) => {
+          const next = COUNTRIES.find((c) => c.code === opt.key);
+          if (next) setCountry(next);
+        }}
       />
     </View>
   );

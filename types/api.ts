@@ -14,16 +14,21 @@ export interface User {
 export interface Country {
   id: string;
   name: string;
-  iso_code: string;
+  /** ISO-3166 alpha-2, ex: 'BJ', 'SN'. Aligné sur la colonne `code` de la table countries. */
+  code: string;
   phone_code: string;
-  currency_code: string;
-  cinetpay_supported: boolean;
+  flag_emoji: string | null;
+  payment_enabled: boolean;
+  is_active: boolean;
   series: Series[];
 }
 
 export interface Series {
   id: string;
-  name: string;
+  /** Code interne (ex: 'A', 'C', 'D', 'S1'). */
+  code: string;
+  /** Libellé affiché (ex: 'Bac A', 'Sciences'). */
+  label: string;
 }
 
 export interface Subject {
