@@ -98,11 +98,10 @@ export default function SearchScreen() {
         title: s.name,
         subtitle: `${s.chapter_count} chapitres`,
         onPress: () => router.push({
-          pathname: '/quiz-chapters',
+          pathname: '/quiz-session',
           params: {
             subjectId: String(s.id),
             subjectLabel: s.name,
-            subjectSlug: s.icon_slug ?? '',
           },
         }),
       }));

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,18 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 
 import { courseService } from '@/services/courseService';
+import { quizService, type QuizSessionHistoryItem } from '@/services/quizService';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
 import { C } from '@/constants/theme';
 import type { Subject } from '@/types/api';
+
+interface SubjectQuizStats {
+  sessions: number;
+  averagePct: number | null;
+}
 
 export default function QuizSubjectsScreen() {
   const insets = useSafeAreaInsets();
@@ -38,13 +45,36 @@ export default function QuizSubjectsScreen() {
     }
   };
 
+  const { data: historyPage } = useQuery({
+    queryKey: ['quiz', 'history', 'first-page'],
+    queryFn: () => quizService.getHistory(1, 50),
+  });
+
+  const statsBySubject = useMemo<Record<number, SubjectQuizStats>>(() => {
+    const items: QuizSessionHistoryItem[] = historyPage?.data ?? [];
+    const acc: Record<number, { sessions: number; sumPct: number }> = {};
+    for (const item of items) {
+      const key = item.subject.id;
+      if (!acc[key]) acc[key] = { sessions: 0, sumPct: 0 };
+      acc[key].sessions += 1;
+      acc[key].sumPct += item.percentage;
+    }
+    const result: Record<number, SubjectQuizStats> = {};
+    for (const [id, { sessions, sumPct }] of Object.entries(acc)) {
+      result[Number(id)] = {
+        sessions,
+        averagePct: sessions > 0 ? Math.round(sumPct / sessions) : null,
+      };
+    }
+    return result;
+  }, [historyPage]);
+
   const handlePickSubject = (subject: Subject) => {
     router.push({
-      pathname: '/quiz-chapters',
+      pathname: '/quiz-session',
       params: {
         subjectId: subject.id.toString(),
         subjectLabel: subject.name,
-        subjectSlug: subject.icon_slug ?? '',
       },
     });
   };
@@ -72,22 +102,29 @@ export default function QuizSubjectsScreen() {
             Teste-toi sur toutes{'\n'}les matières
           </Text>
           <Text style={styles.headerSubtitle}>
-            20 questions par chapitre · explications incluses.
+            10 questions par session · mode examen blanc.
           </Text>
 
           <View style={styles.grid}>
-            {subjects.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                style={styles.card}
-                activeOpacity={0.7}
-                onPress={() => handlePickSubject(s)}
-              >
-                <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
-                <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
-                <Text style={styles.cardCount}>{s.chapter_count || 0} chapitres</Text>
-              </TouchableOpacity>
-            ))}
+            {subjects.map((s) => {
+              const stats = statsBySubject[s.id];
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  style={styles.card}
+                  activeOpacity={0.7}
+                  onPress={() => handlePickSubject(s)}
+                >
+                  <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
+                  <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
+                  <Text style={styles.cardCount}>
+                    {stats && stats.sessions > 0
+                      ? `${stats.sessions} session${stats.sessions > 1 ? 's' : ''} · ${stats.averagePct}% moyen`
+                      : 'Commencer'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </ScrollView>
       )}
