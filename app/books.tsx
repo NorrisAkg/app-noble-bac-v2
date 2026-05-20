@@ -476,11 +476,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
+  // 2 colonnes garanties : `justifyContent: 'space-between'` répartit la
+  // colonne gauche et droite. Pas de `gap` ici car combiné à width 48% il
+  // déborderait sur les écrans étroits (96% + 14px > 100%) et provoquerait
+  // un repli à 1 colonne. L'espacement vertical est porté par `bookCard.marginBottom`.
   gridInner: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 14,
   },
   bookCard: {
     width: '48%', // Approx half with gap

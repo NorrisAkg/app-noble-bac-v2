@@ -1,25 +1,28 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { ChevronRight, Play } from 'lucide-react-native';
 
-interface Section {
-  id: string;
-  title: string;
-  items: any[];
-}
-
 interface ChapterRowCardProps {
-  section: Section;
+  title: string;
+  subtitle: string;
   mode: 'pdf' | 'video';
+  loading?: boolean;
   onClick: () => void;
 }
 
-export const ChapterRowCard: React.FC<ChapterRowCardProps> = ({ section, mode, onClick }) => {
+export const ChapterRowCard: React.FC<ChapterRowCardProps> = ({
+  title,
+  subtitle,
+  mode,
+  loading = false,
+  onClick,
+}) => {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={onClick}
-      style={styles.card}
+      disabled={loading}
+      style={[styles.card, loading && styles.cardLoading]}
     >
       {mode === 'pdf' ? (
         <View style={styles.pdfIcon}>
@@ -32,15 +35,19 @@ export const ChapterRowCard: React.FC<ChapterRowCardProps> = ({ section, mode, o
       )}
 
       <View style={styles.content}>
-        <Text style={styles.title}>{section.title}</Text>
-        <Text style={styles.subtitle}>
-          {mode === 'pdf'
-            ? `${section.items.length} leçons · fiche PDF`
-            : `${section.items.length} leçons · vidéo du chapitre`}
+        <Text style={styles.title} numberOfLines={2}>
+          {title}
+        </Text>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {subtitle}
         </Text>
       </View>
 
-      <ChevronRight size={18} color="#5A6470" strokeWidth={2.2} />
+      {loading ? (
+        <ActivityIndicator size="small" color="#5A6470" />
+      ) : (
+        <ChevronRight size={18} color="#5A6470" strokeWidth={2.2} />
+      )}
     </TouchableOpacity>
   );
 };
@@ -63,6 +70,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 3,
+  },
+  cardLoading: {
+    opacity: 0.7,
   },
   pdfIcon: {
     width: 44,
