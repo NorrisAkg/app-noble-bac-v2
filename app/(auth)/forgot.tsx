@@ -10,6 +10,7 @@ import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
 import { ChevronDown } from 'lucide-react-native';
 import { requestPasswordReset } from '@/services/authService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { buildE164Phone } from '@/utils/phone';
 import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function ForgotPasswordScreen() {
@@ -18,7 +19,7 @@ export default function ForgotPasswordScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [phone, setPhone] = useState('');
 
-  const e164Phone = `${country.dial}${phone.replace(/^0+/, '')}`;
+  const e164Phone = buildE164Phone(country.dial, phone);
   const isValid = phone.length >= 6;
 
   const { mutate, isPending } = useMutation({

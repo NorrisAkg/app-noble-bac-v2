@@ -14,6 +14,7 @@ import { CountryFlag } from '@/components/ui/CountryFlag';
 import { getCountries } from '@/services/referentialService';
 import { register } from '@/services/authService';
 import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
+import { buildE164Phone } from '@/utils/phone';
 import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function SignupScreen() {
@@ -46,7 +47,7 @@ export default function SignupScreen() {
   const apiCountry = apiCountries.find((c) => c.code === country.code) ?? null;
   const defaultSeriesId = apiCountry?.series?.[0]?.id ?? null;
 
-  const e164Phone = `${country.dial}${phone.replace(/^0+/, '')}`;
+  const e164Phone = buildE164Phone(country.dial, phone);
   const isValid =
     !!firstName.trim() &&
     !!lastName.trim() &&

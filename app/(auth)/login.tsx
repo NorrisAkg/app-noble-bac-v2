@@ -11,6 +11,7 @@ import { Eye, EyeOff, ChevronDown } from 'lucide-react-native';
 import { login } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { buildE164Phone } from '@/utils/phone';
 import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function LoginScreen() {
@@ -23,8 +24,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
 
-  // Build the E.164 number — strip leading zeros on the local number
-  const e164Phone = `${country.dial}${phone.replace(/^0+/, '')}`;
+  // Build the E.164 number — preserve leading zeros (UEMOA convention).
+  const e164Phone = buildE164Phone(country.dial, phone);
   const isValid = phone.length >= 6 && password.length >= 4;
 
   const { mutate, isPending } = useMutation({
