@@ -68,7 +68,20 @@ export default function SetupScreen() {
   });
 
   const handleContinue = () => {
-    if (!selectedSeries || !profile) return;
+    if (!selectedSeries) return;
+
+    // Filet de sécurité : si le profil n'a pas pu être chargé (token absent
+    // ou expiré), on ne peut pas savoir si le user change de pays/série.
+    // Plutôt qu'un return silencieux qui laisse l'utilisateur perplexe, on
+    // signale clairement et on renvoie vers /login.
+    if (!profile) {
+      Alert.alert(
+        'Session expirée',
+        'Tu n\'es pas authentifié. Reconnecte-toi pour finaliser ton inscription.',
+        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }],
+      );
+      return;
+    }
 
     if (isDifferentCountry) {
       Alert.alert(
