@@ -5,13 +5,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Platform,
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
+import { Asset } from 'expo-asset';
 import { ChevronLeft, Check, Download } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -40,6 +40,30 @@ export default function PdfViewerScreen() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(initialUrl || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+
+  // Resolution one-shot du viewer PDF.js bundle dans assets/pdfjs/viewer.html.
+  // Asset.downloadAsync() le copie dans le cache local et nous donne un
+  // file:// URI utilisable par <WebView>. Sans ca, on retomberait sur Google
+  // Docs Viewer qui ne peut pas atteindre les URLs LAN ou les signed R2.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require('@/assets/pdfjs/viewer.html'));
+        await asset.downloadAsync();
+        if (!cancelled && asset.localUri) {
+          setViewerUri(asset.localUri);
+        }
+      } catch (e) {
+        console.error('Failed to load PDF viewer asset:', e);
+        if (!cancelled) setError('Impossible de charger le lecteur PDF.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const { show: showPremium } = usePremiumGate();
 
@@ -76,7 +100,15 @@ export default function PdfViewerScreen() {
       if (router.canGoBack()) router.back();
       return;
     }
-    setError('Impossible de charger le document.');
+    const status = err?.response?.status;
+    const apiMsg = err?.response?.data?.message;
+    const networkMsg = err?.message;
+    setError(
+      `Impossible de charger le document.\n` +
+        (status ? `Status API : ${status}\n` : '') +
+        (apiMsg ? `${apiMsg}\n` : '') +
+        (networkMsg && !apiMsg ? `${networkMsg}\n` : ''),
+    );
   }, [showPremium, router]);
 
   const loadFromBook = useCallback(async (id: number) => {
@@ -195,10 +227,18 @@ export default function PdfViewerScreen() {
     );
   }
 
-  const sourceUri =
-    Platform.OS === 'android'
-      ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`
-      : pdfUrl;
+  if (!viewerUri) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#3DBE45" />
+      </View>
+    );
+  }
+
+  // PDF.js viewer local (assets/pdfjs/viewer.html). L'URL du PDF est passee
+  // via le fragment `#url=...` pour eviter les soucis de longueur / encoding
+  // sur les signed URLs R2 (souvent > 200 chars avec query params).
+  const sourceUri = `${viewerUri}#url=${encodeURIComponent(pdfUrl)}`;
 
   return (
     <View style={styles.container}>
@@ -254,9 +294,42 @@ export default function PdfViewerScreen() {
         <WebView
           source={{ uri: sourceUri }}
           style={styles.webview}
-          onLoadStart={() => setLoading(true)}
+          originWhitelist={['*']}
+          allowFileAccess
+          allowFileAccessFromFileURLs
+          allowUniversalAccessFromFileURLs
+          mixedContentMode="always"
+          javaScriptEnabled
+          domStorageEnabled
           onLoadEnd={() => setLoading(false)}
-          scalesPageToFit={true}
+          onMessage={(event) => {
+            try {
+              const msg = JSON.parse(event.nativeEvent.data);
+              if (msg.type === 'rendered') {
+                setLoading(false);
+                console.log('[PdfViewer] rendered', msg.pages, 'pages');
+              } else if (msg.type === 'error') {
+                console.warn('[PdfViewer] PDF.js error:', msg.message);
+                // On NE BASCULE PLUS vers l'ecran d'erreur RN — on laisse la
+                // viewer.html afficher son propre message detaille (avec le
+                // texte de l'erreur). Ca evite de masquer la cause exacte
+                // (CORS, network, parse error, etc.) derriere un message
+                // generique.
+                setLoading(false);
+              }
+            } catch {
+              // Message non JSON — ignore.
+            }
+          }}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('[PdfViewer] WebView error:', nativeEvent);
+            setError(
+              `WebView : ${nativeEvent.description || 'erreur inconnue'}\n` +
+                `code: ${nativeEvent.code}\n` +
+                `url: ${nativeEvent.url}`,
+            );
+          }}
           bounces={false}
           showsHorizontalScrollIndicator={false}
         />
