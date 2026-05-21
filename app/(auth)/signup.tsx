@@ -30,41 +30,42 @@ export default function SignupScreen() {
 
   // ── Selection state ───────────────────────────────────────────────────────
   // Même UX que sur /login : on s'appuie sur la liste statique des pays UEMOA
-  // (`constants/countries`) avec Niger pré-sélectionné. Les `id` backend de
-  // country/series sont résolus au moment du submit via le référentiel API
-  // (cache `staleTime: Infinity`). La filière n'est pas demandée ici — elle
-  // sera choisie sur `/setup` après vérification OTP (cf. CDC US-AUTH-04).
+  // (`constants/countries`) avec Niger pré-sélectionné. Le `country.id` backend
+  // est résolu au moment du submit via le référentiel API (cache
+  // `staleTime: Infinity`). La filière n'est PAS demandée ici — le backend
+  // auto-affecte la 1re série active du pays, l'utilisateur la choisit/corrige
+  // sur `/setup` après vérification OTP (CDC US-AUTH-04).
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
 
-  // Référentiel API préchargé (résolution des id backend au submit).
+  // Référentiel API préchargé (résolution du country_id backend au submit).
   const { data: apiCountries = [], isLoading: loadingApiCountries } = useQuery({
     queryKey: ['countries'],
     queryFn: getCountries,
     staleTime: Infinity,
   });
 
-  const apiCountry = apiCountries.find((c) => c.code === country.code) ?? null;
-  const defaultSeriesId = apiCountry?.series?.[0]?.id ?? null;
-
   const e164Phone = buildE164Phone(country.dial, phone);
+
+  // isValid ne dépend QUE des champs utilisateur. Le référentiel API est
+  // une exigence technique vérifiée au submit (l'utilisateur n'a pas
+  // conscience qu'il « doit » avoir une série).
   const isValid =
     !!firstName.trim() &&
     !!lastName.trim() &&
     phone.length >= 6 &&
     password.length >= 8 &&
-    agree &&
-    apiCountry !== null &&
-    defaultSeriesId !== null;
+    agree;
 
   // ── Register mutation ─────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      if (!apiCountry || !defaultSeriesId) {
+      const apiCountry = apiCountries.find((c) => c.code === country.code) ?? null;
+      if (!apiCountry) {
         throw new Error(
           loadingApiCountries
             ? 'Le référentiel des pays charge encore, réessaie dans un instant.'
-            : `Pays ${country.code} introuvable côté API. Vérifie que le seeder a été exécuté.`,
+            : `Pays ${country.code} introuvable côté API. Vérifie le serveur.`,
         );
       }
       return register({
@@ -73,7 +74,8 @@ export default function SignupScreen() {
         phone: e164Phone,
         password,
         country_id: apiCountry.id,
-        series_id: defaultSeriesId,
+        // series_id volontairement omis : le backend auto-affecte
+        // (le user choisira / corrigera via /setup).
       });
     },
     onSuccess: () => {
@@ -172,6 +174,19 @@ export default function SignupScreen() {
           <Button onPress={() => mutate()} disabled={!isValid} loading={isPending}>
             Créer mon compte
           </Button>
+
+          {/* Feedback statut référentiel — préventif. Si l'API ne répond
+              plus ou que la liste est vide, l'utilisateur sait pourquoi
+              le submit échouera au lieu d'un bouton silencieusement bloqué. */}
+          {loadingApiCountries ? (
+            <Text className="font-poppins text-xs text-brand-ink-medium text-center mt-3">
+              Chargement du référentiel…
+            </Text>
+          ) : apiCountries.length === 0 ? (
+            <Text className="font-poppins-medium text-xs text-red-500 text-center mt-3">
+              Référentiel indisponible. Vérifie le serveur API.
+            </Text>
+          ) : null}
 
           <View className="mt-6 mb-10 flex-row justify-center gap-1">
             <Text className="font-poppins text-[13.5px] text-brand-ink-medium">Déjà inscrit ?</Text>

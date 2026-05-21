@@ -151,7 +151,11 @@ export interface RegisterPayload {
   phone: string;
   password: string;
   country_id: string;
-  series_id: string;
+  /**
+   * Optionnel : le backend auto-affecte la 1re série active du pays
+   * si non fourni. L'utilisateur la choisit/corrige via /setup post-OTP.
+   */
+  series_id?: string;
 }
 
 export interface LoginPayload {
