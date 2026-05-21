@@ -243,6 +243,16 @@ export interface UpdateProfilePayload {
 
 export type ProfileResponse = ApiResponse<UserProfile>;
 
+/**
+ * Shape renvoyée par GET /api/v1/me/stats (MeStatsResource côté backend).
+ * Stats agrégées calculées sur quiz_sessions completed et user_downloads.
+ */
+export interface MeStats {
+  quiz_count: number;
+  average_score_pct: number;
+  exams_consulted: number;
+}
+
 // ─── Catalog (annales BAC) ────────────────────────────────────────────────────
 
 /**

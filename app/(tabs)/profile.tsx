@@ -32,6 +32,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { AppBar } from '@/components/ui/AppBar';
 import { WhatsAppSheet } from '@/components/ui/WhatsAppSheet';
 import { getProfile } from '@/services/profileService';
+import { getMeStats } from '@/services/meService';
 import { C } from '@/constants/theme';
 import type { UserProfile } from '@/types/api';
 
@@ -90,13 +91,19 @@ export default function ProfileScreen() {
         ? 'Chargement...'
         : '';
 
-  // Stats placeholder — pas encore exposées par le backend (cf. /me/stats à
-  // venir). Aligné maquette : `screens-library.jsx:378-390` (3 stats compactes
-  // dans une seule card avec séparateurs verticaux).
+  // Stats agrégées via /me/stats (UserStatsService, cache 60s backend).
+  // Aligné maquette : `screens-library.jsx:378-390` (3 stats compactes dans
+  // une seule card avec séparateurs verticaux).
+  const statsQuery = useQuery({
+    queryKey: ['me', 'stats'],
+    queryFn: getMeStats,
+    staleTime: 5 * 60 * 1000,
+  });
+  const meStats = statsQuery.data;
   const stats = [
-    { label: 'Quiz', value: '—' },
-    { label: 'Score', value: '—' },
-    { label: 'Sujets', value: '—' },
+    { label: 'Quiz', value: meStats ? String(meStats.quiz_count) : '—' },
+    { label: 'Score', value: meStats ? `${meStats.average_score_pct}%` : '—' },
+    { label: 'Sujets', value: meStats ? String(meStats.exams_consulted) : '—' },
   ];
 
   const openWhatsApp = () => {
@@ -189,8 +196,11 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={profileQuery.isRefetching}
-            onRefresh={() => profileQuery.refetch()}
+            refreshing={profileQuery.isRefetching || statsQuery.isRefetching}
+            onRefresh={() => {
+              profileQuery.refetch();
+              statsQuery.refetch();
+            }}
             tintColor={C.green}
           />
         }

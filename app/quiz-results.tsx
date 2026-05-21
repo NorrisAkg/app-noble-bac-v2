@@ -13,8 +13,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { X } from 'lucide-react-native';
 
+import { useQuery } from '@tanstack/react-query';
+
 import { C } from '@/constants/theme';
 import { useQuizStore } from '@/store/useQuizStore';
+import { quizService } from '@/services/quizService';
 
 interface Tier {
   label: string;
@@ -63,6 +66,23 @@ export default function QuizResultsScreen() {
   const subjectName = finishedSession?.subject?.name ?? 'Quiz';
   const durationLabel = formatDuration(finishedSession?.duration_seconds ?? null);
   const errors = Math.max(0, numericTotal - numericScore);
+
+  // Moyenne dynamique sur cette matière, calculée à partir de l'historique
+  // déjà cached par la tab Quiz. On filtre sur subject.id (la session qu'on
+  // vient de finir y est déjà incluse côté backend).
+  const historyQuery = useQuery({
+    queryKey: ['quiz', 'history', 'first-page'],
+    queryFn: () => quizService.getHistory(1, 50),
+    staleTime: 30 * 1000,
+  });
+  const subjectAverage = (() => {
+    const subjectId = finishedSession?.subject?.id;
+    if (!subjectId || !historyQuery.data) return null;
+    const sameSubject = historyQuery.data.data.filter((s) => s.subject.id === subjectId);
+    if (sameSubject.length === 0) return null;
+    const sum = sameSubject.reduce((acc, s) => acc + s.percentage, 0);
+    return { sessions: sameSubject.length, average: Math.round(sum / sameSubject.length) };
+  })();
 
   // Animation du compteur (0 → score). On reproduit le tick de 80ms du template.
   const [animScore, setAnimScore] = useState(0);
@@ -161,7 +181,9 @@ export default function QuizResultsScreen() {
         <View style={styles.comparisonCard}>
           <Text style={styles.comparisonEmoji}>📈</Text>
           <Text style={styles.comparisonText}>
-            Continue à pratiquer pour grimper dans le classement de ta série.
+            {subjectAverage && subjectAverage.sessions >= 2
+              ? `Ta moyenne en ${subjectName} : ${subjectAverage.average}% sur ${subjectAverage.sessions} sessions.`
+              : `Première session sur ${subjectName}. Bon début !`}
           </Text>
         </View>
       </ScrollView>
