@@ -154,7 +154,7 @@ export default function BooksLibraryScreen() {
     setSelectedAuthor(null);
   };
 
-  const { guard } = usePremiumGate();
+  const { guard, isPremium } = usePremiumGate();
 
   const handleOpenBook = (book: Book) => {
     guard(book, () => {
@@ -232,6 +232,7 @@ export default function BooksLibraryScreen() {
               <BookCard
                 key={book.id}
                 book={book}
+                hidePremiumBadge={isPremium}
                 onPress={() => handleOpenBook(book)}
               />
             ))}
@@ -326,7 +327,11 @@ const FilterPill: React.FC<FilterPillProps> = ({ label, value, onPress, disabled
  * "deja telecharge" via useDownloadedSet (cache TanStack Query partage
  * avec l'ecran "Mes telechargements" et le bouton dans pdf-viewer).
  */
-const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress }) => {
+const BookCard: React.FC<{ book: Book; hidePremiumBadge?: boolean; onPress: () => void }> = ({
+  book,
+  hidePremiumBadge,
+  onPress,
+}) => {
   const downloaded = useDownloadedSet();
   const isDownloaded = downloaded.isDownloaded('book', book.id);
   // Fallback gracieux si l'auteur ou la matière sont null côté backend
@@ -336,7 +341,7 @@ const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress
 
   return (
     <TouchableOpacity style={styles.bookCard} activeOpacity={0.8} onPress={onPress}>
-      <BookCover book={book} isDownloaded={isDownloaded} />
+      <BookCover book={book} isDownloaded={isDownloaded} hidePremiumBadge={hidePremiumBadge} />
       <Text style={styles.bookTitle} numberOfLines={2}>
         {book.title}
       </Text>
@@ -347,7 +352,11 @@ const BookCard: React.FC<{ book: Book; onPress: () => void }> = ({ book, onPress
   );
 };
 
-const BookCover: React.FC<{ book: Book; isDownloaded?: boolean }> = ({ book, isDownloaded }) => {
+const BookCover: React.FC<{ book: Book; isDownloaded?: boolean; hidePremiumBadge?: boolean }> = ({
+  book,
+  isDownloaded,
+  hidePremiumBadge,
+}) => {
   const [coverPrimary] = pickCoverPalette(book.subject?.name);
   return (
     <View style={styles.coverContainer}>
@@ -378,11 +387,11 @@ const BookCover: React.FC<{ book: Book; isDownloaded?: boolean }> = ({ book, isD
         <View style={styles.freeBadge}>
           <Text style={styles.freeText}>GRATUIT</Text>
         </View>
-      ) : (
+      ) : !hidePremiumBadge ? (
         <View style={styles.premiumBadge}>
           <Text style={styles.premiumText}>⭐</Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 };

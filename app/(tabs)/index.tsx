@@ -79,7 +79,7 @@ export default function HomeScreen() {
   });
   const books: Book[] = booksQuery.data?.data ?? [];
 
-  const { guard } = usePremiumGate();
+  const { guard, isPremium } = usePremiumGate();
 
   const firstName = user?.first_name ?? 'Étudiant';
   const initials = firstName[0]?.toUpperCase() ?? 'E';
@@ -229,6 +229,7 @@ export default function HomeScreen() {
                     accent: palette.accent,
                     free: b.is_free,
                   }}
+                  hidePremiumBadge={isPremium}
                   onPress={() => handleBookPress(b)}
                 />
               );

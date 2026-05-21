@@ -259,7 +259,7 @@ function ChapterAccordion({ chapter, open, onToggle, subjectLabel, router }: Cha
     enabled: open,
   });
 
-  const { guard } = usePremiumGate();
+  const { guard, isPremium } = usePremiumGate();
 
   const handleOpenLesson = (lesson: Lesson) => {
     // Lesson est free si is_free=true OU order=1 (RM-COURS-05). Le helper
@@ -289,6 +289,7 @@ function ChapterAccordion({ chapter, open, onToggle, subjectLabel, router }: Cha
           <LessonList
             loading={lessonsLoading}
             lessons={lessons ?? []}
+            hideLockIcon={isPremium}
             onPress={handleOpenLesson}
           />
         </View>
@@ -300,10 +301,12 @@ function ChapterAccordion({ chapter, open, onToggle, subjectLabel, router }: Cha
 function LessonList({
   loading,
   lessons,
+  hideLockIcon,
   onPress,
 }: {
   loading: boolean;
   lessons: Lesson[];
+  hideLockIcon?: boolean;
   onPress: (lesson: Lesson) => void;
 }) {
   if (loading) {
@@ -330,7 +333,7 @@ function LessonList({
               <Text style={accordionStyles.rowSubtitle}>{lesson.duration_minutes} min</Text>
             ) : null}
           </View>
-          {!lesson.is_free && <Lock size={14} color="#9AA3AC" />}
+          {!lesson.is_free && !hideLockIcon && <Lock size={14} color="#9AA3AC" />}
         </TouchableOpacity>
       ))}
     </View>

@@ -12,9 +12,15 @@ interface BookCoverProps {
     free: boolean;
   };
   onPress: () => void;
+  /**
+   * Masque le cadenas Premium (typiquement quand l'utilisateur courant est
+   * déjà Premium et a accès sans restriction). Le badge GRATUIT reste affiché
+   * car c'est une info pertinente même pour les Premium.
+   */
+  hidePremiumBadge?: boolean;
 }
 
-export const BookCover: React.FC<BookCoverProps> = ({ book, onPress }) => (
+export const BookCover: React.FC<BookCoverProps> = ({ book, onPress, hidePremiumBadge = false }) => (
   <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.wrapper}>
     <View style={[styles.cover, { backgroundColor: book.color }]}>
       {/* Spine highlight */}
@@ -38,8 +44,8 @@ export const BookCover: React.FC<BookCoverProps> = ({ book, onPress }) => (
         </View>
       )}
 
-      {/* Premium lock */}
-      {!book.free && (
+      {/* Premium lock — masqué si user est Premium */}
+      {!book.free && !hidePremiumBadge && (
         <View style={styles.lockBadge}>
           <Lock size={10} color="#FFC857" strokeWidth={2.4} />
         </View>

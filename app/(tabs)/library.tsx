@@ -108,7 +108,7 @@ export default function LibraryScreen() {
 
   // ─── Actions PDF / videos ─────────────────────────────────────────────────
 
-  const { guard, show: showPremium } = usePremiumGate();
+  const { guard, show: showPremium, isPremium } = usePremiumGate();
 
   const openPdfMutation = useMutation({
     mutationFn: async ({ examId, kind }: { examId: number; kind: 'epreuve' | 'corrige' }) => {
@@ -309,7 +309,7 @@ export default function LibraryScreen() {
           {examForYear != null && tab === 'corrige' && (
             <DocCard
               title={`Corrigé · ${currentSubject?.name ?? ''} ${examForYear.year}`}
-              meta="Premium requis"
+              meta={isPremium ? 'Corrigé complet' : 'Premium requis'}
               extra={`${examForYear.series.name} · ${examForYear.country.name}`}
               kind="pdf-green"
               loading={openPdfMutation.isPending}
