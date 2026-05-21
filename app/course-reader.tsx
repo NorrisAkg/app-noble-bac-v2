@@ -90,32 +90,7 @@ export default function CourseReaderScreen() {
           </View>
         )}
 
-        {status === 'ready' && lesson?.content && (
-          <>
-            <TexRenderer content={lesson.content} />
-
-            {/* Carte CTA fin de leçon — aligné `templates/screens-course-reader.jsx:186-219`.
-                Remplace l'ancien FAB noir flottant 🎯 par une vraie call-to-action intégrée. */}
-            <View style={styles.testCard}>
-              <View style={styles.testIcon}>
-                <Text style={styles.testEmoji}>🎯</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.testTitle}>Tester vos acquis</Text>
-                <Text style={styles.testDesc}>
-                  Quelques questions pour valider la leçon.
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => router.push('/(tabs)/quiz')}
-                activeOpacity={0.85}
-                style={styles.testBtn}
-              >
-                <Text style={styles.testBtnText}>Commencer</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+        {status === 'ready' && lesson?.content && <TexRenderer content={lesson.content} />}
 
         {status === 'ready' && !lesson?.content && (
           <View style={styles.centered}>
@@ -201,59 +176,6 @@ const styles = StyleSheet.create({
   backToListText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 14,
-    color: '#fff',
-  },
-  testCard: {
-    marginHorizontal: 16,
-    marginTop: 24,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: C.line,
-    shadowColor: C.ink,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 3,
-  },
-  testIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: C.salmonSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  testEmoji: {
-    fontSize: 24,
-  },
-  testTitle: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 14,
-    color: C.ink,
-    letterSpacing: -0.2,
-  },
-  testDesc: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 12,
-    color: C.ink3,
-    marginTop: 2,
-  },
-  testBtn: {
-    height: 38,
-    paddingHorizontal: 14,
-    borderRadius: 19,
-    backgroundColor: C.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  testBtnText: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 12.5,
     color: '#fff',
   },
 });
