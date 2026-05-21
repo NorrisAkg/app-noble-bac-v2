@@ -2,9 +2,38 @@ import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ─── DEV: silence un log natif inoffensif de expo-video v3 ───────────────────
+// Pendant un Fast Refresh (HMR), le shared object natif du player Android peut
+// être libéré avant que la nouvelle SurfaceVideoView le remplace, déclenchant
+// un log d'exception Java remonté ici comme console.error. La vidéo joue
+// correctement au cold start ; cette erreur n'apparaît qu'en dev pendant les
+// reloads et ne reflète pas un bug applicatif. On filtre uniquement ces motifs
+// précis pour éviter de masquer d'autres erreurs.
+if (__DEV__) {
+  const expoVideoHmrPatterns: RegExp[] = [
+    /Cannot use shared object that was already released/,
+    /Cannot set prop 'player' on view 'class expo\.modules\.video\./,
+  ];
+
+  // 1) Masque l'erreur dans le LogBox in-app.
+  LogBox.ignoreLogs(expoVideoHmrPatterns);
+
+  // 2) Filtre la même erreur dans le terminal Metro. On override console.error
+  //    en testant uniquement la première string ; tout autre log passe.
+  const originalConsoleError = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    const first = typeof args[0] === 'string' ? args[0] : '';
+    if (expoVideoHmrPatterns.some((p) => p.test(first))) {
+      return;
+    }
+    originalConsoleError(...args);
+  };
+}
 import {
   useFonts,
   Poppins_400Regular,

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -12,40 +12,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 //   2. tinte verte radiale (brand)
 //   3. vignette centrale
 //
-// Au montage, on persiste `hasSeenOnboarding` pour que le RootLayout n'envoie
-// plus l'utilisateur sur le landing au prochain démarrage.
-//
-// expo-video v3 + Fabric peut emettre "Cannot use shared object that was
-// already released" si le hook useVideoPlayer et le VideoView n'ont pas le
-// meme cycle de vie (race au mount / re-render). On isole donc le player +
-// la view dans un sous-composant VideoBackground monte uniquement quand le
-// screen est focuse, ce qui aligne strictement leurs durees de vie.
-
-function VideoBackground() {
-  const player = useVideoPlayer(require('@/assets/videos/landing-bg.mp4'), (p) => {
-    p.loop = true;
-    p.play();
-  });
-
-  return (
-    <VideoView
-      style={styles.video}
-      player={player}
-      nativeControls={false}
-      contentFit="cover"
-    />
-  );
-}
+// expo-video v3 + Fabric : ne JAMAIS démonter conditionnellement <VideoView>
+// ni le player. Un mount/unmount conditionnel crée une race au release du
+// shared object natif. On garde donc VideoView monté en permanence et on
+// contrôle la lecture via player.play()/pause() sur les transitions focus.
 
 export default function LandingScreen() {
   const router = useRouter();
-  const [isFocused, setIsFocused] = useState(false);
+
+  const player = useVideoPlayer(require('@/assets/videos/landing-bg.mp4'), (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
 
   useFocusEffect(
     useCallback(() => {
-      setIsFocused(true);
-      return () => setIsFocused(false);
-    }, []),
+      // Le shared object natif peut déjà être libéré pendant les transitions
+      // de navigation (Fabric/expo-video v3) → on protège play/pause pour
+      // éviter "Cannot use shared object that was already released".
+      try {
+        player.play();
+      } catch {
+        // player libéré : la lecture reprendra au prochain mount.
+      }
+      return () => {
+        try {
+          player.pause();
+        } catch {
+          // player déjà libéré : le démontage natif s'occupe de l'arrêt.
+        }
+      };
+    }, [player]),
   );
 
   useEffect(() => {
@@ -59,7 +57,12 @@ export default function LandingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {isFocused && <VideoBackground />}
+      <VideoView
+        style={styles.video}
+        player={player}
+        nativeControls={false}
+        contentFit="cover"
+      />
 
       {/* 1. Dégradé vertical foncé — 4 stops pour lisibilité haut + bas */}
       <LinearGradient
