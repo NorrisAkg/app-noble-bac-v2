@@ -22,10 +22,11 @@ export async function register(payload: RegisterPayload): Promise<AuthUserRespon
 /**
  * POST /api/v1/auth/verify-otp
  * Verifies the Firebase ID Token produced after a successful on-device OTP step.
- * On success, marks phone_verified_at and returns the updated user.
+ * On success, marks phone_verified_at and **issues** access + refresh tokens
+ * (auto-login post-OTP). Same response shape as /login.
  */
-export async function verifyOtp(payload: VerifyOtpPayload): Promise<AuthUserResponse> {
-  const { data } = await apiClient.post<AuthUserResponse>('/auth/verify-otp', payload);
+export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginResponse> {
+  const { data } = await apiClient.post<LoginResponse>('/auth/verify-otp', payload);
   return data;
 }
 

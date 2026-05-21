@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Delete } from 'lucide-react-native';
 import { firebaseAuthService, FirebaseOtpError } from '@/services/firebaseAuthService';
 import { verifyOtp } from '@/services/authService';
+import { useAuthStore } from '@/store/useAuthStore';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 const OtpCircle = ({ filled, active }: { filled: boolean, active: boolean }) => (
@@ -45,6 +46,8 @@ export default function VerifyScreen() {
   const router = useRouter();
   const { phone: rawPhone } = useLocalSearchParams<{ phone?: string }>();
   const phone = typeof rawPhone === 'string' ? rawPhone : '';
+
+  const setAuth = useAuthStore((s) => s.setAuth);
 
   const [code, setCode] = useState('');
   const [resendIn, setResendIn] = useState(45);
@@ -101,7 +104,11 @@ export default function VerifyScreen() {
       const idToken = await firebaseAuthService.confirmVerificationCode(verificationId, code);
       return verifyOtp({ phone, id_token: idToken });
     },
-    onSuccess: () => {
+    onSuccess: async (res) => {
+      // Auto-login post-OTP : le backend émet user + access_token + refresh_token.
+      // Sans ce setAuth, l'utilisateur arriverait sur /setup non-authentifié et
+      // /me/profile renverrait 401 (bug bouton Continuer silencieusement bloqué).
+      await setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
       router.replace('/(auth)/congrats');
     },
     onError: (error) => {
