@@ -10,7 +10,7 @@ describe('quizService', () => {
     jest.clearAllMocks();
   });
 
-  it('startSession posts subject_id and returns the session with questions', async () => {
+  it('startSession posts chapter_id and returns the session with questions', async () => {
     mockedApiClient.post.mockResolvedValueOnce({
       data: {
         success: true,
@@ -18,6 +18,7 @@ describe('quizService', () => {
         data: {
           id: 1,
           subject_id: 5,
+          chapter_id: 11,
           status: 'in_progress',
           total_questions: 1,
           questions_answered: 0,
@@ -36,9 +37,9 @@ describe('quizService', () => {
       },
     });
 
-    const result = await quizService.startSession(5);
+    const result = await quizService.startSession(11);
 
-    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions', { subject_id: 5 });
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/sessions', { chapter_id: 11 });
     expect(result.id).toBe(1);
     expect(result.questions).toHaveLength(1);
     expect(result.questions[0].statement).toBe('Test Question');
@@ -71,6 +72,7 @@ describe('quizService', () => {
         data: {
           id: 1,
           subject: { id: 5, name: 'SVT' },
+          chapter: { id: 11, title: 'Immunologie' },
           status: 'completed',
           score: 8,
           total_questions: 10,

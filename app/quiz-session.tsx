@@ -13,9 +13,10 @@ import { getApiErrorMessage } from '@/utils/apiError';
 export default function QuizSessionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { subjectId, subjectLabel = 'Quiz' } = useLocalSearchParams<{
-    subjectId: string;
+  const { chapterId, subjectLabel = 'Quiz', chapterTitle } = useLocalSearchParams<{
+    chapterId: string;
     subjectLabel?: string;
+    chapterTitle?: string;
   }>();
 
   const [session, setSession] = useState<QuizSession | null>(null);
@@ -28,15 +29,15 @@ export default function QuizSessionScreen() {
   const setLastFinishedSession = useQuizStore((s) => s.setLastFinishedSession);
 
   useEffect(() => {
-    if (!subjectId) {
-      Alert.alert('Erreur', 'Matière introuvable.');
+    if (!chapterId) {
+      Alert.alert('Erreur', 'Chapitre introuvable.');
       router.back();
       return;
     }
 
     (async () => {
       try {
-        const data = await quizService.startSession(Number(subjectId));
+        const data = await quizService.startSession(Number(chapterId));
         setSession(data);
       } catch (error) {
         Alert.alert('Quiz indisponible', getApiErrorMessage(error));
@@ -45,7 +46,7 @@ export default function QuizSessionScreen() {
         setLoading(false);
       }
     })();
-  }, [subjectId, router]);
+  }, [chapterId, router]);
 
   const questions: QuizSessionQuestion[] = session?.questions ?? [];
   const total = questions.length;
@@ -119,7 +120,9 @@ export default function QuizSessionScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.questionHeader}>
-          <Text style={styles.contextText}>{subjectLabel}</Text>
+          <Text style={styles.contextText}>
+            {chapterTitle ? `${subjectLabel} · ${chapterTitle}` : subjectLabel}
+          </Text>
           <Text style={styles.questionText}>{q.statement}</Text>
           <Text style={styles.hintText}>
             Tu verras les corrections détaillées à la fin du quiz.
@@ -272,8 +275,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   optCardPicked: {
-    backgroundColor: '#1A2027',
-    borderColor: '#1A2027',
+    backgroundColor: '#3DBE45',
+    borderColor: '#3DBE45',
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 6,
@@ -325,7 +328,7 @@ const styles = StyleSheet.create({
   nextBtn: {
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#1A2027',
+    backgroundColor: '#3DBE45',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -24,6 +24,9 @@ export interface QuizSessionQuestion {
 export interface QuizSession {
   id: number;
   subject_id: number;
+  subject?: { id: number; name: string };
+  chapter_id: number | null;
+  chapter?: { id: number; title: string };
   status: QuizSessionStatus;
   total_questions: number;
   questions_answered: number;
@@ -63,6 +66,7 @@ export interface QuizFinishedQuestion {
 export interface QuizSessionFinished {
   id: number;
   subject: { id: number; name: string };
+  chapter: { id: number; title: string } | null;
   status: QuizSessionStatus;
   score: number;
   total_questions: number;
@@ -77,6 +81,7 @@ export interface QuizSessionFinished {
 export interface QuizSessionHistoryItem {
   id: number;
   subject: { id: number; name: string };
+  chapter?: { id: number; title: string } | null;
   score: number;
   total_questions: number;
   percentage: number;
@@ -89,11 +94,12 @@ export interface QuizSessionHistoryItem {
 export const quizService = {
   /**
    * POST /api/v1/quiz/sessions
-   * Démarre une session pour une matière. Le backend tire 10 questions aléatoires.
+   * Démarre une session pour un chapitre. Le backend tire toutes les questions
+   * publiées du chapitre (plancher : 3 questions sinon erreur 422).
    */
-  startSession: async (subjectId: number): Promise<QuizSession> => {
+  startSession: async (chapterId: number): Promise<QuizSession> => {
     const response = await apiClient.post<ApiResponse<QuizSession>>("/quiz/sessions", {
-      subject_id: subjectId,
+      chapter_id: chapterId,
     });
     return response.data.data;
   },

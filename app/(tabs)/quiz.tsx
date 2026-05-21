@@ -66,9 +66,11 @@ export default function QuizSubjectsScreen() {
 
   const handlePickSubject = (subject: Subject) => {
     // Quiz est 100% Premium (RM-QUIZ-05). Gate systématique.
+    // Le flow passe désormais par la sélection de chapitre avant de
+    // démarrer la session (cf. maquette : matière → chapitre → questions).
     guard({ is_free: false, title: 'le quiz' }, () => {
       router.push({
-        pathname: '/quiz-session',
+        pathname: '/quiz-chapters',
         params: {
           subjectId: subject.id.toString(),
           subjectLabel: subject.name,

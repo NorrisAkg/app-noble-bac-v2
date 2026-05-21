@@ -49,6 +49,8 @@ export interface Chapter {
     id: number;
     title: string;
   } | null;
+  /** Nombre de questions de quiz publiées dans ce chapitre (peut être 0). */
+  quiz_questions_count?: number;
 }
 
 export interface Lesson {

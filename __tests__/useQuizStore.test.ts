@@ -4,6 +4,7 @@ import type { QuizSessionFinished } from '../services/quizService';
 const sessionFixture: QuizSessionFinished = {
   id: 42,
   subject: { id: 1, name: 'Mathématiques' },
+  chapter: { id: 11, title: 'Limites et continuité' },
   status: 'completed',
   score: 7,
   total_questions: 10,
