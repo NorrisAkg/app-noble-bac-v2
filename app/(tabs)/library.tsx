@@ -159,7 +159,13 @@ export default function LibraryScreen() {
   const openYoutubeVideo = (video: ExamVideoItem) => {
     // Les vidéos d'épreuve suivent leur flag is_free. is_free=true → libre,
     // sinon Premium gated.
-    guard(video, async () => {
+    //
+    // IMPORTANT : on ne passe PAS l'objet video complet à guard() — il contient
+    // un champ `order` que le helper polymorphique isResourceFree() interprète
+    // (à tort, pour cette ressource) comme « order=1 → free » à cause de la
+    // règle RM-COURS-05 conçue uniquement pour les leçons. On filtre donc
+    // pour ne transmettre que les champs réellement signifiants pour le gate.
+    guard({ is_free: video.is_free, title: video.title }, async () => {
       const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
       try {
         await Linking.openURL(url);

@@ -274,6 +274,7 @@ export interface ExamVideoItem {
   duration_sec: number | null;
   thumbnail_url: string | null;
   order: number;
+  is_free: boolean;
   status: string;
 }
 
