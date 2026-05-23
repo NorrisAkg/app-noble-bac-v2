@@ -113,6 +113,10 @@ export default function RootLayout() {
       if (!isAuthenticated && inTabsGroup) {
         router.replace('/landing');
       } else if (isAuthenticated && (inAuthGroup || isLanding)) {
+        // L'écran congrats est volontairement post-auth (affiché après le succès
+        // de verifyOtp). Sans cette exception, le guard court-circuiterait le
+        // flow inscription → OTP → congrats → setup en redirigeant vers (tabs).
+        if (segments[1] === 'congrats') return;
         router.replace('/(tabs)');
       }
     };

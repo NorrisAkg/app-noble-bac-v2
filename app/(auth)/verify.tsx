@@ -104,12 +104,23 @@ export default function VerifyScreen() {
       const idToken = await firebaseAuthService.confirmVerificationCode(verificationId, code);
       return verifyOtp({ phone, id_token: idToken });
     },
-    onSuccess: async (res) => {
-      // Auto-login post-OTP : le backend émet user + access_token + refresh_token.
-      // Sans ce setAuth, l'utilisateur arriverait sur /setup non-authentifié et
-      // /me/profile renverrait 401 (bug bouton Continuer silencieusement bloqué).
-      await setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
+    onSuccess: (res) => {
+      // ORDRE CRITIQUE : navigate AVANT setAuth.
+      // Si on faisait `await setAuth(...)` puis `router.replace`, le store
+      // passerait isAuthenticated=true alors que segments est encore
+      // ['(auth)', 'verify']. Le guard de _layout.tsx déclencherait alors
+      // router.replace('/(tabs)') (puisque segments[1] !== 'congrats'),
+      // court-circuitant la navigation vers congrats juste après — l'user
+      // verrait un flash de l'écran congrats puis l'accueil sans passer
+      // par /setup.
+      //
+      // En naviguant d'abord, segments=['(auth)', 'congrats'] AVANT que
+      // setAuth ne mute isAuthenticated. Le guard re-évalue ensuite et
+      // matche bien l'exception segments[1] === 'congrats'.
       router.replace('/(auth)/congrats');
+      // SecureStore est rapide (~50 ms) ; l'utilisateur ne pourra pas
+      // cliquer « Commencer maintenant » avant que setAuth ait fini.
+      void setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
     },
     onError: (error) => {
       const message = error instanceof FirebaseOtpError
