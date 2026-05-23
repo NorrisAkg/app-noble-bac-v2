@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
 import { Check, ChevronDown } from 'lucide-react-native';
-import { CountryFlag } from '@/components/ui/CountryFlag';
+import { CountryMap } from '@/components/ui/CountryMap';
 import { getCountries } from '@/services/referentialService';
 import { register } from '@/services/authService';
 import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
@@ -132,10 +132,11 @@ export default function SignupScreen() {
             onChangeText={(v) => { setPhone(v); setFieldErrors((e) => ({ ...e, phone: '' })); }}
             icon={
               <TouchableOpacity
+                key={country.code}
                 onPress={() => setCountryPickerOpen(true)}
                 className="flex-row items-center gap-1.5 pr-2 border-r border-line"
               >
-                <CountryFlag code={country.code} size={22} />
+                <CountryMap code={country.code} size={22} />
                 <Text className="font-poppins-semibold text-sm text-brand-ink ml-1">{country.dial}</Text>
                 <ChevronDown size={14} color="#5A6470" />
               </TouchableOpacity>

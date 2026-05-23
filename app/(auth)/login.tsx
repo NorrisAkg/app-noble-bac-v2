@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { CountryFlag } from '@/components/ui/CountryFlag';
+import { CountryMap } from '@/components/ui/CountryMap';
 import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
 import { Eye, EyeOff, ChevronDown } from 'lucide-react-native';
 import { login } from '@/services/authService';
@@ -63,10 +63,11 @@ export default function LoginScreen() {
             onChangeText={setPhone}
             icon={
               <TouchableOpacity
+                key={country.code}
                 onPress={() => setPickerOpen(true)}
                 className="flex-row items-center gap-1.5 pr-2 border-r border-line"
               >
-                <CountryFlag code={country.code} size={22} />
+                <CountryMap code={country.code} size={22} />
                 <Text className="font-poppins-semibold text-sm text-brand-ink ml-1">{country.dial}</Text>
                 <ChevronDown size={14} color="#5A6470" />
               </TouchableOpacity>
