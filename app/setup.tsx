@@ -179,9 +179,6 @@ const CountryStep: React.FC<CountryStepProps> = ({ countries, onSelect }) => (
             }}
           >
             <CountryMap code={c.code} size={84} />
-            <Text className="font-poppins-semibold text-[13.5px] text-brand-ink mt-2.5">
-              {c.name}
-            </Text>
           </TouchableOpacity>
         </View>
       ))}
