@@ -7,7 +7,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Search, Bell } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
@@ -121,10 +121,6 @@ export default function HomeScreen() {
 
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/search')}>
             <Search size={18} color="#fff" strokeWidth={1.8} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]} onPress={() => Alert.alert('Notifications', 'Bientôt disponible')}>
-            <Bell size={18} color="#fff" strokeWidth={1.8} />
-            <View style={styles.notifDot} />
           </TouchableOpacity>
         </View>
 
@@ -309,17 +305,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 8,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E8A090',
-    borderWidth: 1.5,
-    borderColor: '#2EA037',
   },
   progressCard: {
     marginTop: 16,

@@ -18,7 +18,6 @@ import {
   LogOut,
   Settings,
   Globe2,
-  Bell,
   HelpCircle,
   ShieldCheck,
   Wallet,
@@ -126,14 +125,6 @@ export default function ProfileScreen() {
       iconColor: C.green,
       iconBg: C.greenSoft,
       onPress: () => router.push('/setup' as Href),
-    },
-    {
-      id: 'notif',
-      label: 'Notifications',
-      icon: Bell,
-      iconColor: C.salmonDark,
-      iconBg: C.salmonSoft,
-      onPress: () => router.push('/settings/notifications' as Href),
     },
     {
       id: 'downloads',
