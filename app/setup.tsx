@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -39,16 +39,15 @@ export default function SetupScreen() {
     staleTime: 60_000,
   });
 
-  // Pré-sélectionne le pays + série du compte fraîchement créé.
-  useEffect(() => {
-    if (!profile || !countries.length || selectedCountry) return;
-    const current = countries.find((c) => c.code === profile.country.code);
-    if (current) {
-      setSelectedCountry(current);
-      const currentSeries = current.series.find((s) => s.id === String(profile.series.id));
-      if (currentSeries) setSelectedSeries(currentSeries);
+  const handleCountrySelect = (c: Country) => {
+    setSelectedCountry(c);
+    if (profile && c.code === profile.country.code) {
+      const profileSeries = c.series.find((s) => s.id === String(profile.series.id));
+      setSelectedSeries(profileSeries ?? null);
+    } else {
+      setSelectedSeries(null);
     }
-  }, [profile, countries, selectedCountry]);
+  };
 
   const registeredCountryCode = profile?.country.code;
   const isDifferentCountry =
@@ -123,7 +122,7 @@ export default function SetupScreen() {
       />
 
       <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
-        {!showSeries && <CountryStep countries={countries} onSelect={setSelectedCountry} />}
+        {!showSeries && <CountryStep countries={countries} onSelect={handleCountrySelect} />}
 
         {showSeries && selectedCountry && (
           <SeriesStep
@@ -286,7 +285,7 @@ const SeriesStep: React.FC<SeriesStepProps> = ({ country, onModify, selected, on
                 color: active ? '#fff' : C.ink,
               }}
             >
-              Bac {s.label}
+              {s.code}
             </Text>
             {active && <Check size={20} color="#fff" strokeWidth={2.6} />}
           </TouchableOpacity>
