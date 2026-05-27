@@ -45,7 +45,11 @@ export default function PaymentCheckoutScreen() {
   const transactionId = transaction_id ? Number(transaction_id) : null;
   const url = payment_url ? decodeURIComponent(payment_url) : null;
 
+  // Domaine FedaPay extrait du payment_url pour filtrer les navigations.
+  const fedapayHost = url ? (() => { try { return new URL(url).hostname; } catch { return null; } })() : null;
+
   const [webViewLoading, setWebViewLoading] = useState(true);
+  const initialLoadDoneRef = useRef(false);
   const [status, setStatus] = useState<TransactionStatus>('pending');
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
   const finishedRef = useRef(false);
@@ -89,7 +93,7 @@ export default function PaymentCheckoutScreen() {
         if (tx.status === 'confirmed') {
           finishedRef.current = true;
           clearInterval(interval);
-          await queryClient.invalidateQueries({ queryKey: ['active-subscription'] });
+          await queryClient.invalidateQueries({ queryKey: ['subscription', 'active'] });
           await queryClient.invalidateQueries({ queryKey: ['profile'] });
           await queryClient.invalidateQueries({ queryKey: ['my-subscription-transactions'] });
           setStatus('confirmed');
@@ -170,7 +174,7 @@ export default function PaymentCheckoutScreen() {
         <TouchableOpacity onPress={handleCancel} style={styles.backBtn}>
           <ChevronLeft color="#fff" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Paiement CinetPay</Text>
+        <Text style={styles.headerTitle}>Paiement</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -183,9 +187,22 @@ export default function PaymentCheckoutScreen() {
 
       <View style={styles.webViewWrap}>
         <WebView
-          source={{ uri: url }}
-          onLoadStart={() => setWebViewLoading(true)}
-          onLoadEnd={() => setWebViewLoading(false)}
+          source={{ uri: url, headers: { 'ngrok-skip-browser-warning': '1' } }}
+          onLoadEnd={() => {
+            initialLoadDoneRef.current = true;
+            setWebViewLoading(false);
+          }}
+          onShouldStartLoadWithRequest={(req) => {
+            if (!fedapayHost) return true;
+            try {
+              const host = new URL(req.url).hostname;
+              // Autorise uniquement les domaines FedaPay ; bloque la redirection
+              // vers la callback URL (notre serveur) après paiement.
+              return host === fedapayHost || host.endsWith('.fedapay.com');
+            } catch {
+              return true;
+            }
+          }}
           startInLoadingState
           javaScriptEnabled
           domStorageEnabled
