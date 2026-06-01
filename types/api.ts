@@ -43,6 +43,7 @@ export interface Chapter {
   id: number;
   title: string;
   description: string;
+  icon_slug?: string | null;
   order: number;
   file_count: number;
   free_file: {

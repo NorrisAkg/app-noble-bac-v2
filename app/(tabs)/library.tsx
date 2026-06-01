@@ -116,13 +116,14 @@ export default function LibraryScreen() {
         ? catalogService.getCorrigeSignedUrl(examId)
         : catalogService.getExamSignedUrl(examId);
     },
-    onSuccess: (signed, { kind }) => {
+    onSuccess: (signed, { examId, kind }) => {
       router.push({
         pathname: '/pdf-viewer',
         params: {
           url: signed.url,
           title: kind === 'corrige' ? `Corrigé ${year}` : `Épreuve ${year}`,
           subject: currentSubject?.name ?? '',
+          cacheKey: `${kind}_${examId}`,
         },
       });
     },

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,19 +14,13 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react-native';
 
 import { courseService } from '@/services/courseService';
+import { quizService } from '@/services/quizService';
+import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
 import { C } from '@/constants/theme';
 import type { Chapter } from '@/types/api';
 
 const QUIZ_MIN_QUESTIONS = 3;
 
-/**
- * Écran de sélection de chapitre pour démarrer un quiz.
- *
- * Reçu via /quiz → tap sur une matière. Affiche la liste des chapitres
- * publiés de la matière avec un compteur de questions disponibles.
- * Un chapitre avec moins de 3 questions est désactivé (la maquette
- * attend qu'on guide l'utilisateur vers les chapitres prêts).
- */
 export default function QuizChaptersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -40,6 +34,24 @@ export default function QuizChaptersScreen() {
     queryFn: () => courseService.getChapters(Number(subjectId)),
     enabled: !!subjectId,
   });
+
+  const historyQuery = useQuery({
+    queryKey: ['quiz', 'history', 'subject', Number(subjectId)],
+    queryFn: () => quizService.getHistory(1, 100, Number(subjectId)),
+    enabled: !!subjectId,
+  });
+
+  const bestScores = useMemo(() => {
+    const map: Record<number, { score: number; total: number }> = {};
+    for (const s of historyQuery.data?.data ?? []) {
+      if (!s.chapter?.id) continue;
+      const prev = map[s.chapter.id];
+      if (!prev || s.score > prev.score) {
+        map[s.chapter.id] = { score: s.score, total: s.total_questions };
+      }
+    }
+    return map;
+  }, [historyQuery.data]);
 
   const chapters: Chapter[] = chaptersQuery.data ?? [];
 
@@ -94,6 +106,8 @@ export default function QuizChaptersScreen() {
           {chapters.map((chapter) => {
             const count = chapter.quiz_questions_count ?? 0;
             const isQuizable = count >= QUIZ_MIN_QUESTIONS;
+            const best = bestScores[chapter.id];
+            const hasHistory = !!best;
 
             return (
               <TouchableOpacity
@@ -103,19 +117,28 @@ export default function QuizChaptersScreen() {
                 activeOpacity={0.7}
                 style={[styles.card, !isQuizable && styles.cardDisabled]}
               >
-                <View style={styles.cardOrder}>
-                  <Text style={styles.cardOrderText}>{chapter.order}</Text>
-                </View>
+                <SubjectIcon
+                  kind={backendSlugToSubjectKind(chapter.icon_slug)}
+                  size={56}
+                  style={{ borderRadius: 999 }}
+                />
+
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle} numberOfLines={2}>{chapter.title}</Text>
-                  <Text style={styles.cardMeta}>
+                  <Text style={[styles.cardMeta, isQuizable && hasHistory && styles.cardMetaGreen]}>
                     {isQuizable
-                      ? `${count} question${count > 1 ? 's' : ''} · Quiz disponible`
+                      ? (hasHistory ? 'En cours' : 'Commencez le Quiz')
                       : 'Bientôt disponible'}
                   </Text>
                 </View>
+
                 {isQuizable ? (
-                  <ChevronRight size={20} color={C.green} strokeWidth={2.4} />
+                  <View style={styles.rightSlot}>
+                    {hasHistory && (
+                      <Text style={styles.score}>{best.score}/{best.total}</Text>
+                    )}
+                    <ChevronRight size={20} color={C.green} strokeWidth={2.4} />
+                  </View>
                 ) : (
                   <Lock size={16} color="#9AA3AC" />
                 )}
@@ -201,19 +224,6 @@ const styles = StyleSheet.create({
   cardDisabled: {
     opacity: 0.55,
   },
-  cardOrder: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EAF7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardOrderText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 16,
-    color: C.green,
-  },
   cardTitle: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 14,
@@ -225,6 +235,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: C.ink3,
     marginTop: 4,
+  },
+  cardMetaGreen: {
+    color: C.green,
+  },
+  rightSlot: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  score: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 13,
+    color: C.danger,
   },
   emptyCard: {
     backgroundColor: '#fff',

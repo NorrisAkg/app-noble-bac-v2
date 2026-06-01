@@ -148,10 +148,11 @@ export const quizService = {
   getHistory: async (
     page = 1,
     perPage = 20,
+    subjectId?: number,
   ): Promise<{ data: QuizSessionHistoryItem[]; meta?: ApiResponse<unknown>["meta"] }> => {
     const response = await apiClient.get<ApiResponse<QuizSessionHistoryItem[]>>(
       "/quiz/sessions/history",
-      { params: { page, per_page: perPage } },
+      { params: { page, per_page: perPage, ...(subjectId ? { subject_id: subjectId } : {}) } },
     );
     return { data: response.data.data, meta: response.data.meta };
   },
