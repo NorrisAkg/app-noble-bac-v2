@@ -26,7 +26,7 @@ export default function LoginScreen() {
 
   // Build the E.164 number — preserve leading zeros (UEMOA convention).
   const e164Phone = buildE164Phone(country.dial, phone);
-  const isValid = phone.length >= 6 && password.length >= 4;
+  const isValid = phone.length >= 6 && password.length === 4;
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => login({ phone: e164Phone, password }),
@@ -76,7 +76,9 @@ export default function LoginScreen() {
 
           <Input
             label="Mot de passe"
-            placeholder="••••••••"
+            placeholder="• • • •"
+            keyboardType="number-pad"
+            maxLength={4}
             secureTextEntry={!showPwd}
             value={password}
             onChangeText={setPassword}

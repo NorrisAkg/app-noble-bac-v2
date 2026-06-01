@@ -38,7 +38,7 @@ export default function ResetPasswordScreen() {
   }, [phone, router]);
 
   const codeValid = code.length === 6;
-  const passwordValid = password.length >= 8 && password === passwordConfirm;
+  const passwordValid = password.length === 4 && password === passwordConfirm;
   const isValid = codeValid && passwordValid && !!verificationId;
 
   const { mutate, isPending } = useMutation({
@@ -80,7 +80,7 @@ export default function ResetPasswordScreen() {
             Vérification + nouveau mot de passe
           </Text>
           <Text className="font-poppins text-sm text-brand-ink-medium mt-1.5 mb-6 leading-5">
-            Saisis le code à 6 chiffres envoyé au {phone || ''}, puis choisis un nouveau mot de passe (8 caractères min).
+            Saisis le code à 6 chiffres envoyé au {phone || ''}, puis choisis un nouveau code PIN à 4 chiffres.
           </Text>
 
           {verificationError && (
@@ -105,7 +105,9 @@ export default function ResetPasswordScreen() {
 
           <Input
             label="Nouveau mot de passe"
-            placeholder="8 caractères minimum"
+            placeholder="• • • •"
+            keyboardType="number-pad"
+            maxLength={4}
             secureTextEntry={!showPwd}
             value={password}
             onChangeText={setPassword}
@@ -118,7 +120,9 @@ export default function ResetPasswordScreen() {
 
           <Input
             label="Confirmer le mot de passe"
-            placeholder="••••••••"
+            placeholder="• • • •"
+            keyboardType="number-pad"
+            maxLength={4}
             secureTextEntry={!showPwd}
             value={passwordConfirm}
             onChangeText={setPasswordConfirm}

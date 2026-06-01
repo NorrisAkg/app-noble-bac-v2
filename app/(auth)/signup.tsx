@@ -9,7 +9,7 @@ import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
-import { Check, ChevronDown } from 'lucide-react-native';
+import { Check, ChevronDown, Eye, EyeOff } from 'lucide-react-native';
 import { CountryMap } from '@/components/ui/CountryMap';
 import { getCountries } from '@/services/referentialService';
 import { register } from '@/services/authService';
@@ -26,6 +26,7 @@ export default function SignupScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [agree, setAgree] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ── Selection state ───────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ export default function SignupScreen() {
     !!firstName.trim() &&
     !!lastName.trim() &&
     phone.length >= 6 &&
-    password.length >= 8 &&
+    password.length === 4 &&
     agree;
 
   // ── Register mutation ─────────────────────────────────────────────────────
@@ -148,10 +149,17 @@ export default function SignupScreen() {
 
           {/* ── Password ── */}
           <Input
-            placeholder="Mot de passe (8 caractères min)"
-            secureTextEntry
+            placeholder="Code PIN à 4 chiffres"
+            keyboardType="number-pad"
+            maxLength={4}
+            secureTextEntry={!showPwd}
             value={password}
             onChangeText={setPassword}
+            icon={
+              <TouchableOpacity onPress={() => setShowPwd((v) => !v)}>
+                {showPwd ? <EyeOff size={20} color="#5A6470" /> : <Eye size={20} color="#5A6470" />}
+              </TouchableOpacity>
+            }
           />
 
           {/* ── Terms ── */}
