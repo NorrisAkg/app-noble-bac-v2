@@ -9,6 +9,7 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
@@ -58,7 +59,7 @@ export async function performRefresh(): Promise<string | null> {
     const response = await axios.post(
       `${baseURL}/auth/refresh`,
       { refresh_token: refreshToken },
-      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' } },
     );
     const tokens = response.data?.data;
     if (!tokens?.access_token || !tokens?.refresh_token) {

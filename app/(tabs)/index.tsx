@@ -69,7 +69,10 @@ export default function HomeScreen() {
 
   const countryCode = profile?.country.code ?? null;
   const days = useMemo(() => daysUntilBac(countryCode), [countryCode]);
-  const bacYear = useMemo(() => getNextBacDate(countryCode).getFullYear(), [countryCode]);
+  const bacDateFormatted = useMemo(
+    () => getNextBacDate(countryCode).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+    [countryCode],
+  );
 
   // Top 6 livres du catalog backend (filtres par scope cote backend via Sanctum user).
   const booksQuery = useQuery({
@@ -129,15 +132,14 @@ export default function HomeScreen() {
             cote backend (a livrer en post-MVP, cf PLAN M-P2.7 TBD). */}
         <View style={styles.progressCard}>
           <View style={styles.daysBox}>
-            <Text style={styles.daysNum}>{days}</Text>
-            <Text style={styles.daysLabel}>jours</Text>
+            <Text style={styles.daysNum}>J-{days}</Text>
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.progressTitle}>BAC {bacYear}</Text>
+            <Text style={styles.progressTitle}>{bacDateFormatted}</Text>
             <Text style={styles.progressPct}>
               {profile != null
-                ? `${profile.country.name} · ${profile.series.label}`
+                ? `${profile.country.name} · Bac ${profile.series.code}`
                 : 'Chargement de ton scope…'}
             </Text>
           </View>
@@ -328,17 +330,10 @@ const styles = StyleSheet.create({
   },
   daysNum: {
     fontFamily: 'Poppins_800ExtraBold',
-    fontSize: 18,
+    fontSize: 16,
     color: '#3DBE45',
-    lineHeight: 22,
+    lineHeight: 20,
     letterSpacing: -0.5,
-  },
-  daysLabel: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 8,
-    color: '#5A6470',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
   },
   progressTitle: {
     fontFamily: 'Poppins_600SemiBold',
