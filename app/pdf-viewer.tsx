@@ -17,8 +17,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
+import { getCachedPdfUri } from '@/services/pdfCacheService';
 import { declareDownload, listDownloads } from '@/services/myDownloadsService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { getApiErrorMessage } from '@/utils/apiError';
 import type { OfflineDownloadableType, QuotaExceededErrorPayload } from '@/types/api';
 
@@ -29,13 +31,16 @@ export default function PdfViewerScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
-  const { url: initialUrl, title, subject, bookId, revisionSheetId } = useLocalSearchParams<{
+  const { url: initialUrl, title, subject, bookId, revisionSheetId, cacheKey: cacheKeyParam } = useLocalSearchParams<{
     url?: string;
     title?: string;
     subject?: string;
     bookId?: string;
     revisionSheetId?: string;
+    cacheKey?: string;
   }>();
+
+  const isOnline = useOnlineStatus();
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(initialUrl || null);
   const [loading, setLoading] = useState(true);
@@ -114,34 +119,69 @@ export default function PdfViewerScreen() {
   const loadFromBook = useCallback(async (id: number) => {
     try {
       setLoading(true);
-      const { url } = await catalogService.downloadBook(id);
-      setPdfUrl(url);
+      const uri = await getCachedPdfUri(
+        `book_${id}`,
+        async () => {
+          const { url } = await catalogService.downloadBook(id);
+          return url;
+        },
+        isOnline,
+      );
+      setPdfUrl(uri);
     } catch (err: any) {
-      handleLoadError(err, 'ce livre');
+      if (err?.message === 'OFFLINE_NO_CACHE') {
+        setError('Pas de connexion. Ouvre ce livre une première fois en ligne pour le consulter hors ligne.');
+      } else {
+        handleLoadError(err, 'ce livre');
+      }
     } finally {
       setLoading(false);
     }
-  }, [handleLoadError]);
+  }, [handleLoadError, isOnline]);
 
   const loadFromRevisionSheet = useCallback(async (id: number) => {
     try {
       setLoading(true);
-      const sheet = await courseService.getRevisionSheet(id);
-      if (!sheet.signed_url) {
-        setError("Cette fiche n'est pas encore prête au téléchargement.");
-        return;
-      }
-      setPdfUrl(sheet.signed_url);
+      const uri = await getCachedPdfUri(
+        `sheet_${id}`,
+        async () => {
+          const sheet = await courseService.getRevisionSheet(id);
+          if (!sheet.signed_url) throw new Error("Cette fiche n'est pas encore prête au téléchargement.");
+          return sheet.signed_url;
+        },
+        isOnline,
+      );
+      setPdfUrl(uri);
     } catch (err: any) {
-      handleLoadError(err, 'cette fiche');
+      if (err?.message === 'OFFLINE_NO_CACHE') {
+        setError('Pas de connexion. Ouvre cette fiche une première fois en ligne pour la consulter hors ligne.');
+      } else {
+        handleLoadError(err, 'cette fiche');
+      }
     } finally {
       setLoading(false);
     }
-  }, [handleLoadError]);
+  }, [handleLoadError, isOnline]);
 
   useEffect(() => {
     if (initialUrl) {
-      setLoading(false);
+      if (cacheKeyParam) {
+        // Exam corrigé/épreuve : mise en cache transparente au premier accès
+        setLoading(true);
+        getCachedPdfUri(cacheKeyParam, async () => initialUrl, isOnline)
+          .then((uri) => setPdfUrl(uri))
+          .catch((err) => {
+            if (err?.message === 'OFFLINE_NO_CACHE') {
+              setError('Pas de connexion. Ouvre ce document une première fois en ligne pour le consulter hors ligne.');
+            } else {
+              setError('Impossible de charger le document.');
+            }
+          })
+          .finally(() => setLoading(false));
+      } else {
+        setPdfUrl(initialUrl);
+        setLoading(false);
+      }
       return;
     }
     if (bookId) {
@@ -153,7 +193,7 @@ export default function PdfViewerScreen() {
       return;
     }
     setLoading(false);
-  }, [bookId, revisionSheetId, initialUrl, loadFromBook, loadFromRevisionSheet]);
+  }, [bookId, revisionSheetId, initialUrl, cacheKeyParam, loadFromBook, loadFromRevisionSheet, isOnline]);
 
   // ─── Telechargement hors-ligne ────────────────────────────────────────────
 

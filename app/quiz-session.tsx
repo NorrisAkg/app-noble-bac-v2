@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,10 @@ import { X } from 'lucide-react-native';
 import { quizService } from '@/services/quizService';
 import type { QuizSession, QuizSessionQuestion } from '@/services/quizService';
 import { useQuizStore } from '@/store/useQuizStore';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { getApiErrorMessage } from '@/utils/apiError';
+
+type PendingAnswer = { questionId: number; optionId: number };
 
 export default function QuizSessionScreen() {
   const insets = useSafeAreaInsets();
@@ -25,6 +28,9 @@ export default function QuizSessionScreen() {
 
   const [idx, setIdx] = useState(0);
   const [pickedOptionId, setPickedOptionId] = useState<number | null>(null);
+
+  const isOnline = useOnlineStatus();
+  const pendingAnswers = useRef<PendingAnswer[]>([]);
 
   const setLastFinishedSession = useQuizStore((s) => s.setLastFinishedSession);
 
@@ -61,17 +67,44 @@ export default function QuizSessionScreen() {
   const handleNext = async () => {
     if (!session || pickedOptionId === null || submitting) return;
 
+    if (!isLast) {
+      // Réponse intermédiaire : soumettre en ligne ou mettre en attente
+      if (isOnline) {
+        setSubmitting(true);
+        try {
+          await quizService.submitAnswer(session.id, q.id, pickedOptionId);
+        } catch (error) {
+          Alert.alert('Erreur', getApiErrorMessage(error));
+          setSubmitting(false);
+          return;
+        }
+        setSubmitting(false);
+      } else {
+        pendingAnswers.current.push({ questionId: q.id, optionId: pickedOptionId });
+      }
+      setIdx((i) => i + 1);
+      setPickedOptionId(null);
+      return;
+    }
+
+    // Dernière question
+    if (!isOnline && pendingAnswers.current.length > 0) {
+      Alert.alert(
+        'Connexion requise',
+        'Tu as des réponses en attente. Reconnecte-toi pour soumettre ton quiz.',
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await quizService.submitAnswer(session.id, q.id, pickedOptionId);
-
-      if (!isLast) {
-        setIdx((i) => i + 1);
-        setPickedOptionId(null);
-        setSubmitting(false);
-        return;
+      // Vider la file d'attente avant de terminer
+      for (const { questionId, optionId } of pendingAnswers.current) {
+        await quizService.submitAnswer(session.id, questionId, optionId);
       }
+      pendingAnswers.current = [];
 
+      await quizService.submitAnswer(session.id, q.id, pickedOptionId);
       const finished = await quizService.finishSession(session.id);
       setLastFinishedSession(finished);
 
@@ -155,10 +188,13 @@ export default function QuizSessionScreen() {
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
         <TouchableOpacity
-          style={[styles.nextBtn, (pickedOptionId === null || submitting) && styles.nextBtnDisabled]}
+          style={[
+            styles.nextBtn,
+            (pickedOptionId === null || submitting || (isLast && !isOnline && pendingAnswers.current.length > 0)) && styles.nextBtnDisabled,
+          ]}
           onPress={handleNext}
           activeOpacity={0.85}
-          disabled={pickedOptionId === null || submitting}
+          disabled={pickedOptionId === null || submitting || (isLast && !isOnline && pendingAnswers.current.length > 0)}
         >
           {submitting ? (
             <ActivityIndicator color="#fff" />

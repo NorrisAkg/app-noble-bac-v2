@@ -1,11 +1,12 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 // ─── DEV: silence un log natif inoffensif de expo-video v3 ───────────────────
 // Pendant un Fast Refresh (HMR), le shared object natif du player Android peut
@@ -48,7 +49,7 @@ import '@/global.css';
 
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
-import { QueryProvider } from '@/providers/QueryProvider';
+import { QueryProvider, queryClient } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -74,10 +75,24 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Let apiClient drop the auth state locally when /auth/refresh fails on 401.
     registerAuthCleanup(() => useAuthStore.getState().clearLocal());
     initialize();
   }, [initialize]);
+
+  const wasOnlineRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener((state) => {
+      const online = !!state.isConnected && state.isInternetReachable !== false;
+      if (online && wasOnlineRef.current === false) {
+        queryClient.invalidateQueries({ queryKey: ['subscription'] });
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['my-downloads'] });
+      }
+      wasOnlineRef.current = online;
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (loaded || error) {
