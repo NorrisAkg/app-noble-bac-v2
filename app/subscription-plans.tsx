@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getActiveSubscription, getSubscriptionPlans } from '@/services/subscriptionService';
 import { initiatePayment } from '@/services/paymentService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { displayCurrency } from '@/utils/currency';
 import { C } from '@/constants/theme';
 import type { SubscriptionPlan } from '@/types/api';
 
@@ -150,7 +151,41 @@ export default function SubscriptionPlansScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 130 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* PERKS — 5 lignes avec tile vert clair + emoji */}
+        {userHasActiveSub && (
+          <View style={styles.activeBanner}>
+            <Text style={styles.activeBannerTitle}>Tu as déjà un abonnement actif</Text>
+            <TouchableOpacity onPress={() => router.replace('/my-subscription')}>
+              <Text style={styles.activeBannerLink}>Voir mon abonnement →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* FORFAITS en premier — mis en évidence */}
+        <Text style={styles.sectionTitle}>Choisis ta formule</Text>
+
+        {isLoading ? (
+          <View style={styles.stateBox}>
+            <ActivityIndicator color={C.green} />
+          </View>
+        ) : plans.length === 0 ? (
+          <View style={styles.stateBox}>
+            <Text style={styles.stateText}>Aucun plan disponible pour le moment.</Text>
+          </View>
+        ) : (
+          <View style={styles.plansList}>
+            {plans.map((plan, idx) => (
+              <PlanRow
+                key={plan.id}
+                plan={plan}
+                active={plan.id === selectedPlanId}
+                best={idx === recommendedIdx}
+                onPress={() => setSelectedPlanId(plan.id)}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* PERKS — 5 lignes avec tile vert clair + emoji, en bas */}
         <View style={styles.perks}>
           {PERKS.map((p) => (
             <View key={p.title} style={styles.perkRow}>
@@ -164,39 +199,6 @@ export default function SubscriptionPlansScreen() {
             </View>
           ))}
         </View>
-
-        {userHasActiveSub && (
-          <View style={styles.activeBanner}>
-            <Text style={styles.activeBannerTitle}>Tu as déjà un abonnement actif</Text>
-            <TouchableOpacity onPress={() => router.replace('/my-subscription')}>
-              <Text style={styles.activeBannerLink}>Voir mon abonnement →</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>Choisis ta formule</Text>
-
-        {isLoading ? (
-          <View style={styles.stateBox}>
-            <ActivityIndicator color={C.green} />
-          </View>
-        ) : plans.length === 0 ? (
-          <View style={styles.stateBox}>
-            <Text style={styles.stateText}>Aucun plan disponible pour le moment.</Text>
-          </View>
-        ) : (
-          <View style={{ gap: 8 }}>
-            {plans.map((plan, idx) => (
-              <PlanRow
-                key={plan.id}
-                plan={plan}
-                active={plan.id === selectedPlanId}
-                best={idx === recommendedIdx}
-                onPress={() => setSelectedPlanId(plan.id)}
-              />
-            ))}
-          </View>
-        )}
       </ScrollView>
 
       {/* CTA fixe en bas — aligné maquette */}
@@ -212,7 +214,7 @@ export default function SubscriptionPlansScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.ctaText}>
-                Continuer · {formatPrice(selectedPlan.price_fcfa)} {selectedPlan.currency}
+                Continuer · {formatPrice(selectedPlan.price_fcfa)} {displayCurrency(selectedPlan.currency)}
               </Text>
             )}
           </TouchableOpacity>
@@ -260,7 +262,7 @@ const PlanRow: React.FC<PlanRowProps> = ({ plan, active, best, onPress }) => (
     <View style={{ alignItems: 'flex-end' }}>
       <Text style={styles.planPrice}>{formatPrice(plan.price_fcfa)}</Text>
       <Text style={styles.planPeriod}>
-        {plan.currency} / {plan.duration_days}j
+        {displayCurrency(plan.currency)} / {plan.duration_days}j
       </Text>
     </View>
   </TouchableOpacity>
@@ -284,7 +286,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    alignSelf: 'flex-end',
+    marginBottom: 4,
   },
   heroEmoji: {
     fontSize: 36,
@@ -306,9 +309,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
+  plansList: {
+    gap: 8,
+  },
   perks: {
     gap: 12,
-    marginBottom: 22,
+    marginTop: 28,
   },
   perkRow: {
     flexDirection: 'row',

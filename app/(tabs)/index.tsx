@@ -13,6 +13,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { QuickAction } from '@/components/home/QuickAction';
 import { BookCover } from '@/components/home/BookCover';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyBooks } from '@/components/ui/EmptyIllustrations';
 import { daysUntilBac, getNextBacDate } from '@/constants/bacDates';
 import { catalogService } from '@/services/catalogService';
 import { getProfile } from '@/services/profileService';
@@ -205,9 +207,11 @@ export default function HomeScreen() {
             <ActivityIndicator color="#3DBE45" />
           </View>
         ) : books.length === 0 ? (
-          <View style={styles.bookCarouselLoader}>
-            <Text style={styles.emptyText}>Aucun livre disponible pour le moment.</Text>
-          </View>
+          <EmptyState
+            illustration={IllustrationEmptyBooks}
+            title="Aucun livre disponible"
+            description="De nouveaux livres seront bientôt ajoutés pour ta série."
+          />
         ) : (
           <ScrollView
             horizontal
@@ -362,12 +366,6 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 12,
-    color: '#9AA3AC',
-    textAlign: 'center',
   },
   // Body
   quickRow: {

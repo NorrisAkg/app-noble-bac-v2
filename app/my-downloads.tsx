@@ -19,6 +19,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listDownloads, revokeDownload } from '@/services/myDownloadsService';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { useOfflinePreferences } from '@/hooks/useOfflinePreferences';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyDownloads } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import type { OfflineDownloadableType, UserDownload } from '@/types/api';
 
@@ -201,12 +203,11 @@ export default function MyDownloadsScreen() {
             <ActivityIndicator color="#3DBE45" />
           </View>
         ) : downloads.length === 0 ? (
-          <View style={styles.stateBox}>
-            <Text style={styles.stateText}>Aucun téléchargement actif.</Text>
-            <Text style={styles.stateSubText}>
-              Télécharge un livre, une fiche ou un corrigé depuis le visualiseur PDF pour le retrouver ici.
-            </Text>
-          </View>
+          <EmptyState
+            illustration={IllustrationEmptyDownloads}
+            title="Aucun téléchargement actif"
+            description="Télécharge un livre, une fiche ou un corrigé depuis le visualiseur PDF pour le retrouver ici."
+          />
         ) : (
           <View style={styles.list}>
             {downloads.map((d) => (
@@ -354,19 +355,6 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     alignItems: 'center',
     paddingHorizontal: 24,
-  },
-  stateText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 14,
-    color: '#1A2027',
-    textAlign: 'center',
-  },
-  stateSubText: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 12,
-    color: '#9AA3AC',
-    textAlign: 'center',
-    marginTop: 8,
   },
   list: {
     marginTop: 16,

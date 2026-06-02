@@ -14,6 +14,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Search as SearchIcon, X, Clock, ArrowUpRight, ChevronRight } from 'lucide-react-native';
 
 import { SubjectIcon, type SubjectKind } from '@/components/ui/SubjectIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptySearch } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import { courseService } from '@/services/courseService';
 import { catalogService } from '@/services/catalogService';
@@ -202,11 +204,11 @@ export default function SearchScreen() {
             </Text>
 
             {results.length === 0 && (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>
-                  Aucun résultat. Essaie un autre terme ou une matière.
-                </Text>
-              </View>
+              <EmptyState
+                illustration={IllustrationEmptySearch}
+                title="Aucun résultat"
+                description="Essaie un autre terme ou une matière."
+              />
             )}
 
             {results.map((r) => {
@@ -360,18 +362,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: C.ink3,
     marginBottom: 10,
-  },
-  emptyBox: {
-    paddingVertical: 48,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 13.5,
-    color: C.ink3,
-    textAlign: 'center',
-    lineHeight: 20,
   },
   resultCard: {
     backgroundColor: '#fff',

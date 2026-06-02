@@ -16,6 +16,8 @@ import { ChevronLeft, ChevronRight, Lock } from 'lucide-react-native';
 import { courseService } from '@/services/courseService';
 import { quizService } from '@/services/quizService';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import type { Chapter } from '@/types/api';
 
@@ -98,9 +100,11 @@ export default function QuizChaptersScreen() {
           </Text>
 
           {chapters.length === 0 && (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Aucun chapitre publié pour cette matière.</Text>
-            </View>
+            <EmptyState
+              illustration={IllustrationEmptyCourses}
+              title="Aucun chapitre publié"
+              description="Aucun chapitre n'est encore disponible pour cette matière."
+            />
           )}
 
           {chapters.map((chapter) => {
@@ -247,17 +251,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 13,
     color: C.danger,
-  },
-  emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 13,
-    color: C.ink3,
-    textAlign: 'center',
   },
 });

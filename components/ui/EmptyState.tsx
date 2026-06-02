@@ -4,6 +4,11 @@ import type { LucideIcon } from 'lucide-react-native';
 
 interface EmptyStateProps {
   icon?: LucideIcon;
+  /**
+   * Illustration SVG contextuelle (cf. EmptyIllustrations.tsx). Prioritaire sur `icon`.
+   * Rendue a ~140px de large pour illustrer l'absence de donnees.
+   */
+  illustration?: React.FC<{ size?: number }>;
   title: string;
   description?: string;
   /** Texte du bouton CTA. Si absent, aucun bouton n'est affiche. */
@@ -25,6 +30,7 @@ interface EmptyStateProps {
  */
 export const EmptyState: React.FC<EmptyStateProps> = ({
   icon: Icon,
+  illustration: Illustration,
   title,
   description,
   ctaLabel,
@@ -33,7 +39,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      {Icon != null && (
+      {Illustration != null ? (
+        <View style={styles.illustrationWrap}>
+          <Illustration size={140} />
+        </View>
+      ) : Icon != null ? (
         <View style={[styles.iconWrap, tone === 'accent' ? styles.iconWrapAccent : styles.iconWrapMuted]}>
           <Icon
             size={28}
@@ -41,7 +51,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             strokeWidth={2}
           />
         </View>
-      )}
+      ) : null}
       <Text style={styles.title}>{title}</Text>
       {description != null && <Text style={styles.description}>{description}</Text>}
       {ctaLabel != null && onCtaPress != null && (
@@ -67,6 +77,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+  },
+  illustrationWrap: {
+    width: 140,
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   iconWrapMuted: { backgroundColor: '#EEF1F4' },
   iconWrapAccent: { backgroundColor: '#EAF7EB' },

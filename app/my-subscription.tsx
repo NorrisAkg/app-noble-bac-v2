@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@tanstack/react-query';
 
 import { getActiveSubscription, getTransactions } from '@/services/subscriptionService';
+import { displayCurrency } from '@/utils/currency';
 import { C } from '@/constants/theme';
 import type { PaymentTransaction, SubscriptionStatus, TransactionStatus } from '@/types/api';
 
@@ -33,7 +34,7 @@ function formatDate(iso: string | null): string {
 }
 
 function formatAmount(fcfa: number, currency: string): string {
-  return `${new Intl.NumberFormat('fr-FR').format(fcfa)} ${currency}`;
+  return `${new Intl.NumberFormat('fr-FR').format(fcfa)} ${displayCurrency(currency)}`;
 }
 
 function daysRemaining(expiresAt: string | null): number {

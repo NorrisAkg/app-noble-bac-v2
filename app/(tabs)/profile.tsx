@@ -85,7 +85,7 @@ export default function ProfileScreen() {
 
   const userMeta =
     profile != null
-      ? `Bac ${profile.series.label} · ${profile.country.name}`
+      ? `Bac ${profile.series.code} · ${profile.country.name}`
       : isLoading
         ? 'Chargement...'
         : '';

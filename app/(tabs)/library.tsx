@@ -19,6 +19,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CustomBottomSheet } from '@/components/ui/BottomSheet';
 import { DiamondIcon } from '@/components/ui/DiamondIcon';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyDocs } from '@/components/ui/EmptyIllustrations';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { courseService } from '@/services/courseService';
 import { catalogService } from '@/services/catalogService';
@@ -178,7 +180,7 @@ export default function LibraryScreen() {
 
   // ─── Rendu ────────────────────────────────────────────────────────────────
 
-  const profileMeta = profile != null ? `${profile.country.name} · Bac ${profile.series.label}` : '';
+  const profileMeta = profile != null ? `${profile.country.name} · Bac ${profile.series.code}` : '';
 
   const isLoadingExams = examsQuery.isLoading;
   const noExamsForSubject = !isLoadingExams && exams.length === 0;
@@ -289,11 +291,11 @@ export default function LibraryScreen() {
           )}
 
           {noExamsForSubject && (
-            <View style={styles.stateBox}>
-              <Text style={styles.stateText}>
-                Aucune annale publiée pour cette matière dans ton scope ({profileMeta}).
-              </Text>
-            </View>
+            <EmptyState
+              illustration={IllustrationEmptyDocs}
+              title="Aucune annale disponible"
+              description={`Aucune annale publiée pour cette matière (${profileMeta}).`}
+            />
           )}
 
           {noExamForYear && (
@@ -306,7 +308,7 @@ export default function LibraryScreen() {
             <DocCard
               title={`${currentSubject?.name ?? ''} · BAC ${examForYear.year}`}
               meta={examForYear.session ? `Session ${examForYear.session}` : 'Annale officielle'}
-              extra={`${examForYear.series.name} · ${examForYear.country.name}`}
+              extra={`Bac ${examForYear.series.code} · ${examForYear.country.name}`}
               kind="pdf"
               loading={openPdfMutation.isPending}
               onOpen={() => openPdfMutation.mutate({ examId: examForYear.id, kind: 'epreuve' })}
@@ -317,7 +319,7 @@ export default function LibraryScreen() {
             <DocCard
               title={`Corrigé · ${currentSubject?.name ?? ''} ${examForYear.year}`}
               meta={isPremium ? 'Corrigé complet' : 'Premium requis'}
-              extra={`${examForYear.series.name} · ${examForYear.country.name}`}
+              extra={`Bac ${examForYear.series.code} · ${examForYear.country.name}`}
               kind="pdf-green"
               loading={openPdfMutation.isPending}
               onOpen={() => openCorrige(examForYear.id)}
@@ -444,9 +446,11 @@ const VideosSection: React.FC<VideosSectionProps> = ({ isLoading, videos, onOpen
   }
   if (videos.length === 0) {
     return (
-      <View style={styles.stateBox}>
-        <Text style={styles.stateText}>Aucune vidéo commentée pour cette épreuve.</Text>
-      </View>
+      <EmptyState
+        illustration={IllustrationEmptyDocs}
+        title="Aucune vidéo commentée"
+        description="Aucune vidéo n'est disponible pour cette épreuve."
+      />
     );
   }
   return (

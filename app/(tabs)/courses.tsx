@@ -14,6 +14,8 @@ import type { Chapter, Lesson, Subject } from '@/types/api';
 import { SubjectChips } from '@/components/courses/SubjectChips';
 import { TabChips } from '@/components/courses/TabChips';
 import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 
 type CourseTabKey = 'cours' | 'fiches' | 'videos';
@@ -197,9 +199,11 @@ export default function CoursesScreen() {
           )}
 
           {!chaptersLoading && chapters && chapters.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>Aucun chapitre pour cette matière.</Text>
-            </View>
+            <EmptyState
+              illustration={IllustrationEmptyCourses}
+              title="Aucun chapitre"
+              description="Aucun chapitre n'est encore disponible pour cette matière."
+            />
           )}
 
           {/* Cours : accordéon avec liste de leçons par chapitre. */}
@@ -376,16 +380,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 110,
-  },
-  emptyState: {
-    paddingVertical: 40,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 13.5,
-    color: '#9AA3AC',
   },
 });
 

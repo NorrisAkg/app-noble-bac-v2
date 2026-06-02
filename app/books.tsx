@@ -8,6 +8,8 @@ import { Image } from 'expo-image';
 
 import { AppBar } from '@/components/ui/AppBar';
 import { Toast, type ToastTone } from '@/components/ui/Toast';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyBooks } from '@/components/ui/EmptyIllustrations';
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
 import { useDownloadedSet } from '@/hooks/useDownloadedSet';
@@ -240,12 +242,13 @@ export default function BooksLibraryScreen() {
         )}
 
         {!loading && filteredBooks.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Aucun livre ne correspond à tes filtres.</Text>
-            <TouchableOpacity onPress={resetFilters} style={styles.emptyResetBtn}>
-              <Text style={styles.emptyResetText}>Réinitialiser les filtres</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            illustration={IllustrationEmptyBooks}
+            title="Aucun livre trouvé"
+            description="Aucun livre ne correspond à tes filtres."
+            ctaLabel="Réinitialiser les filtres"
+            onCtaPress={resetFilters}
+          />
         )}
       </ScrollView>
 
@@ -604,26 +607,5 @@ const styles = StyleSheet.create({
     color: '#9AA3AC',
     textAlign: 'center',
     width: '100%',
-  },
-  emptyState: {
-    paddingVertical: 60,
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  emptyText: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 13,
-    color: '#9AA3AC',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyResetBtn: {
-    marginTop: 12,
-    paddingVertical: 8,
-  },
-  emptyResetText: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 13,
-    color: '#3DBE45',
   },
 });

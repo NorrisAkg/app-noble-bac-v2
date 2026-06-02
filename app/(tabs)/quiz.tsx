@@ -16,6 +16,8 @@ import { useQuery } from '@tanstack/react-query';
 import { courseService } from '@/services/courseService';
 import { quizService, type QuizSessionHistoryItem } from '@/services/quizService';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import type { Subject } from '@/types/api';
@@ -115,27 +117,35 @@ export default function QuizSubjectsScreen() {
             10 questions par session · mode examen blanc.
           </Text>
 
-          <View style={styles.grid}>
-            {subjects.map((s) => {
-              const stats = statsBySubject[s.id];
-              return (
-                <TouchableOpacity
-                  key={s.id}
-                  style={styles.card}
-                  activeOpacity={0.7}
-                  onPress={() => handlePickSubject(s)}
-                >
-                  <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
-                  <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
-                  <Text style={styles.cardCount}>
-                    {stats && stats.sessions > 0
-                      ? `${stats.sessions} session${stats.sessions > 1 ? 's' : ''} · ${stats.averagePct}% moyen`
-                      : 'Commencer'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {subjects.length === 0 ? (
+            <EmptyState
+              illustration={IllustrationEmptyCourses}
+              title="Aucune matière disponible"
+              description="Les quiz arrivent bientôt pour ta série."
+            />
+          ) : (
+            <View style={styles.grid}>
+              {subjects.map((s) => {
+                const stats = statsBySubject[s.id];
+                return (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={styles.card}
+                    activeOpacity={0.7}
+                    onPress={() => handlePickSubject(s)}
+                  >
+                    <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
+                    <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
+                    <Text style={styles.cardCount}>
+                      {stats && stats.sessions > 0
+                        ? `${stats.sessions} session${stats.sessions > 1 ? 's' : ''} · ${stats.averagePct}% moyen`
+                        : 'Commencer'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
