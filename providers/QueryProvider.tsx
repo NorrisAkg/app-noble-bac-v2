@@ -10,7 +10,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 2,
       staleTime: 1000 * 60 * 5,        // 5 min — fenêtre "fresh" en ligne
-      gcTime: 1000 * 60 * 60 * 24 * 7, // 7 jours — survit aux redémarrages
+      gcTime: 1000 * 60 * 60 * 24 * 15, // 15 jours — survit aux redémarrages
       networkMode: "offlineFirst",       // sert le cache sans tenter le réseau
     },
   },

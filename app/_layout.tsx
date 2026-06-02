@@ -51,6 +51,7 @@ import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
 import { QueryProvider, queryClient } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
+import { prefetchAllData } from '@/services/prefetchService';
 import { useAuthStore } from '@/store/useAuthStore';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -78,6 +79,14 @@ export default function RootLayout() {
     registerAuthCleanup(() => useAuthStore.getState().clearLocal());
     initialize();
   }, [initialize]);
+
+  // Pré-charge toutes les données texte/JSON dès que l'utilisateur est authentifié.
+  // prefetchQuery est silencieux (pas de throw) et no-op si les données sont encore fraîches.
+  useEffect(() => {
+    if (isAuthenticated) {
+      prefetchAllData(queryClient);
+    }
+  }, [isAuthenticated]);
 
   const wasOnlineRef = useRef<boolean | null>(null);
 

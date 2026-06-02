@@ -269,7 +269,7 @@ export interface ExamListItem {
   year: number;
   session: string | null;
   country: { id: number; name: string; iso_code: string };
-  series: { id: number; name: string };
+  series: { id: number; code: string };
   subject: { id: number; name: string; icon_slug: string | null };
 }
 
