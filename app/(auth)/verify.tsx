@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
@@ -11,23 +12,14 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 const OtpCircle = ({ filled, active }: { filled: boolean, active: boolean }) => (
-  // Active state : anneau visible 4px aligné maquette `screens-verify-congrats.jsx:20`
-  // (`boxShadow: 0 0 0 4px greenSoft`). Reproduit en React Native via un View
-  // wrapper coloré greenSoft + le cercle blanc interne plus petit.
   <View
-    className={`items-center justify-center rounded-full ${
-      active ? 'bg-brand-green/20 w-[54px] h-[54px]' : 'w-[46px] h-[46px]'
+    className={`w-[46px] h-[46px] rounded-full border-2 items-center justify-center bg-white ${
+      filled || active ? 'border-brand-green' : 'border-[#D5DAE0]'
     }`}
   >
-    <View
-      className={`w-[46px] h-[46px] rounded-full border-2 items-center justify-center bg-white ${
-        filled || active ? 'border-brand-green' : 'border-[#D5DAE0]'
-      }`}
-    >
-      {filled && (
-        <View className="w-3 h-3 rounded-full bg-brand-green" />
-      )}
-    </View>
+    {filled && (
+      <View className="w-3 h-3 rounded-full bg-brand-green" />
+    )}
   </View>
 );
 
@@ -44,6 +36,7 @@ const KeypadKey = ({ children, onClick }: { children: React.ReactNode, onClick: 
 
 export default function VerifyScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { phone: rawPhone } = useLocalSearchParams<{ phone?: string }>();
   const phone = typeof rawPhone === 'string' ? rawPhone : '';
 
@@ -206,7 +199,7 @@ export default function VerifyScreen() {
         </View>
       </View>
 
-      <View className="bg-[#ECEEF0] p-1.5 pb-3">
+      <View className="bg-[#ECEEF0] p-1.5" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
         {[
           ['1', '2', '3'],
           ['4', '5', '6'],
