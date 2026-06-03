@@ -15,7 +15,7 @@ import { QuickAction } from '@/components/home/QuickAction';
 import { BookCover } from '@/components/home/BookCover';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyBooks } from '@/components/ui/EmptyIllustrations';
-import { daysUntilBac, getNextBacDate } from '@/constants/bacDates';
+import { getNextBacDate } from '@/constants/bacDates';
 import { catalogService } from '@/services/catalogService';
 import { getProfile } from '@/services/profileService';
 import type { Book, UserProfile } from '@/types/api';
@@ -70,7 +70,10 @@ export default function HomeScreen() {
   const profile = profileQuery.data;
 
   const countryCode = profile?.country.code ?? null;
-  const days = useMemo(() => daysUntilBac(countryCode), [countryCode]);
+  const bacDateParts = useMemo(() => {
+    const d = getNextBacDate(countryCode);
+    return { day: d.getDate(), month: d.toLocaleDateString('fr-FR', { month: 'short' }) };
+  }, [countryCode]);
   const bacDateFormatted = useMemo(
     () => getNextBacDate(countryCode).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
     [countryCode],
@@ -134,7 +137,8 @@ export default function HomeScreen() {
             cote backend (a livrer en post-MVP, cf PLAN M-P2.7 TBD). */}
         <View style={styles.progressCard}>
           <View style={styles.daysBox}>
-            <Text style={styles.daysNum}>J-{days}</Text>
+            <Text style={styles.daysNum}>{bacDateParts.day}</Text>
+            <Text style={styles.daysMonth}>{bacDateParts.month}</Text>
           </View>
 
           <View style={{ flex: 1 }}>
@@ -334,10 +338,17 @@ const styles = StyleSheet.create({
   },
   daysNum: {
     fontFamily: 'Poppins_800ExtraBold',
-    fontSize: 16,
+    fontSize: 20,
     color: '#3DBE45',
-    lineHeight: 20,
+    lineHeight: 22,
     letterSpacing: -0.5,
+  },
+  daysMonth: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 9,
+    color: '#3DBE45',
+    lineHeight: 11,
+    textTransform: 'capitalize',
   },
   progressTitle: {
     fontFamily: 'Poppins_600SemiBold',
