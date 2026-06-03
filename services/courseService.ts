@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   Subject,
   Chapter,
+  CourseSnapshotSubject,
   Lesson,
   RevisionSheet,
   RevisionSheetListItem,
@@ -11,6 +12,16 @@ import type {
 } from "@/types/api";
 
 export const courseService = {
+  /**
+   * GET /api/v1/courses/snapshot
+   * Retourne toutes les matières publiées avec chapitres et leçons imbriqués
+   * en 3 requêtes SQL. Conçu pour le pré-chargement offline au premier login.
+   */
+  getSnapshot: async (): Promise<CourseSnapshotSubject[]> => {
+    const response = await apiClient.get<ApiResponse<CourseSnapshotSubject[]>>("/courses/snapshot");
+    return response.data.data;
+  },
+
   /**
    * GET /api/v1/courses/subjects
    */

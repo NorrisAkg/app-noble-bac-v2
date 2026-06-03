@@ -39,6 +39,12 @@ export interface Subject {
   chapter_count: number;
 }
 
+/** Réponse de GET /courses/snapshot — matière avec chapitres et leçons imbriqués. */
+export interface CourseSnapshotSubject extends Subject {
+  color_hex?: string;
+  chapters: Array<Chapter & { lessons: Lesson[] }>;
+}
+
 export interface Chapter {
   id: number;
   title: string;

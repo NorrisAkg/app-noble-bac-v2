@@ -10,23 +10,37 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 
 /**
  * Pre-fetches all text/JSON data needed for offline use right after
- * authentication. Runs silently in the background — errors are swallowed
- * so a failing endpoint never blocks the user.
+ * authentication. The course snapshot (subjects + chapters + lessons)
+ * is fetched in 3 SQL queries and then distributed into the individual
+ * query cache keys so every screen finds its data already cached.
  *
- * Subjects are fetched first (sequential), then all chapter lists are
- * fired in parallel alongside the other endpoints.
+ * Runs silently in the background — errors are swallowed so a failing
+ * endpoint never blocks the user.
  */
 export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
-  // 1. Subjects first — needed to fan out chapter prefetches
-  const subjects = await queryClient
-    .fetchQuery({
-      queryKey: ['courses', 'subjects'],
-      queryFn: courseService.getSubjects,
-      staleTime: DAY_MS,
-    })
-    .catch(() => []);
+  // 1. Course snapshot: subjects + chapters + full lesson content in one call.
+  //    Populate individual cache keys so useQuery() calls find data immediately.
+  const snapshot = await courseService.getSnapshot().catch(() => []);
 
-  // 2. Everything else in parallel
+  if (snapshot.length > 0) {
+    // subjects list — matches ['courses', 'subjects'] query key
+    queryClient.setQueryData(['courses', 'subjects'], snapshot.map(({ chapters: _c, ...s }) => s));
+
+    for (const subject of snapshot) {
+      // chapters per subject — matches ['courses', 'chapters', subjectId]
+      queryClient.setQueryData(
+        ['courses', 'chapters', subject.id],
+        subject.chapters.map(({ lessons: _l, ...c }) => c),
+      );
+
+      for (const chapter of subject.chapters) {
+        // lessons per chapter — matches ['courses', 'lessons', chapterId]
+        queryClient.setQueryData(['courses', 'lessons', chapter.id], chapter.lessons);
+      }
+    }
+  }
+
+  // 2. Everything else in parallel (non-blocking)
   await Promise.allSettled([
     queryClient.prefetchQuery({
       queryKey: ['profile'],
@@ -49,11 +63,5 @@ export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
       queryKey: ['quiz', 'history', 'first-page'],
       queryFn: () => quizService.getHistory(1, 20),
     }),
-    ...subjects.map((s) =>
-      queryClient.prefetchQuery({
-        queryKey: ['courses', 'chapters', s.id],
-        queryFn: () => courseService.getChapters(s.id),
-      }),
-    ),
   ]);
 }
