@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -14,18 +14,12 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { courseService } from '@/services/courseService';
-import { quizService, type QuizSessionHistoryItem } from '@/services/quizService';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import type { Subject } from '@/types/api';
-
-interface SubjectQuizStats {
-  sessions: number;
-  averagePct: number | null;
-}
 
 export default function QuizSubjectsScreen() {
   const insets = useSafeAreaInsets();
@@ -38,31 +32,6 @@ export default function QuizSubjectsScreen() {
   });
   const subjects: Subject[] = subjectsQuery.data ?? [];
   const loading = subjectsQuery.isLoading;
-
-  const historyQuery = useQuery({
-    queryKey: ['quiz', 'history', 'first-page'],
-    queryFn: () => quizService.getHistory(1, 50),
-  });
-  const historyPage = historyQuery.data;
-
-  const statsBySubject = useMemo<Record<number, SubjectQuizStats>>(() => {
-    const items: QuizSessionHistoryItem[] = historyPage?.data ?? [];
-    const acc: Record<number, { sessions: number; sumPct: number }> = {};
-    for (const item of items) {
-      const key = item.subject.id;
-      if (!acc[key]) acc[key] = { sessions: 0, sumPct: 0 };
-      acc[key].sessions += 1;
-      acc[key].sumPct += item.percentage;
-    }
-    const result: Record<number, SubjectQuizStats> = {};
-    for (const [id, { sessions, sumPct }] of Object.entries(acc)) {
-      result[Number(id)] = {
-        sessions,
-        averagePct: sessions > 0 ? Math.round(sumPct / sessions) : null,
-      };
-    }
-    return result;
-  }, [historyPage]);
 
   const { guard } = usePremiumGate();
 
@@ -101,11 +70,8 @@ export default function QuizSubjectsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={subjectsQuery.isRefetching || historyQuery.isRefetching}
-              onRefresh={() => {
-                subjectsQuery.refetch();
-                historyQuery.refetch();
-              }}
+              refreshing={subjectsQuery.isRefetching}
+              onRefresh={() => subjectsQuery.refetch()}
               tintColor={C.green}
             />
           }
@@ -114,7 +80,7 @@ export default function QuizSubjectsScreen() {
             Teste-toi sur toutes{'\n'}les matières
           </Text>
           <Text style={styles.headerSubtitle}>
-            10 questions par session · mode examen blanc.
+            Questions par chapitre · explications incluses.
           </Text>
 
           {subjects.length === 0 ? (
@@ -125,25 +91,20 @@ export default function QuizSubjectsScreen() {
             />
           ) : (
             <View style={styles.grid}>
-              {subjects.map((s) => {
-                const stats = statsBySubject[s.id];
-                return (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={styles.card}
-                    activeOpacity={0.7}
-                    onPress={() => handlePickSubject(s)}
-                  >
-                    <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
-                    <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
-                    <Text style={styles.cardCount}>
-                      {stats && stats.sessions > 0
-                        ? `${stats.sessions} session${stats.sessions > 1 ? 's' : ''} · ${stats.averagePct}% moyen`
-                        : 'Commencer'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {subjects.map((s) => (
+                <TouchableOpacity
+                  key={s.id}
+                  style={styles.card}
+                  activeOpacity={0.7}
+                  onPress={() => handlePickSubject(s)}
+                >
+                  <SubjectIcon kind={backendSlugToSubjectKind(s.icon_slug)} size={52} />
+                  <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
+                  <Text style={styles.cardCount}>
+                    {s.chapter_count} {s.chapter_count > 1 ? 'chapitres' : 'chapitre'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
         </ScrollView>

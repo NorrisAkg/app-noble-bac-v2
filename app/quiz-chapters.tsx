@@ -43,12 +43,12 @@ export default function QuizChaptersScreen() {
     enabled: !!subjectId,
   });
 
+  // History is ordered by completed_at DESC — first occurrence is the latest session.
   const bestScores = useMemo(() => {
     const map: Record<number, { score: number; total: number }> = {};
     for (const s of historyQuery.data?.data ?? []) {
       if (!s.chapter?.id) continue;
-      const prev = map[s.chapter.id];
-      if (!prev || s.score > prev.score) {
+      if (!map[s.chapter.id]) {
         map[s.chapter.id] = { score: s.score, total: s.total_questions };
       }
     }
@@ -138,10 +138,14 @@ export default function QuizChaptersScreen() {
 
                 {isQuizable ? (
                   <View style={styles.rightSlot}>
-                    {hasHistory && (
-                      <Text style={styles.score}>{best.score}/{best.total}</Text>
+                    {hasHistory ? (
+                      <>
+                        <Text style={styles.score}>{best.score}/{best.total}</Text>
+                        <ChevronRight size={20} color={C.green} strokeWidth={2.4} />
+                      </>
+                    ) : (
+                      <Lock size={20} color={C.green} strokeWidth={2} />
                     )}
-                    <ChevronRight size={20} color={C.green} strokeWidth={2.4} />
                   </View>
                 ) : (
                   <Lock size={16} color="#9AA3AC" />

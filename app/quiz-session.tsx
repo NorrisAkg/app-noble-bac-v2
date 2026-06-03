@@ -1,17 +1,33 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Animated,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { X } from 'lucide-react-native';
+import { X, Check, AlertCircle } from 'lucide-react-native';
 
 import { quizService } from '@/services/quizService';
 import type { QuizSession, QuizSessionQuestion } from '@/services/quizService';
 import { useQuizStore } from '@/store/useQuizStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { C } from '@/constants/theme';
 
 type PendingAnswer = { questionId: number; optionId: number };
+
+type AnswerResult = {
+  isCorrect: boolean;
+  correctOptionId: number | null;
+  explanation: string | null;
+};
 
 export default function QuizSessionScreen() {
   const insets = useSafeAreaInsets();
@@ -28,6 +44,11 @@ export default function QuizSessionScreen() {
 
   const [idx, setIdx] = useState(0);
   const [pickedOptionId, setPickedOptionId] = useState<number | null>(null);
+  const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null);
+
+  const drawerAnim = useRef(new Animated.Value(300)).current;
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const drawerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOnline = useOnlineStatus();
   const pendingAnswers = useRef<PendingAnswer[]>([]);
@@ -40,7 +61,6 @@ export default function QuizSessionScreen() {
       router.back();
       return;
     }
-
     (async () => {
       try {
         const data = await quizService.startSession(Number(chapterId));
@@ -54,58 +74,102 @@ export default function QuizSessionScreen() {
     })();
   }, [chapterId, router]);
 
+  useEffect(() => {
+    return () => {
+      if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
+    };
+  }, []);
+
   const questions: QuizSessionQuestion[] = session?.questions ?? [];
   const total = questions.length;
   const q = questions[idx];
   const isLast = idx === total - 1;
+  const answered = answerResult !== null;
 
-  const handlePick = (optionId: number) => {
-    if (submitting) return;
+  const showDrawer = () => {
+    setDrawerVisible(true);
+    Animated.timing(drawerAnim, {
+      toValue: 0,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideDrawer = (cb: () => void) => {
+    Animated.timing(drawerAnim, {
+      toValue: 300,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setDrawerVisible(false);
+      cb();
+    });
+  };
+
+  const handlePick = async (optionId: number) => {
+    if (answered || submitting) return;
     setPickedOptionId(optionId);
+
+    if (isOnline) {
+      setSubmitting(true);
+      try {
+        if (!isLast) {
+          const progress = await quizService.submitAnswer(session!.id, q.id, optionId);
+          setAnswerResult({
+            isCorrect: progress.is_correct,
+            correctOptionId: progress.correct_option_id,
+            explanation: progress.explanation,
+          });
+        } else {
+          // Last question: submit + finish after drawer interaction
+          const progress = await quizService.submitAnswer(session!.id, q.id, optionId);
+          setAnswerResult({
+            isCorrect: progress.is_correct,
+            correctOptionId: progress.correct_option_id,
+            explanation: progress.explanation,
+          });
+        }
+      } catch (error) {
+        Alert.alert('Erreur', getApiErrorMessage(error));
+        setPickedOptionId(null);
+        setSubmitting(false);
+        return;
+      }
+      setSubmitting(false);
+    } else {
+      pendingAnswers.current.push({ questionId: q.id, optionId });
+      // Offline: no feedback available
+      setAnswerResult({ isCorrect: false, correctOptionId: null, explanation: null });
+    }
+
+    drawerTimerRef.current = setTimeout(showDrawer, 600);
   };
 
   const handleNext = async () => {
-    if (!session || pickedOptionId === null || submitting) return;
-
     if (!isLast) {
-      // Réponse intermédiaire : soumettre en ligne ou mettre en attente
-      if (isOnline) {
-        setSubmitting(true);
-        try {
-          await quizService.submitAnswer(session.id, q.id, pickedOptionId);
-        } catch (error) {
-          Alert.alert('Erreur', getApiErrorMessage(error));
-          setSubmitting(false);
-          return;
-        }
-        setSubmitting(false);
-      } else {
-        pendingAnswers.current.push({ questionId: q.id, optionId: pickedOptionId });
-      }
-      setIdx((i) => i + 1);
-      setPickedOptionId(null);
+      hideDrawer(() => {
+        setIdx((i) => i + 1);
+        setPickedOptionId(null);
+        setAnswerResult(null);
+        drawerAnim.setValue(300);
+      });
       return;
     }
 
-    // Dernière question
+    // Last question — finish session
     if (!isOnline && pendingAnswers.current.length > 0) {
-      Alert.alert(
-        'Connexion requise',
-        'Tu as des réponses en attente. Reconnecte-toi pour soumettre ton quiz.',
-      );
+      Alert.alert('Connexion requise', 'Reconnecte-toi pour soumettre ton quiz.');
       return;
     }
 
     setSubmitting(true);
     try {
-      // Vider la file d'attente avant de terminer
       for (const { questionId, optionId } of pendingAnswers.current) {
-        await quizService.submitAnswer(session.id, questionId, optionId);
+        await quizService.submitAnswer(session!.id, questionId, optionId);
       }
       pendingAnswers.current = [];
 
-      await quizService.submitAnswer(session.id, q.id, pickedOptionId);
-      const finished = await quizService.finishSession(session.id);
+      const finished = await quizService.finishSession(session!.id);
       setLastFinishedSession(finished);
 
       router.replace({
@@ -131,80 +195,114 @@ export default function QuizSessionScreen() {
     );
   }
 
+  const progressPct = ((idx + 1) / total) * 100;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
+      {/* Top bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 14 }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.closeBtn}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} activeOpacity={0.7}>
           <X size={20} color="#fff" strokeWidth={2.4} />
         </TouchableOpacity>
 
         <View style={styles.progressContainer}>
-          <View style={[styles.progressFill, { width: `${((idx + 1) / total) * 100}%` }]} />
+          <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
         </View>
 
         <Text style={styles.progressText}>{idx + 1}/{total}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.questionHeader}>
-          <Text style={styles.contextText}>
-            {chapterTitle ? `${subjectLabel} · ${chapterTitle}` : subjectLabel}
-          </Text>
-          <Text style={styles.questionText}>{q.statement}</Text>
-          <Text style={styles.hintText}>
-            Tu verras les corrections détaillées à la fin du quiz.
-          </Text>
-        </View>
+      {/* Question + options */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.questionText}>{q.statement}</Text>
 
-        <View style={styles.optionsContainer}>
+        <View style={styles.optionsCard}>
           {q.options.map((opt, i) => {
             const isPicked = pickedOptionId === opt.id;
+            const isOffline = answered && answerResult?.correctOptionId === null;
+            const isCorrectOpt = !isOffline && answered && answerResult?.correctOptionId === opt.id;
+            const isWrongPick = !isOffline && answered && isPicked && !answerResult?.isCorrect;
+            const isOfflinePick = isOffline && isPicked;
+
+            const showCheck = isCorrectOpt;
+            const showCross = isWrongPick;
+            const isWhiteText = isCorrectOpt || isWrongPick || isOfflinePick;
+            const isNotLastOpt = i < q.options.length - 1;
 
             return (
               <TouchableOpacity
                 key={opt.id}
                 onPress={() => handlePick(opt.id)}
-                disabled={submitting}
-                activeOpacity={0.8}
-                style={[styles.optCard, isPicked && styles.optCardPicked]}
+                disabled={answered || submitting}
+                activeOpacity={0.75}
+                style={[
+                  styles.optRow,
+                  isNotLastOpt && styles.optBorder,
+                  isCorrectOpt && styles.optCorrect,
+                  isWrongPick && styles.optWrong,
+                  isOfflinePick && styles.optOffline,
+                ]}
               >
-                <View style={[styles.optIconWrap, isPicked && styles.optIconWrapPicked]}>
-                  <Text style={[styles.optIconText, isPicked && styles.optIconTextWhite]}>
-                    {String.fromCharCode(65 + i)}
-                  </Text>
-                </View>
-                <Text style={[styles.optText, isPicked && styles.optTextPicked]}>{opt.label}</Text>
+                {showCheck && <Check size={18} color="#fff" strokeWidth={2.6} style={styles.optIcon} />}
+                {showCross && <X size={18} color="#fff" strokeWidth={2.6} style={styles.optIcon} />}
+                {!showCheck && !showCross && <View style={styles.optIconPlaceholder} />}
+                <Text style={[styles.optText, isWhiteText && styles.optTextWhite]}>{opt.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
-        <TouchableOpacity
+      {/* Explanation drawer */}
+      {drawerVisible && (
+        <Animated.View
           style={[
-            styles.nextBtn,
-            (pickedOptionId === null || submitting || (isLast && !isOnline && pendingAnswers.current.length > 0)) && styles.nextBtnDisabled,
+            styles.drawer,
+            { paddingBottom: Math.max(insets.bottom, 20) + 16, transform: [{ translateY: drawerAnim }] },
           ]}
-          onPress={handleNext}
-          activeOpacity={0.85}
-          disabled={pickedOptionId === null || submitting || (isLast && !isOnline && pendingAnswers.current.length > 0)}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
+          {answerResult?.correctOptionId !== null ? (
+            <View style={[styles.drawerStatus, answerResult?.isCorrect ? styles.drawerStatusCorrect : styles.drawerStatusWrong]}>
+              {answerResult?.isCorrect ? (
+                <Check size={16} color={C.green} strokeWidth={2.6} />
+              ) : (
+                <AlertCircle size={16} color={C.salmonDark} strokeWidth={2.4} />
+              )}
+              <Text style={[styles.drawerStatusText, { color: answerResult?.isCorrect ? C.green : C.salmonDark }]}>
+                {answerResult?.isCorrect ? 'Bonne réponse !' : 'Pas tout à fait'}
+              </Text>
+            </View>
           ) : (
-            <Text style={styles.nextBtnText}>
-              {isLast ? 'Voir mon score' : 'Question suivante'}
-            </Text>
+            <View style={[styles.drawerStatus, styles.drawerStatusOffline]}>
+              <Text style={styles.drawerStatusTextOffline}>Réponse enregistrée</Text>
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
+
+          {answerResult?.explanation ? (
+            <Text style={styles.drawerExplanation}>{answerResult.explanation}</Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.drawerBtn}
+            onPress={handleNext}
+            activeOpacity={0.85}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.drawerBtnText}>
+                {isLast ? 'Voir mon score' : 'Question suivante'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -247,7 +345,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: '#4F86F7',
     borderRadius: 4,
   },
   progressText: {
@@ -258,94 +356,70 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 120,
-  },
-  questionHeader: {
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingHorizontal: 8,
-  },
-  contextText: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.85)',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 8,
+    paddingTop: 20,
+    paddingBottom: 240,
   },
   questionText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 19,
     color: '#fff',
-    lineHeight: 26,
+    lineHeight: 27,
     letterSpacing: -0.3,
     textAlign: 'center',
+    marginBottom: 28,
+    paddingHorizontal: 8,
   },
-  hintText: {
-    marginTop: 10,
-    fontFamily: 'Poppins_500Medium',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.75)',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  optionsContainer: {
-    gap: 10,
-  },
-  optCard: {
-    minHeight: 60,
-    borderRadius: 16,
+  optionsCard: {
     backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  optRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 60,
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    gap: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    paddingVertical: 14,
+    gap: 12,
   },
-  optCardPicked: {
-    backgroundColor: '#3DBE45',
-    borderColor: '#3DBE45',
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 6,
+  optBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: C.line,
   },
-  optIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
+  optBase: {
+    backgroundColor: '#fff',
   },
-  optIconWrapPicked: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  optCorrect: {
+    backgroundColor: C.green,
   },
-  optIconText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 12,
-    color: '#5A6470',
+  optWrong: {
+    backgroundColor: '#E14B36',
   },
-  optIconTextWhite: {
-    color: '#fff',
+  optOffline: {
+    backgroundColor: C.ink2,
+  },
+  optIcon: {
+    width: 22,
+  },
+  optIconPlaceholder: {
+    width: 22,
   },
   optText: {
     flex: 1,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 15,
-    color: '#1A2027',
+    color: C.ink,
   },
-  optTextPicked: {
+  optTextWhite: {
     color: '#fff',
   },
-  footer: {
+  // Drawer
+  drawer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -354,26 +428,65 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 22,
-    paddingTop: 18,
+    paddingTop: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 20,
   },
-  nextBtn: {
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#3DBE45',
+  drawerStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  drawerStatusCorrect: {
+    backgroundColor: C.greenSoft,
+  },
+  drawerStatusWrong: {
+    backgroundColor: C.salmonSoft,
+  },
+  drawerStatusOffline: {
+    backgroundColor: C.bg,
+  },
+  drawerStatusText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 14,
+  },
+  drawerStatusTextOffline: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 13,
+    color: C.ink2,
+  },
+  drawerExplanation: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13.5,
+    color: C.ink2,
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  drawerBtn: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 6,
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 6,
   },
-  nextBtnDisabled: {
-    opacity: 0.4,
-  },
-  nextBtnText: {
-    fontFamily: Platform.OS === 'ios' ? 'Poppins_600SemiBold' : 'Poppins_600SemiBold',
-    fontSize: 14,
+  drawerBtnText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 15,
     color: '#fff',
+    letterSpacing: 0.2,
   },
 });

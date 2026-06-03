@@ -39,6 +39,9 @@ export interface QuizSession {
 export interface AnswerProgress {
   questions_answered: number;
   questions_remaining: number;
+  is_correct: boolean;
+  correct_option_id: number;
+  explanation: string | null;
 }
 
 /** Option exposée APRÈS finish (avec correction). */
