@@ -48,7 +48,7 @@ export default function SupportScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>Une question, un blocage ?</Text>
           <Text style={styles.heroSub}>On répond en moins de 24h, du lundi au samedi.</Text>

@@ -26,7 +26,7 @@ export default function PrivacyScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         <Text style={styles.updatedDate}>Dernière mise à jour : 1er avril 2026</Text>
         <Text style={styles.h1}>Politique de confidentialité</Text>
         

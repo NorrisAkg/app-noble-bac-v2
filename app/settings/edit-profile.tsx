@@ -101,7 +101,7 @@ export default function EditProfileScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {/* Avatar Edit — gradient `135deg green→greenDark` aligné maquette
             `screens-profile-extras.jsx:33`. */}
         <View style={styles.avatarSection}>

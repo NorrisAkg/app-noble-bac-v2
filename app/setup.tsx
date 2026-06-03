@@ -18,10 +18,12 @@ import { C } from '@/constants/theme';
 import { getCountries } from '@/services/referentialService';
 import { getProfile, updateProfile } from '@/services/profileService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Country, Series } from '@/types/api';
 
 export default function SetupScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
@@ -135,7 +137,7 @@ export default function SetupScreen() {
       </ScrollView>
 
       {showSeries && selectedSeries && (
-        <View className="px-6 pt-3 pb-6 bg-background">
+        <View className="px-6 pt-3 bg-background" style={{ paddingBottom: Math.max(insets.bottom, 24) }}>
           <Button onPress={handleContinue} loading={updateMutation.isPending}>
             Continuer
           </Button>

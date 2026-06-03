@@ -41,7 +41,7 @@ export default function QuizReviewScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {questions.map((q, qIdx) => {
           const isCorrect = q.user_answer.is_correct;
 

@@ -54,7 +54,7 @@ export default function NotificationsSettingsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         <SectionLabel>Canaux</SectionLabel>
         <View style={styles.card}>
           <SettingsRow 
