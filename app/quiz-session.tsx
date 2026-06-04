@@ -298,20 +298,20 @@ export default function QuizSessionScreen() {
             <Text style={styles.drawerExplanation}>{answerResult.explanation}</Text>
           ) : null */}
 
-          <TouchableOpacity
-            style={styles.drawerBtn}
-            onPress={handleNext}
-            activeOpacity={0.85}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.drawerBtnText}>
-                {isLast ? 'Voir mon score' : 'Question suivante'}
-              </Text>
-            )}
-          </TouchableOpacity>
+          {isLast && (
+            <TouchableOpacity
+              style={styles.drawerBtn}
+              onPress={handleNext}
+              activeOpacity={0.85}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.drawerBtnText}>Voir mon score</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </Animated.View>
       )}
     </View>
