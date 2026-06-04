@@ -88,19 +88,26 @@ export default function SubscriptionPlansScreen() {
     staleTime: 60 * 1000,
   });
 
-  const plans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
-  const recommendedIdx = useMemo(() => pickRecommendedIndex(plans), [plans]);
+  const allPlans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
+  const activeSub = activeQuery.data;
+  const userHasActiveSub = activeSub?.status === 'active';
+
+  const visiblePlans = useMemo(() => {
+    const activePlan = activeSub?.status === 'active' ? activeSub.plan : null;
+    if (!activePlan) return allPlans;
+    return allPlans.filter((p) => p.price_fcfa > activePlan.price_fcfa);
+  }, [allPlans, activeSub]);
+
+  const recommendedIdx = useMemo(() => pickRecommendedIndex(visiblePlans), [visiblePlans]);
 
   // Sélection par défaut au premier rendu : le plan recommandé.
   useEffect(() => {
-    if (selectedPlanId === null && plans.length > 0) {
-      setSelectedPlanId(plans[recommendedIdx >= 0 ? recommendedIdx : 0].id);
+    if (selectedPlanId === null && visiblePlans.length > 0) {
+      setSelectedPlanId(visiblePlans[recommendedIdx >= 0 ? recommendedIdx : 0].id);
     }
-  }, [plans, selectedPlanId, recommendedIdx]);
+  }, [visiblePlans, selectedPlanId, recommendedIdx]);
 
-  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
-  const activeSub = activeQuery.data;
-  const userHasActiveSub = activeSub?.status === 'active';
+  const selectedPlan = visiblePlans.find((p) => p.id === selectedPlanId) ?? null;
 
   const handleContinue = async () => {
     if (!selectedPlan || isInitiating) return;
@@ -161,28 +168,32 @@ export default function SubscriptionPlansScreen() {
         )}
 
         {/* FORFAITS en premier — mis en évidence */}
-        <Text style={styles.sectionTitle}>Choisis ta formule</Text>
+        {!(userHasActiveSub && visiblePlans.length === 0) && (
+          <>
+            <Text style={styles.sectionTitle}>Choisis ta formule</Text>
 
-        {isLoading ? (
-          <View style={styles.stateBox}>
-            <ActivityIndicator color={C.green} />
-          </View>
-        ) : plans.length === 0 ? (
-          <View style={styles.stateBox}>
-            <Text style={styles.stateText}>Aucun plan disponible pour le moment.</Text>
-          </View>
-        ) : (
-          <View style={styles.plansList}>
-            {plans.map((plan, idx) => (
-              <PlanRow
-                key={plan.id}
-                plan={plan}
-                active={plan.id === selectedPlanId}
-                best={idx === recommendedIdx}
-                onPress={() => setSelectedPlanId(plan.id)}
-              />
-            ))}
-          </View>
+            {isLoading ? (
+              <View style={styles.stateBox}>
+                <ActivityIndicator color={C.green} />
+              </View>
+            ) : visiblePlans.length === 0 ? (
+              <View style={styles.stateBox}>
+                <Text style={styles.stateText}>Aucun plan disponible pour le moment.</Text>
+              </View>
+            ) : (
+              <View style={styles.plansList}>
+                {visiblePlans.map((plan, idx) => (
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    active={plan.id === selectedPlanId}
+                    best={idx === recommendedIdx}
+                    onPress={() => setSelectedPlanId(plan.id)}
+                  />
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         {/* PERKS — 5 lignes avec tile vert clair + emoji, en bas */}
