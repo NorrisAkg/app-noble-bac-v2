@@ -438,7 +438,7 @@ export type TransactionStatus = 'pending' | 'confirmed' | 'failed' | 'expired';
 export interface PaymentTransaction {
   id: number;
   internal_reference: string;
-  cinetpay_transaction_id: string | null;
+  gateway_transaction_id: string | null;
   status: TransactionStatus;
   amount_fcfa: number;
   currency: string;

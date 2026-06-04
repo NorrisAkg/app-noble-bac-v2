@@ -13,7 +13,7 @@ const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>;
 const transactionFixture: PaymentTransaction = {
   id: 101,
   internal_reference: 'TX-NBL-AB12CD',
-  cinetpay_transaction_id: null,
+  gateway_transaction_id: null,
   status: 'pending',
   amount_fcfa: 5000,
   currency: 'XOF',
@@ -61,7 +61,7 @@ describe('paymentService', () => {
         status: 'confirmed',
         webhook_received_at: '2026-05-18T10:02:00Z',
         confirmed_at: '2026-05-18T10:02:00Z',
-        cinetpay_transaction_id: 'cnp_xyz',
+        gateway_transaction_id: 'cnp_xyz',
       };
       mockedApiClient.get.mockResolvedValueOnce({
         data: { success: true, message: 'OK', data: confirmed },
@@ -71,7 +71,7 @@ describe('paymentService', () => {
 
       expect(mockedApiClient.get).toHaveBeenCalledWith('/payments/101/status');
       expect(result.status).toBe('confirmed');
-      expect(result.cinetpay_transaction_id).toBe('cnp_xyz');
+      expect(result.gateway_transaction_id).toBe('cnp_xyz');
     });
 
     it('renvoie un statut failed sans erreur (cas paiement rejete)', async () => {
