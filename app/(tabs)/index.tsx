@@ -1,51 +1,73 @@
-import React, { useMemo } from 'react';
+import React, { useMemo } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
   RefreshControl,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { Search } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '@/store/useAuthStore';
-import { usePremiumGate } from '@/hooks/usePremiumGate';
-import { QuickAction } from '@/components/home/QuickAction';
-import { BookCover } from '@/components/home/BookCover';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { IllustrationEmptyBooks } from '@/components/ui/EmptyIllustrations';
-import { getNextBacDate } from '@/constants/bacDates';
-import { catalogService } from '@/services/catalogService';
-import { getProfile } from '@/services/profileService';
-import type { Book, UserProfile } from '@/types/api';
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { Search } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "@/store/useAuthStore";
+import { usePremiumGate } from "@/hooks/usePremiumGate";
+import { QuickAction } from "@/components/home/QuickAction";
+import { BookCover } from "@/components/home/BookCover";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { IllustrationEmptyBooks } from "@/components/ui/EmptyIllustrations";
+import { getNextBacDate } from "@/constants/bacDates";
+import { catalogService } from "@/services/catalogService";
+import { getProfile } from "@/services/profileService";
+import type { Book, UserProfile } from "@/types/api";
 
 // Palette deterministe pour habiller les covers livres (le backend n'expose
 // pas de couleur de couverture). Indexe par subject.id, fallback gris.
 const BOOK_PALETTE = [
-  { color: '#1F3A66', accent: '#F2C744' },
-  { color: '#0F5C42', accent: '#9DEBA2' },
-  { color: '#7A2326', accent: '#FFC2A6' },
-  { color: '#4A2A6B', accent: '#D6B6FF' },
-  { color: '#1F4E5A', accent: '#9DECEC' },
-  { color: '#5C3A1F', accent: '#FFD89A' },
+  { color: "#1F3A66", accent: "#F2C744" },
+  { color: "#0F5C42", accent: "#9DEBA2" },
+  { color: "#7A2326", accent: "#FFC2A6" },
+  { color: "#4A2A6B", accent: "#D6B6FF" },
+  { color: "#1F4E5A", accent: "#9DECEC" },
+  { color: "#5C3A1F", accent: "#FFD89A" },
 ] as const;
 
 function bookColors(book: Book): { color: string; accent: string } {
   const subjectId = book.subject?.id ?? 0;
-  return BOOK_PALETTE[subjectId % BOOK_PALETTE.length] ?? { color: '#3A4250', accent: '#D5DAE0' };
+  return (
+    BOOK_PALETTE[subjectId % BOOK_PALETTE.length] ?? {
+      color: "#3A4250",
+      accent: "#D5DAE0",
+    }
+  );
 }
 
 // ─── Section header ──────────────────────────────────────────────────────────
 const SectionHeader = ({
-  title, subtitle, action, onAction,
+  title,
+  subtitle,
+  action,
+  onAction,
 }: {
-  title: string; subtitle?: string; action?: string; onAction?: () => void;
+  title: string;
+  subtitle?: string;
+  action?: string;
+  onAction?: () => void;
 }) => (
   <View style={styles.sectionHeader}>
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flex: 1 }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "baseline", gap: 6, flex: 1 }}
+    >
       <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle && <Text style={styles.sectionSubtitle} numberOfLines={1}>{subtitle}</Text>}
+      {subtitle && (
+        <Text style={styles.sectionSubtitle} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      )}
     </View>
     {action && (
       <TouchableOpacity onPress={onAction}>
@@ -63,7 +85,7 @@ export default function HomeScreen() {
 
   // Profil enrichi pour le countdown localise par pays UEMOA.
   const profileQuery = useQuery<UserProfile>({
-    queryKey: ['profile'],
+    queryKey: ["profile"],
     queryFn: getProfile,
     staleTime: 5 * 60 * 1000,
   });
@@ -72,16 +94,22 @@ export default function HomeScreen() {
   const countryCode = profile?.country.code ?? null;
   const bacDateParts = useMemo(() => {
     const d = getNextBacDate(countryCode);
-    return { day: d.getDate(), month: d.toLocaleDateString('fr-FR', { month: 'short' }) };
+    return {
+      day: d.getDate(),
+      month: d.toLocaleDateString("fr-FR", { month: "short" }),
+    };
   }, [countryCode]);
   const bacDateFormatted = useMemo(
-    () => getNextBacDate(countryCode).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+    () =>
+      getNextBacDate(countryCode).toLocaleDateString("fr-FR", {
+        year: "numeric",
+      }),
     [countryCode],
   );
 
   // Top 6 livres du catalog backend (filtres par scope cote backend via Sanctum user).
   const booksQuery = useQuery({
-    queryKey: ['home', 'books'],
+    queryKey: ["home", "books"],
     queryFn: () => catalogService.getBooks({ per_page: 6 }),
     staleTime: 10 * 60 * 1000,
   });
@@ -89,20 +117,24 @@ export default function HomeScreen() {
 
   const { guard, isPremium } = usePremiumGate();
 
-  const firstName = user?.first_name ?? 'Étudiant';
-  const initials = firstName[0]?.toUpperCase() ?? 'E';
+  const firstName = user?.first_name ?? "Étudiant";
+  const initials = firstName[0]?.toUpperCase() ?? "E";
 
   const handleBookPress = (book: Book) => {
     guard(book, () => {
       router.push({
-        pathname: '/pdf-viewer',
-        params: { bookId: String(book.id), title: book.title, subject: book.subject?.name ?? '' },
+        pathname: "/pdf-viewer",
+        params: {
+          bookId: String(book.id),
+          title: book.title,
+          subject: book.subject?.name ?? "",
+        },
       });
     });
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+    <View style={{ flex: 1, backgroundColor: "#F5F5F5" }}>
       <StatusBar style="light" />
 
       {/* ── HERO HEADER ────────────────────────────────────────── */}
@@ -123,11 +155,14 @@ export default function HomeScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>Salut,</Text>
             <Text style={styles.heroName} numberOfLines={1}>
-              {firstName} {user?.last_name ?? ''}
+              {firstName} {user?.last_name ?? ""}
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/search')}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/search")}
+          >
             <Search size={18} color="#fff" strokeWidth={1.8} />
           </TouchableOpacity>
         </View>
@@ -146,7 +181,7 @@ export default function HomeScreen() {
             <Text style={styles.progressPct}>
               {profile != null
                 ? `${profile.country.name} · Bac ${profile.series.code}`
-                : 'Chargement de ton scope…'}
+                : "Chargement de ton scope…"}
             </Text>
           </View>
         </View>
@@ -170,9 +205,22 @@ export default function HomeScreen() {
       >
         {/* Quick actions */}
         <View style={styles.quickRow}>
-          <QuickAction label="Cours" icon="book" onPress={() => router.push('/(tabs)/courses')} />
-          <QuickAction label="Annales" icon="paper" onPress={() => router.push('/(tabs)/library')} />
-          <QuickAction label="Premium" icon="star" accent onPress={() => router.push('/subscription-plans')} />
+          <QuickAction
+            label="Cours"
+            icon="book"
+            onPress={() => router.push("/(tabs)/courses")}
+          />
+          <QuickAction
+            label="Annales"
+            icon="paper"
+            onPress={() => router.push("/(tabs)/library")}
+          />
+          <QuickAction
+            label="Premium"
+            icon="star"
+            accent
+            onPress={() => router.push("/subscription-plans")}
+          />
         </View>
 
         {/* Section « Reprendre » — CTA tant que le backend n'expose pas
@@ -182,16 +230,18 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.resumeCard}
           activeOpacity={0.85}
-          onPress={() => router.push('/(tabs)/courses')}
+          onPress={() => router.push("/(tabs)/courses")}
         >
           <View style={styles.resumeIcon}>
             <Text style={styles.resumeEmoji}>📚</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.resumeTitle}>Commence ta première leçon</Text>
-            <Text style={styles.resumeSubtitle}>Choisis une matière pour démarrer.</Text>
+            <Text style={styles.resumeSubtitle}>
+              Choisis une matière pour démarrer.
+            </Text>
             <View style={styles.resumeTrack}>
-              <View style={[styles.resumeFill, { width: '0%' }]} />
+              <View style={[styles.resumeFill, { width: "0%" }]} />
             </View>
           </View>
           <View style={styles.resumePlayBtn}>
@@ -204,7 +254,7 @@ export default function HomeScreen() {
           title="Bibliothèque"
           subtitle="Ouvrages recommandés"
           action="Voir tout"
-          onAction={() => router.push('/books')}
+          onAction={() => router.push("/books")}
         />
         {booksQuery.isLoading && books.length === 0 ? (
           <View style={styles.bookCarouselLoader}>
@@ -230,7 +280,7 @@ export default function HomeScreen() {
                   key={b.id}
                   book={{
                     title: b.title,
-                    subject: b.subject?.name ?? 'Général',
+                    subject: b.subject?.name ?? "Général",
                     color: palette.color,
                     accent: palette.accent,
                     free: b.is_free,
@@ -253,22 +303,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   // Hero
   hero: {
-    backgroundColor: '#3DBE45',
+    backgroundColor: "#3DBE45",
     paddingHorizontal: 20,
     paddingBottom: 64,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
-    position: 'relative',
-    overflow: 'hidden',
+    position: "relative",
+    overflow: "hidden",
   },
   dotGrid: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     right: 12,
     width: 80,
     height: 80,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
     opacity: 0.18,
   },
@@ -276,150 +326,150 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: "rgba(255,255,255,0.22)",
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255,255,255,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarText: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 16,
-    color: '#fff',
+    color: "#fff",
   },
   greeting: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: "Poppins_400Regular",
     fontSize: 12,
-    color: 'rgba(255,255,255,0.85)',
+    color: "rgba(255,255,255,0.85)",
   },
   heroName: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 15.5,
-    color: '#fff',
+    color: "#fff",
   },
   iconBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   progressCard: {
     marginTop: 16,
     padding: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderColor: "rgba(255,255,255,0.2)",
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
   },
   daysBox: {
     width: 52,
     height: 52,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   daysNum: {
-    fontFamily: 'Poppins_800ExtraBold',
+    fontFamily: "Poppins_800ExtraBold",
     fontSize: 20,
-    color: '#3DBE45',
+    color: "#3DBE45",
     lineHeight: 22,
     letterSpacing: -0.5,
   },
   daysMonth: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 9,
-    color: '#3DBE45',
+    color: "#3DBE45",
     lineHeight: 11,
-    textTransform: 'capitalize',
+    textTransform: "capitalize",
   },
   progressTitle: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 13,
-    color: '#fff',
+    color: "#fff",
   },
   progressTrack: {
     marginTop: 6,
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    overflow: 'hidden',
+    backgroundColor: "rgba(255,255,255,0.28)",
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
-    backgroundColor: '#fff',
+    height: "100%",
+    backgroundColor: "#fff",
     borderRadius: 3,
   },
   progressPct: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: "Poppins_400Regular",
     fontSize: 11,
-    color: 'rgba(255,255,255,0.85)',
+    color: "rgba(255,255,255,0.85)",
     marginTop: 4,
   },
   bookCarouselLoader: {
     paddingVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   // Body
   quickRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginBottom: 22,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
     marginBottom: 12,
     marginTop: 4,
     paddingHorizontal: 4,
   },
   sectionTitle: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 15,
-    color: '#1A2027',
+    color: "#1A2027",
     letterSpacing: -0.2,
   },
   sectionSubtitle: {
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: "Poppins_500Medium",
     fontSize: 11,
-    color: '#9AA3AC',
+    color: "#9AA3AC",
     flexShrink: 1,
   },
   sectionAction: {
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: "Poppins_500Medium",
     fontSize: 12,
-    color: '#3DBE45',
+    color: "#3DBE45",
     flexShrink: 0,
   },
   // Resume card
   resumeCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
     marginBottom: 22,
-    shadowColor: '#1A2027',
+    shadowColor: "#1A2027",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
     shadowRadius: 10,
@@ -429,47 +479,47 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   resumeTitle: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 13.5,
-    color: '#1A2027',
+    color: "#1A2027",
   },
   resumeSubtitle: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: "Poppins_400Regular",
     fontSize: 11.5,
-    color: '#9AA3AC',
+    color: "#9AA3AC",
     marginTop: 2,
   },
   resumeTrack: {
     marginTop: 8,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E6E8EB',
-    overflow: 'hidden',
+    backgroundColor: "#E6E8EB",
+    overflow: "hidden",
   },
   resumeFill: {
-    height: '100%',
-    backgroundColor: '#3DBE45',
+    height: "100%",
+    backgroundColor: "#3DBE45",
     borderRadius: 2,
   },
   resumePlayBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EAF7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#EAF7EB",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   resumePlayText: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 20,
-    color: '#3DBE45',
+    color: "#3DBE45",
     lineHeight: 22,
     marginTop: -2,
   },
@@ -479,113 +529,113 @@ const styles = StyleSheet.create({
   // Modal / Bottom sheet
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(11,20,16,0.55)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(11,20,16,0.55)",
+    justifyContent: "flex-end",
   },
   sheetCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 22,
     paddingBottom: 36,
-    alignItems: 'center',
+    alignItems: "center",
   },
   sheetHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E6E8EB',
+    backgroundColor: "#E6E8EB",
     marginBottom: 18,
   },
   premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#FBEDE8',
+    backgroundColor: "#FBEDE8",
   },
   premiumBadgeText: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 11,
-    color: '#D38576',
+    color: "#D38576",
     letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   sheetTitle: {
-    fontFamily: 'Poppins_800ExtraBold',
+    fontFamily: "Poppins_800ExtraBold",
     fontSize: 20,
-    color: '#1A2027',
+    color: "#1A2027",
     letterSpacing: -0.4,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 20,
     marginBottom: 6,
   },
   sheetBody: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: "Poppins_400Regular",
     fontSize: 13,
-    color: '#5A6470',
+    color: "#5A6470",
     lineHeight: 20,
-    textAlign: 'center',
+    textAlign: "center",
     maxWidth: 280,
   },
   featureList: {
-    width: '100%',
+    width: "100%",
     marginTop: 18,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 14,
     padding: 14,
     gap: 8,
   },
   featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   featureCheck: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#3DBE45',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#3DBE45",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   featureText: {
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: "Poppins_500Medium",
     fontSize: 13,
-    color: '#1A2027',
+    color: "#1A2027",
   },
   premiumBtn: {
-    width: '100%',
+    width: "100%",
     height: 54,
     marginTop: 18,
     borderRadius: 27,
-    backgroundColor: '#3DBE45',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#3DBE45',
+    backgroundColor: "#3DBE45",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#3DBE45",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 6,
   },
   premiumBtnText: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 15,
-    color: '#fff',
+    color: "#fff",
   },
   laterBtn: {
-    width: '100%',
+    width: "100%",
     height: 44,
     marginTop: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   laterBtnText: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 13.5,
-    color: '#5A6470',
+    color: "#5A6470",
   },
 });
