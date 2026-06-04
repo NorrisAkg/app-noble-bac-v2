@@ -49,6 +49,7 @@ export default function QuizSessionScreen() {
   const drawerAnim = useRef(new Animated.Value(300)).current;
   const [drawerVisible, setDrawerVisible] = useState(false);
   const drawerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoNextTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOnline = useOnlineStatus();
   const pendingAnswers = useRef<PendingAnswer[]>([]);
@@ -77,6 +78,7 @@ export default function QuizSessionScreen() {
   useEffect(() => {
     return () => {
       if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
+      if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
     };
   }, []);
 
@@ -142,10 +144,19 @@ export default function QuizSessionScreen() {
       setAnswerResult({ isCorrect: false, correctOptionId: null, explanation: null });
     }
 
-    drawerTimerRef.current = setTimeout(showDrawer, 600);
+    drawerTimerRef.current = setTimeout(() => {
+      showDrawer();
+      if (!isLast) {
+        autoNextTimerRef.current = setTimeout(handleNext, 700);
+      }
+    }, 600);
   };
 
   const handleNext = async () => {
+    if (autoNextTimerRef.current) {
+      clearTimeout(autoNextTimerRef.current);
+      autoNextTimerRef.current = null;
+    }
     if (!isLast) {
       hideDrawer(() => {
         setIdx((i) => i + 1);
@@ -283,9 +294,9 @@ export default function QuizSessionScreen() {
             </View>
           )}
 
-          {answerResult?.explanation ? (
+          {/* answerResult?.explanation ? (
             <Text style={styles.drawerExplanation}>{answerResult.explanation}</Text>
-          ) : null}
+          ) : null */}
 
           <TouchableOpacity
             style={styles.drawerBtn}
