@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { ChevronRight, Play } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
 
 interface ChapterRowCardProps {
   title: string;
@@ -30,7 +31,13 @@ export const ChapterRowCard: React.FC<ChapterRowCardProps> = ({
         </View>
       ) : (
         <View style={styles.videoIcon}>
-          <Play size={18} color="#3DBE45" fill="#3DBE45" style={{ marginLeft: 3 }} />
+          <Svg width={32} height={22} viewBox="0 0 32 22">
+            <Path
+              d="M31.3 3.4A4 4 0 0 0 28.5.6C26 0 16 0 16 0S6 0 3.5.6A4 4 0 0 0 .7 3.4C0 5.9 0 11 0 11s0 5.1.7 7.6A4 4 0 0 0 3.5 21.4C6 22 16 22 16 22s10 0 12.5-.6a4 4 0 0 0 2.8-2.8C32 16.1 32 11 32 11s0-5.1-.7-7.6z"
+              fill="#FF0000"
+            />
+            <Path d="M13 15.5l8.5-4.5L13 6.5v9z" fill="#fff" />
+          </Svg>
         </View>
       )}
 
@@ -91,7 +98,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#EAF7EB',
+    backgroundColor: '#F5F6F7',
     alignItems: 'center',
     justifyContent: 'center',
   },
