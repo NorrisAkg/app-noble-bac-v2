@@ -4,7 +4,7 @@ import type { ApiResponse, PaymentTransaction } from '@/types/api';
 /**
  * Reponse de POST /api/v1/payments/initiate.
  * `transaction` contient le statut initial (pending) + l'internal_reference.
- * `payment_url` est l'URL hostee CinetPay a charger dans la WebView mobile.
+ * `payment_url` est l'URL FedaPay a charger dans la WebView mobile.
  */
 export interface InitiatePaymentResponse {
   transaction: PaymentTransaction;
@@ -13,9 +13,9 @@ export interface InitiatePaymentResponse {
 
 /**
  * POST /api/v1/payments/initiate
- * Cree une Transaction en base (status=pending) et renvoie l'URL CinetPay
+ * Cree une Transaction en base (status=pending) et renvoie l'URL FedaPay
  * a ouvrir cote mobile. L'activation reelle de l'abonnement se fait via le
- * webhook backend, jamais via la reponse synchrone CinetPay (cf
+ * webhook backend, jamais via la reponse synchrone FedaPay (cf
  * api/.claude/CLAUDE.md).
  */
 export async function initiatePayment(
@@ -31,9 +31,9 @@ export async function initiatePayment(
 /**
  * GET /api/v1/payments/{transaction}/status
  * Renvoie le statut courant de la transaction. Si encore `pending` cote local,
- * le backend interroge CinetPay et met a jour si besoin avant de repondre.
+ * le backend interroge FedaPay et met a jour si besoin avant de repondre.
  * Le mobile poll cet endpoint pendant le checkout pour detecter une
- * confirmation rapide sans dependre du redirect retour CinetPay.
+ * confirmation rapide sans dependre du redirect retour FedaPay.
  */
 export async function getPaymentStatus(
   transactionId: number,

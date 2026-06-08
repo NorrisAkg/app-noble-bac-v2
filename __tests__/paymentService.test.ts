@@ -32,7 +32,7 @@ describe('paymentService', () => {
     it('POST /payments/initiate avec le bon body et deballe data', async () => {
       const response: InitiatePaymentResponse = {
         transaction: transactionFixture,
-        payment_url: 'https://checkout.cinetpay.com/payment/abc123',
+        payment_url: 'https://checkout.fedapay.com/payment/abc123',
       };
       mockedApiClient.post.mockResolvedValueOnce({
         data: { success: true, message: 'Paiement initié.', data: response },
@@ -43,7 +43,7 @@ describe('paymentService', () => {
       expect(mockedApiClient.post).toHaveBeenCalledWith('/payments/initiate', {
         subscription_plan_id: 1,
       });
-      expect(result.payment_url).toBe('https://checkout.cinetpay.com/payment/abc123');
+      expect(result.payment_url).toBe('https://checkout.fedapay.com/payment/abc123');
       expect(result.transaction.id).toBe(101);
       expect(result.transaction.status).toBe('pending');
     });
@@ -61,7 +61,7 @@ describe('paymentService', () => {
         status: 'confirmed',
         webhook_received_at: '2026-05-18T10:02:00Z',
         confirmed_at: '2026-05-18T10:02:00Z',
-        gateway_transaction_id: 'cnp_xyz',
+        gateway_transaction_id: 'fdp_xyz',
       };
       mockedApiClient.get.mockResolvedValueOnce({
         data: { success: true, message: 'OK', data: confirmed },
@@ -71,7 +71,7 @@ describe('paymentService', () => {
 
       expect(mockedApiClient.get).toHaveBeenCalledWith('/payments/101/status');
       expect(result.status).toBe('confirmed');
-      expect(result.gateway_transaction_id).toBe('cnp_xyz');
+      expect(result.gateway_transaction_id).toBe('fdp_xyz');
     });
 
     it('renvoie un statut failed sans erreur (cas paiement rejete)', async () => {

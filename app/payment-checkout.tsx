@@ -21,7 +21,7 @@ import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
 import type { TransactionStatus } from '@/types/api';
 
 /**
- * Intervalle entre deux polls de statut. CinetPay confirme generalement en
+ * Intervalle entre deux polls de statut. FedaPay confirme generalement en
  * ~10-30s apres saisie OTP utilisateur. 4s est un compromis charge/UX.
  */
 const POLL_INTERVAL_MS = 4_000;
