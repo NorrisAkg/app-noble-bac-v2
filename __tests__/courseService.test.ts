@@ -89,13 +89,13 @@ describe('courseService', () => {
     expect(mockedApiClient.get).toHaveBeenCalledWith('/courses/chapters/3/chapter-videos');
   });
 
-  it('getChapterVideo returns the youtube_video_id', async () => {
+  it('getChapterVideo returns video_provider and video_id', async () => {
     mockedApiClient.get.mockResolvedValueOnce({
       data: {
         success: true,
         message: 'OK',
         data: {
-          id: 5, title: 'V1', description: null, youtube_video_id: 'abc123',
+          id: 5, title: 'V1', description: null, video_provider: 'youtube', video_id: 'abc123',
           duration_sec: 600, thumbnail_url: null, is_free: true, status: 'published',
           chapter: { id: 3, title: 'Chapitre 3' },
         },
@@ -105,6 +105,7 @@ describe('courseService', () => {
     const video = await courseService.getChapterVideo(5);
 
     expect(mockedApiClient.get).toHaveBeenCalledWith('/courses/chapter-videos/5');
-    expect(video.youtube_video_id).toBe('abc123');
+    expect(video.video_id).toBe('abc123');
+    expect(video.video_provider).toBe('youtube');
   });
 });

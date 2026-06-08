@@ -116,7 +116,8 @@ export interface ChapterVideoListItem {
   id: number;
   title: string;
   description: string | null;
-  youtube_video_id: string;
+  video_provider: 'youtube' | 'vimeo';
+  video_id: string;
   duration_sec: number | null;
   thumbnail_url: string | null;
   is_free: boolean;

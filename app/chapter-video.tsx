@@ -38,10 +38,14 @@ export default function ChapterVideoScreen() {
     }
   }, [isForbidden, showPremium, router]);
 
-  const embedHtml = video
-    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#000;height:100%}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube.com/embed/${encodeURIComponent(
-        video.youtube_video_id,
-      )}?rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></body></html>`
+  const embedSrc = video
+    ? video.video_provider === 'vimeo'
+      ? `https://player.vimeo.com/video/${encodeURIComponent(video.video_id)}?autoplay=1`
+      : `https://www.youtube.com/embed/${encodeURIComponent(video.video_id)}?rel=0&playsinline=1`
+    : '';
+
+  const embedHtml = embedSrc
+    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#000;height:100%}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="${embedSrc}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></body></html>`
     : '';
 
   return (
