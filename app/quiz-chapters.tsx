@@ -21,8 +21,6 @@ import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import type { Chapter } from '@/types/api';
 
-const QUIZ_MIN_QUESTIONS = 3;
-
 export default function QuizChaptersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -32,8 +30,8 @@ export default function QuizChaptersScreen() {
   }>();
 
   const chaptersQuery = useQuery({
-    queryKey: ['courses', 'chapters', Number(subjectId)],
-    queryFn: () => courseService.getChapters(Number(subjectId)),
+    queryKey: ['quiz', 'chapters', Number(subjectId)],
+    queryFn: () => courseService.getQuizChapters(Number(subjectId)),
     enabled: !!subjectId,
   });
 
@@ -102,24 +100,21 @@ export default function QuizChaptersScreen() {
           {chapters.length === 0 && (
             <EmptyState
               illustration={IllustrationEmptyCourses}
-              title="Aucun chapitre publié"
-              description="Aucun chapitre n'est encore disponible pour cette matière."
+              title="Aucun quiz disponible"
+              description="Aucun quiz n'est encore disponible pour cette matière."
             />
           )}
 
           {chapters.map((chapter) => {
-            const count = chapter.quiz_questions_count ?? 0;
-            const isQuizable = count >= QUIZ_MIN_QUESTIONS;
             const best = bestScores[chapter.id];
             const hasHistory = !!best;
 
             return (
               <TouchableOpacity
                 key={chapter.id}
-                onPress={() => (isQuizable ? handlePickChapter(chapter) : null)}
-                disabled={!isQuizable}
+                onPress={() => handlePickChapter(chapter)}
                 activeOpacity={0.7}
-                style={[styles.card, !isQuizable && styles.cardDisabled]}
+                style={styles.card}
               >
                 <SubjectIcon
                   kind={backendSlugToSubjectKind(chapter.icon_slug)}
@@ -129,27 +124,21 @@ export default function QuizChaptersScreen() {
 
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle} numberOfLines={2}>{chapter.title}</Text>
-                  <Text style={[styles.cardMeta, isQuizable && hasHistory && styles.cardMetaGreen]}>
-                    {isQuizable
-                      ? (hasHistory ? 'En cours' : 'Commencez le Quiz')
-                      : 'Bientôt disponible'}
+                  <Text style={[styles.cardMeta, hasHistory && styles.cardMetaGreen]}>
+                    {hasHistory ? 'En cours' : 'Commencez le Quiz'}
                   </Text>
                 </View>
 
-                {isQuizable ? (
-                  <View style={styles.rightSlot}>
-                    {hasHistory ? (
-                      <>
-                        <Text style={styles.score}>{best.score}/{best.total}</Text>
-                        <ChevronRight size={20} color={C.green} strokeWidth={2.4} />
-                      </>
-                    ) : (
-                      <Lock size={20} color={C.green} strokeWidth={2} />
-                    )}
-                  </View>
-                ) : (
-                  <Lock size={16} color="#9AA3AC" />
-                )}
+                <View style={styles.rightSlot}>
+                  {hasHistory ? (
+                    <>
+                      <Text style={styles.score}>{best.score}/{best.total}</Text>
+                      <ChevronRight size={20} color={C.green} strokeWidth={2.4} />
+                    </>
+                  ) : (
+                    <Lock size={20} color={C.green} strokeWidth={2} />
+                  )}
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -228,9 +217,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 10,
     elevation: 2,
-  },
-  cardDisabled: {
-    opacity: 0.55,
   },
   cardTitle: {
     fontFamily: 'Poppins_700Bold',

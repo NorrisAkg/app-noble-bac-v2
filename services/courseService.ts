@@ -42,6 +42,17 @@ export const courseService = {
   },
 
   /**
+   * GET /api/v1/quiz/subjects/{subjectId}/chapters
+   * Retourne uniquement les chapitres dont le quiz est publié par l'admin (quiz_published = true).
+   */
+  getQuizChapters: async (subjectId: number): Promise<Chapter[]> => {
+    const response = await apiClient.get<ApiResponse<Chapter[]>>(
+      `/quiz/subjects/${subjectId}/chapters`,
+    );
+    return response.data.data;
+  },
+
+  /**
    * GET /api/v1/courses/chapters/{chapterId}/lessons
    */
   getLessons: async (chapterId: number): Promise<Lesson[]> => {

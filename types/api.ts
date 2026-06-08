@@ -58,6 +58,8 @@ export interface Chapter {
   } | null;
   /** Nombre de questions de quiz publiées dans ce chapitre (peut être 0). */
   quiz_questions_count?: number;
+  /** true si l'admin a explicitement publié le quiz de ce chapitre côté backend. */
+  quiz_published?: boolean;
 }
 
 export interface Lesson {
