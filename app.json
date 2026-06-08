@@ -40,6 +40,14 @@
       ],
       "expo-secure-store",
       "expo-video",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#3DBE45",
+          "sounds": []
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/auth"
     ],
