@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Animated,
   ActivityIndicator,
   Alert,
@@ -226,10 +225,7 @@ export default function QuizSessionScreen() {
       </View>
 
       {/* Question + options */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.scrollContent}>
         <Text style={styles.questionText}>{q.statement}</Text>
 
         <View style={styles.optionsCard}>
@@ -267,7 +263,7 @@ export default function QuizSessionScreen() {
             );
           })}
         </View>
-      </ScrollView>
+      </View>
 
       {/* Explanation drawer */}
       {drawerVisible && (
@@ -365,10 +361,10 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   scrollContent: {
-    flexGrow: 1,
+    flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 240,
+    paddingBottom: 20,
   },
   questionText: {
     fontFamily: 'Poppins_600SemiBold',
@@ -381,6 +377,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   optionsCard: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 20,
     overflow: 'hidden',
@@ -391,9 +388,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   optRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 60,
     paddingHorizontal: 18,
     paddingVertical: 14,
     gap: 12,
