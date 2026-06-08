@@ -275,7 +275,7 @@ export interface MeStats {
  */
 export interface ExamListItem {
   id: number;
-  year: number;
+  year: { id: number; value: number };
   session: string | null;
   country: { id: number; name: string; iso_code: string };
   series: { id: number; code: string };

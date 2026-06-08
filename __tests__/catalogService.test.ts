@@ -18,7 +18,7 @@ describe('catalogService', () => {
         data: [
           {
             id: 1,
-            year: 2024,
+            year: { id: 1, value: 2024 },
             session: 'Juin',
             country: { id: 1, name: 'Sénégal', iso_code: 'SN' },
             series: { id: 7, name: 'S2' },
@@ -40,7 +40,7 @@ describe('catalogService', () => {
       params: { subject_id: 3, country_id: 1, series_id: 7, per_page: 100 },
     });
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].year).toBe(2024);
+    expect(result.data[0].year.value).toBe(2024);
     expect(result.meta?.total).toBe(1);
   });
 
@@ -51,7 +51,7 @@ describe('catalogService', () => {
         message: 'OK',
         data: {
           id: 42,
-          year: 2024,
+          year: { id: 2, value: 2024 },
           session: null,
           country: { id: 1, name: 'CI', iso_code: 'CI' },
           series: { id: 1, name: 'C' },

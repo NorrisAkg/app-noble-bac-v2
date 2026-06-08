@@ -92,7 +92,7 @@ export default function LibraryScreen() {
 
   // Annees dispo : extraites des exams retournes, tri desc.
   const availableYears = useMemo(
-    () => Array.from(new Set(exams.map((e) => e.year))).sort((a, b) => b - a),
+    () => Array.from(new Set(exams.map((e) => e.year.value))).sort((a, b) => b - a),
     [exams],
   );
 
@@ -104,7 +104,7 @@ export default function LibraryScreen() {
   }, [availableYears, year]);
 
   const examForYear = useMemo<ExamListItem | undefined>(
-    () => exams.find((e) => e.year === year),
+    () => exams.find((e) => e.year.value === year),
     [exams, year],
   );
 
@@ -306,7 +306,7 @@ export default function LibraryScreen() {
 
           {examForYear != null && tab === 'epreuve' && (
             <DocCard
-              title={`${currentSubject?.name ?? ''} · BAC ${examForYear.year}`}
+              title={`${currentSubject?.name ?? ''} · BAC ${examForYear.year.value}`}
               meta={examForYear.session ? `Session ${examForYear.session}` : 'Annale officielle'}
               extra={`Bac ${examForYear.series.code} · ${examForYear.country.name}`}
               kind="pdf"
@@ -317,7 +317,7 @@ export default function LibraryScreen() {
 
           {examForYear != null && tab === 'corrige' && (
             <DocCard
-              title={`Corrigé · ${currentSubject?.name ?? ''} ${examForYear.year}`}
+              title={`Corrigé · ${currentSubject?.name ?? ''} ${examForYear.year.value}`}
               meta={isPremium ? 'Corrigé complet' : 'Premium requis'}
               extra={`Bac ${examForYear.series.code} · ${examForYear.country.name}`}
               kind="pdf-green"
