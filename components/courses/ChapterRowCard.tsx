@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 
 interface ChapterRowCardProps {
   title: string;
@@ -27,7 +27,12 @@ export const ChapterRowCard: React.FC<ChapterRowCardProps> = ({
     >
       {mode === 'pdf' ? (
         <View style={styles.pdfIcon}>
-          <Text style={styles.pdfText}>PDF</Text>
+          <Svg width={28} height={28} viewBox="0 0 28 28">
+            <Rect x="0" y="0" width="28" height="28" rx="5" ry="5" fill="#3B8FD4" />
+            <Circle cx="20" cy="8" r="4" fill="#F5C842" />
+            <Path d="M0 28 L10 12 L20 28 Z" fill="#3A7D44" opacity="0.7" />
+            <Path d="M12 28 L20 16 L28 28 Z" fill="#4CAF62" />
+          </Svg>
         </View>
       ) : (
         <View style={styles.videoIcon}>
@@ -85,14 +90,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#FCE9E5',
+    backgroundColor: '#D6EAFF',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pdfText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 10,
-    color: '#E14B36',
   },
   videoIcon: {
     width: 44,
