@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, ImageSourcePropType, ViewStyle } from 'react-native';
+import { View, Image, ImageSourcePropType, ViewStyle } from 'react-native';
 import { C } from '@/constants/theme';
 
 export type SubjectKind =
@@ -89,31 +89,10 @@ interface SubjectIconProps {
 
 export const SubjectIcon: React.FC<SubjectIconProps> = ({ kind, size = 36, plain = false, style }) => {
   const typedKind = kind as SubjectKind | undefined;
-  const source = typedKind ? SUBJECT_SOURCES[typedKind] : undefined;
-  const bg = plain ? 'transparent' : (typedKind && SUBJECT_TILE_BG[typedKind]) || C.greenSoft;
+  const resolvedKind: SubjectKind = (typedKind && SUBJECT_SOURCES[typedKind]) ? typedKind : 'bonus';
+  const source = SUBJECT_SOURCES[resolvedKind];
+  const bg = plain ? 'transparent' : SUBJECT_TILE_BG[resolvedKind] ?? C.greenSoft;
   const radius = plain ? 0 : Math.round(size * 0.28);
-
-  if (!source) {
-    return (
-      <View
-        style={[
-          {
-            width: size, height: size, borderRadius: radius, backgroundColor: bg,
-            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          },
-          style,
-        ]}
-      >
-        <Text style={{
-          fontFamily: 'Poppins_700Bold',
-          fontSize: size * 0.4,
-          color: C.green,
-        }}>
-          {(kind || '?').slice(0, 1).toUpperCase()}
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <View
@@ -129,7 +108,7 @@ export const SubjectIcon: React.FC<SubjectIconProps> = ({ kind, size = 36, plain
       <Image
         source={source}
         resizeMode="contain"
-        accessibilityLabel={kind}
+        accessibilityLabel={kind ?? 'bonus'}
         style={{ width: '74%', height: '74%' }}
       />
     </View>
