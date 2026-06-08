@@ -53,6 +53,12 @@ import { QueryProvider, queryClient } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
 import { prefetchAllData } from '@/services/prefetchService';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+
+function PushNotificationInitializer() {
+  usePushNotifications();
+  return null;
+}
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -155,6 +161,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryProvider>
+        {isAuthenticated && <PushNotificationInitializer />}
         <PremiumGateProvider>
           <ThemeProvider value={DefaultTheme}>
             <Stack screenOptions={{ headerShown: false }}>
