@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
@@ -16,14 +15,16 @@ import { Search } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePremiumGate } from "@/hooks/usePremiumGate";
+import { AdsBanner } from "@/components/home/AdsBanner";
 import { QuickAction } from "@/components/home/QuickAction";
 import { BookCover } from "@/components/home/BookCover";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IllustrationEmptyBooks } from "@/components/ui/EmptyIllustrations";
 import { getNextBacDate } from "@/constants/bacDates";
+import { adsService } from "@/services/adsService";
 import { catalogService } from "@/services/catalogService";
 import { getProfile } from "@/services/profileService";
-import type { Book, UserProfile } from "@/types/api";
+import type { Advertisement, Book, UserProfile } from "@/types/api";
 
 // Palette deterministe pour habiller les covers livres (le backend n'expose
 // pas de couleur de couverture). Indexe par subject.id, fallback gris.
@@ -115,6 +116,13 @@ export default function HomeScreen() {
   });
   const books: Book[] = booksQuery.data?.data ?? [];
 
+  const adsQuery = useQuery<Advertisement[]>({
+    queryKey: ["home", "ads"],
+    queryFn: adsService.getAds,
+    staleTime: 15 * 60 * 1000,
+  });
+  const ads: Advertisement[] = adsQuery.data ?? [];
+
   const { guard, isPremium } = usePremiumGate();
 
   const firstName = user?.first_name ?? "Étudiant";
@@ -205,16 +213,7 @@ export default function HomeScreen() {
       >
         {/* Quick actions */}
         <View style={styles.quickRow}>
-          <QuickAction
-            label="Cours"
-            icon="book"
-            onPress={() => router.push("/(tabs)/courses")}
-          />
-          <QuickAction
-            label="Annales"
-            icon="paper"
-            onPress={() => router.push("/(tabs)/library")}
-          />
+          <AdsBanner ads={ads} />
           <QuickAction
             label="Premium"
             icon="star"

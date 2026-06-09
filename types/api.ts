@@ -1,5 +1,12 @@
 // ─── Domain Models ────────────────────────────────────────────────────────────
 
+export interface Advertisement {
+  id: string;
+  image_url: string;
+  link_url: string;
+  order: number;
+}
+
 export interface User {
   id: string;
   first_name: string;
