@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { courseService } from '@/services/courseService';
+import { quizService } from '@/services/quizService';
 import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
@@ -26,8 +26,8 @@ export default function QuizSubjectsScreen() {
   const router = useRouter();
 
   const subjectsQuery = useQuery({
-    queryKey: ['courses', 'subjects'],
-    queryFn: courseService.getSubjects,
+    queryKey: ['quiz', 'subjects'],
+    queryFn: quizService.getSubjects,
     staleTime: 24 * 60 * 60 * 1000,
   });
   const subjects: Subject[] = subjectsQuery.data ?? [];

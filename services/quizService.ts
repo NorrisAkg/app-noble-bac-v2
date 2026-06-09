@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import type { ApiResponse } from "@/types/api";
+import type { ApiResponse, Subject } from "@/types/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,15 @@ export interface QuizSessionHistoryItem {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const quizService = {
+  /**
+   * GET /api/v1/quiz/subjects
+   * Retourne les matières ayant au moins un chapitre quiz publié pour la série de l'utilisateur.
+   */
+  getSubjects: async (): Promise<Subject[]> => {
+    const response = await apiClient.get<ApiResponse<Subject[]>>("/quiz/subjects");
+    return response.data.data;
+  },
+
   /**
    * POST /api/v1/quiz/sessions
    * Démarre une session pour un chapitre. Le backend tire toutes les questions
