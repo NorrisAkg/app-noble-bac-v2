@@ -184,8 +184,13 @@ export interface LoginPayload {
 export interface VerifyOtpPayload {
   /** E.164 format */
   phone: string;
-  /** Firebase ID Token issued after on-device OTP success */
-  id_token: string;
+  /** 6-digit OTP code received on WhatsApp via Twilio Verify */
+  code: string;
+}
+
+export interface SendOtpPayload {
+  /** E.164 format */
+  phone: string;
 }
 
 export interface RequestPasswordResetPayload {
@@ -196,9 +201,9 @@ export interface RequestPasswordResetPayload {
 export interface ResetPasswordPayload {
   /** E.164 format */
   phone: string;
-  /** Firebase ID Token issued after on-device OTP success — must carry the same phone */
-  id_token: string;
-  /** New password, min 8 chars (backend enforces "confirmed" rule) */
+  /** 6-digit OTP code received on WhatsApp via Twilio Verify */
+  code: string;
+  /** New 4-digit PIN (backend enforces "confirmed" rule) */
   password: string;
   password_confirmation: string;
 }

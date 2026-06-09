@@ -5,6 +5,7 @@ import type {
   VerifyOtpPayload,
   RequestPasswordResetPayload,
   ResetPasswordPayload,
+  SendOtpPayload,
   AuthUserResponse,
   LoginResponse,
   ApiResponse,
@@ -12,7 +13,8 @@ import type {
 
 /**
  * POST /api/v1/auth/register
- * Creates a new account. The user must then verify their phone via OTP.
+ * Creates a new account and triggers a WhatsApp OTP via Twilio Verify.
+ * The user must then verify their phone via /auth/verify-otp.
  */
 export async function register(payload: RegisterPayload): Promise<AuthUserResponse> {
   const { data } = await apiClient.post<AuthUserResponse>('/auth/register', payload);
@@ -21,9 +23,8 @@ export async function register(payload: RegisterPayload): Promise<AuthUserRespon
 
 /**
  * POST /api/v1/auth/verify-otp
- * Verifies the Firebase ID Token produced after a successful on-device OTP step.
- * On success, marks phone_verified_at and **issues** access + refresh tokens
- * (auto-login post-OTP). Same response shape as /login.
+ * Submits the 6-digit OTP code to the backend. Twilio Verify validates it.
+ * On success, marks phone_verified_at and issues access + refresh tokens (auto-login).
  */
 export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginResponse> {
   const { data } = await apiClient.post<LoginResponse>('/auth/verify-otp', payload);
@@ -58,9 +59,8 @@ export async function refreshToken(): Promise<LoginResponse> {
 
 /**
  * POST /api/v1/auth/password/request-reset
- * Probe used by the mobile to confirm the phone is known before starting the
- * Firebase OTP flow on-device. The backend ALWAYS responds 200 to avoid phone
- * enumeration — it does not send any OTP itself.
+ * Confirms the phone is registered and dispatches a WhatsApp OTP via Twilio Verify.
+ * Always responds 200 to avoid phone-number enumeration.
  */
 export async function requestPasswordReset(
   payload: RequestPasswordResetPayload,
@@ -71,10 +71,20 @@ export async function requestPasswordReset(
 
 /**
  * POST /api/v1/auth/password/reset
- * Reset the password after the on-device Firebase OTP has produced an ID Token.
+ * Resets the password after Twilio Verify validates the 6-digit OTP code.
  * Backend revokes all existing Sanctum tokens on success.
  */
 export async function resetPassword(payload: ResetPasswordPayload): Promise<ApiResponse<null>> {
   const { data } = await apiClient.post<ApiResponse<null>>('/auth/password/reset', payload);
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/send-otp
+ * Requests a new WhatsApp OTP dispatch for the given phone.
+ * Used by the resend button on the verify screen.
+ */
+export async function sendOtp(payload: SendOtpPayload): Promise<ApiResponse<null>> {
+  const { data } = await apiClient.post<ApiResponse<null>>('/auth/send-otp', payload);
   return data;
 }

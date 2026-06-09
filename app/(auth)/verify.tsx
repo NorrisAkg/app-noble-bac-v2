@@ -6,8 +6,8 @@ import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Button } from '@/components/ui/Button';
 import { Delete } from 'lucide-react-native';
-import { firebaseAuthService, FirebaseOtpError } from '@/services/firebaseAuthService';
-import { verifyOtp } from '@/services/authService';
+import { otpService, OtpError } from '@/services/otpService';
+import { verifyOtp, sendOtp } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getApiErrorMessage } from '@/utils/apiError';
 
@@ -44,35 +44,19 @@ export default function VerifyScreen() {
 
   const [code, setCode] = useState('');
   const [resendIn, setResendIn] = useState(45);
-  const [verificationId, setVerificationId] = useState<string | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [sendingOtp, setSendingOtp] = useState(false);
 
-  // Envoi du SMS au mount (et a chaque clic "Renvoyer le code")
-  const sendOtp = useCallback(async () => {
-    if (!phone) return;
-    setSendingOtp(true);
-    setVerificationError(null);
-    try {
-      const vid = await firebaseAuthService.sendVerificationCode(phone);
-      setVerificationId(vid);
-    } catch (e) {
-      setVerificationError(
-        e instanceof FirebaseOtpError ? e.message : getApiErrorMessage(e),
-      );
-    } finally {
-      setSendingOtp(false);
-    }
-  }, [phone]);
-
+  // The OTP was already dispatched by the register endpoint.
+  // On mount we just log the bypass hint (no-op in production).
   useEffect(() => {
     if (!phone) {
       Alert.alert('Erreur', 'Numéro de téléphone manquant.');
       router.back();
       return;
     }
-    sendOtp();
-  }, [phone, router, sendOtp]);
+    otpService.acknowledgeOtpSent(phone);
+  }, [phone, router]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -91,11 +75,8 @@ export default function VerifyScreen() {
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      if (!verificationId) {
-        throw new FirebaseOtpError('Aucune verification en cours. Redemande un code.');
-      }
-      const idToken = await firebaseAuthService.confirmVerificationCode(verificationId, code);
-      return verifyOtp({ phone, id_token: idToken });
+      const validatedCode = otpService.validateCode(code);
+      return verifyOtp({ phone, code: validatedCode });
     },
     onSuccess: (res) => {
       // ORDRE CRITIQUE : navigate AVANT setAuth.
@@ -116,7 +97,7 @@ export default function VerifyScreen() {
       void setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
     },
     onError: (error) => {
-      const message = error instanceof FirebaseOtpError
+      const message = error instanceof OtpError
         ? error.message
         : getApiErrorMessage(error);
       Alert.alert('Vérification échouée', message);
@@ -125,15 +106,25 @@ export default function VerifyScreen() {
   });
 
   const handleVerify = () => {
-    if (!isFilled || !verificationId) return;
+    if (!isFilled || isPending) return;
     mutate();
   };
 
-  const handleResend = async () => {
+  const handleResend = useCallback(async () => {
+    if (!phone) return;
     setCode('');
     setResendIn(45);
-    await sendOtp();
-  };
+    setSendingOtp(true);
+    setVerificationError(null);
+    try {
+      await sendOtp({ phone });
+      otpService.acknowledgeOtpSent(phone);
+    } catch (e) {
+      setVerificationError(getApiErrorMessage(e));
+    } finally {
+      setSendingOtp(false);
+    }
+  }, [phone]);
 
   return (
     <View className="flex-1 bg-white">
@@ -144,7 +135,7 @@ export default function VerifyScreen() {
           Vérification
         </Text>
         <Text className="text-center font-poppins text-[14.5px] text-brand-ink-medium mt-3 leading-5">
-          Saisis le code à 6 chiffres envoyé au{'\n'}
+          Saisis le code à 6 chiffres envoyé sur WhatsApp au{'\n'}
           <Text className="font-poppins-medium">{phone || '+225 01 XX XX XX'}</Text>
         </Text>
 
@@ -160,7 +151,7 @@ export default function VerifyScreen() {
         {verificationError && (
           <View className="bg-[#FBEDE8] border border-[#E14B36] rounded-xl p-3 mx-1 mt-3">
             <Text className="font-poppins-semibold text-xs text-[#A93122] mb-0.5">
-              Envoi SMS impossible
+              Envoi WhatsApp impossible
             </Text>
             <Text className="font-poppins text-xs text-[#A93122] leading-4">
               {verificationError}
@@ -176,7 +167,7 @@ export default function VerifyScreen() {
 
         <Button
           onPress={handleVerify}
-          disabled={!isFilled || !verificationId || isPending}
+          disabled={!isFilled || isPending}
           loading={isPending}
           shape="rounded"
           className={!isFilled ? 'bg-[#C7CCD2]' : ''}

@@ -7,47 +7,39 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { resetPassword } from '@/services/authService';
-import { firebaseAuthService, FirebaseOtpError } from '@/services/firebaseAuthService';
+import { otpService, OtpError } from '@/services/otpService';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const { phone } = useLocalSearchParams<{ phone: string }>();
 
-  const [verificationId, setVerificationId] = useState<string | null>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPwd, setShowPwd] = useState(false);
 
+  // The OTP was dispatched by /auth/password/request-reset in forgot.tsx.
+  // On mount we just log the bypass hint (no-op in production).
   useEffect(() => {
     if (!phone) {
       Alert.alert('Erreur', 'Numéro de téléphone manquant.');
       router.back();
       return;
     }
-    firebaseAuthService
-      .sendVerificationCode(phone)
-      .then(setVerificationId)
-      .catch((e) => {
-        setVerificationError(
-          e instanceof FirebaseOtpError ? e.message : getApiErrorMessage(e),
-        );
-      });
+    otpService.acknowledgeOtpSent(String(phone));
   }, [phone, router]);
 
   const codeValid = code.length === 6;
   const passwordValid = password.length === 4 && password === passwordConfirm;
-  const isValid = codeValid && passwordValid && !!verificationId;
+  const isValid = codeValid && passwordValid;
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      if (!verificationId) throw new FirebaseOtpError('Aucune verification en cours. Redemande un code.');
-      const idToken = await firebaseAuthService.confirmVerificationCode(verificationId, code);
+      const validatedCode = otpService.validateCode(code);
       return resetPassword({
         phone: String(phone),
-        id_token: idToken,
+        code: validatedCode,
         password,
         password_confirmation: passwordConfirm,
       });
@@ -60,7 +52,7 @@ export default function ResetPasswordScreen() {
       );
     },
     onError: (error) => {
-      const message = error instanceof FirebaseOtpError
+      const message = error instanceof OtpError
         ? error.message
         : getApiErrorMessage(error);
       Alert.alert('Échec', message);
@@ -80,22 +72,11 @@ export default function ResetPasswordScreen() {
             Vérification + nouveau mot de passe
           </Text>
           <Text className="font-poppins text-sm text-brand-ink-medium mt-1.5 mb-6 leading-5">
-            Saisis le code à 6 chiffres envoyé au {phone || ''}, puis choisis un nouveau code PIN à 4 chiffres.
+            Saisis le code à 6 chiffres reçu sur WhatsApp au {phone || ''}, puis choisis un nouveau code PIN à 4 chiffres.
           </Text>
 
-          {verificationError && (
-            <View className="bg-[#FBEDE8] border border-[#E14B36] rounded-xl p-3 mb-5">
-              <Text className="font-poppins-semibold text-xs text-[#A93122] mb-0.5">
-                Vérification SMS indisponible
-              </Text>
-              <Text className="font-poppins text-xs text-[#A93122] leading-4">
-                {verificationError}
-              </Text>
-            </View>
-          )}
-
           <Input
-            label="Code SMS"
+            label="Code WhatsApp"
             placeholder="• • • • • •"
             keyboardType="number-pad"
             maxLength={6}
