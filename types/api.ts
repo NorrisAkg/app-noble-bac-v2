@@ -41,6 +41,7 @@ export interface Series {
 export interface Subject {
   id: number;
   name: string;
+  short_name?: string;
   slug: string;
   icon_slug: string;
   chapter_count: number;
@@ -67,6 +68,8 @@ export interface Chapter {
   quiz_questions_count?: number;
   /** true si l'admin a explicitement publié le quiz de ce chapitre côté backend. */
   quiz_published?: boolean;
+  /** true si le chapitre possède une vidéo publiée. */
+  has_video?: boolean;
 }
 
 export interface Lesson {

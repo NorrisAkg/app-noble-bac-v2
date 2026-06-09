@@ -46,7 +46,7 @@ export default function CoursesScreen() {
 
   const subjects: SubjectChip[] = (apiSubjects ?? []).map((s: Subject) => ({
     k: String(s.id),
-    label: s.name,
+    label: s.short_name ?? s.name,
     id: s.id,
   }));
 
@@ -232,7 +232,7 @@ export default function CoursesScreen() {
             />
           ))}
 
-          {!chaptersLoading && chapters && tab === 'videos' && chapters.map((chapter) => (
+          {!chaptersLoading && chapters && tab === 'videos' && chapters.filter(c => c.has_video).map((chapter) => (
             <ChapterRowCard
               key={chapter.id}
               title={chapter.title}
