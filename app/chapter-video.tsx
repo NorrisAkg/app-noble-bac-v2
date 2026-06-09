@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,14 @@ import { courseService } from '@/services/courseService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 
+function buildEmbedUri(provider: string, videoId: string): string {
+  const id = encodeURIComponent(videoId);
+  if (provider === 'vimeo') {
+    return `https://player.vimeo.com/video/${id}?autoplay=1`;
+  }
+  return `https://www.youtube.com/watch?v=${id}`;
+}
+
 export default function ChapterVideoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -19,6 +27,9 @@ export default function ChapterVideoScreen() {
     title?: string;
     subject?: string;
   }>();
+
+  const [webviewLoading, setWebviewLoading] = useState(true);
+  const [webviewError, setWebviewError] = useState(false);
 
   const { data: video, isLoading, error } = useQuery({
     queryKey: ['courses', 'chapter-video', videoId],
@@ -38,15 +49,7 @@ export default function ChapterVideoScreen() {
     }
   }, [isForbidden, showPremium, router]);
 
-  const embedSrc = video
-    ? video.video_provider === 'vimeo'
-      ? `https://player.vimeo.com/video/${encodeURIComponent(video.video_id)}?autoplay=1`
-      : `https://www.youtube.com/embed/${encodeURIComponent(video.video_id)}?rel=0&playsinline=1`
-    : '';
-
-  const embedHtml = embedSrc
-    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#000;height:100%}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="${embedSrc}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></body></html>`
-    : '';
+  const embedUri = video ? buildEmbedUri(video.video_provider, video.video_id) : null;
 
   return (
     <View style={styles.container}>
@@ -81,15 +84,35 @@ export default function ChapterVideoScreen() {
           </View>
         )}
 
-        {!isLoading && video && !error && (
-          <WebView
-            originWhitelist={['*']}
-            source={{ html: embedHtml }}
-            style={styles.webview}
-            allowsFullscreenVideo
-            javaScriptEnabled
-            mediaPlaybackRequiresUserAction={false}
-          />
+        {!isLoading && video && !error && webviewError && (
+          <View style={styles.centered}>
+            <Text style={styles.errorTitle}>Vidéo indisponible</Text>
+            <Text style={styles.errorText}>Impossible de charger cette vidéo.</Text>
+          </View>
+        )}
+
+        {!isLoading && embedUri && !error && !webviewError && (
+          <View style={styles.webviewContainer}>
+            <WebView
+              originWhitelist={['*']}
+              source={{ uri: embedUri }}
+              style={styles.webview}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              mediaPlaybackRequiresUserAction={false}
+              onLoadStart={() => setWebviewLoading(true)}
+              onLoadEnd={() => setWebviewLoading(false)}
+              onError={() => { setWebviewLoading(false); setWebviewError(true); }}
+              onHttpError={(e) => {
+                if (e.nativeEvent.statusCode >= 400) { setWebviewLoading(false); setWebviewError(true); }
+              }}
+            />
+            {webviewLoading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color="#3DBE45" />
+              </View>
+            )}
+          </View>
         )}
       </View>
 
@@ -156,8 +179,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19,
   },
+  webviewContainer: {
+    flex: 1,
+  },
   webview: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
