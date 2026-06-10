@@ -97,6 +97,24 @@ export const IllustrationEmptyDocs: React.FC<EmptyIllustrationProps> = ({ size, 
   </Svg>
 );
 
+/** Cloche — boîte de notifications vide. */
+export const IllustrationEmptyNotifications: React.FC<EmptyIllustrationProps> = ({ size, ...rest }) => (
+  <Svg viewBox="0 0 280 220" {...dims(size)} {...rest}>
+    <Backdrop id="empty_notif" from="#3DBE45" to="#3DBE45" />
+    {/* Corps de la cloche */}
+    <Path d="M140 60 C140 60 108 72 108 112 v20 h64 v-20 C172 72 140 60 140 60 z" fill="#fff" stroke="#E6E8EB" strokeWidth={2} />
+    {/* Battant */}
+    <Rect x={133} y={132} width={14} height={16} rx={7} fill="#3DBE45" />
+    {/* Tige */}
+    <Rect x={137} y={52} width={6} height={12} rx={3} fill="#9AA3AC" />
+    {/* Lignes ondes */}
+    <Path d="M96 88 C88 96 88 110 96 118" stroke="#EAF7EB" strokeWidth={4} fill="none" strokeLinecap="round" />
+    <Path d="M184 88 C192 96 192 110 184 118" stroke="#EAF7EB" strokeWidth={4} fill="none" strokeLinecap="round" />
+    <Circle cx={200} cy={80} r={4} fill="#E8A090" />
+    <Circle cx={86} cy={148} r={3} fill="#3DBE45" />
+  </Svg>
+);
+
 /** Livre ouvert vide — chapitres / leçons / quiz non publiés. */
 export const IllustrationEmptyCourses: React.FC<EmptyIllustrationProps> = ({ size, ...rest }) => (
   <Svg viewBox="0 0 280 220" {...dims(size)} {...rest}>

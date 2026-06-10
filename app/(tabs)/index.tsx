@@ -11,7 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Search } from "lucide-react-native";
+import { Search, Bell } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePremiumGate } from "@/hooks/usePremiumGate";
@@ -24,6 +24,7 @@ import { getNextBacDate } from "@/constants/bacDates";
 import { adsService } from "@/services/adsService";
 import { catalogService } from "@/services/catalogService";
 import { getProfile } from "@/services/profileService";
+import { getUnreadCount } from "@/services/notificationApiService";
 import type { Advertisement, Book, UserProfile } from "@/types/api";
 
 // Palette deterministe pour habiller les covers livres (le backend n'expose
@@ -125,6 +126,13 @@ export default function HomeScreen() {
 
   const { guard, isPremium } = usePremiumGate();
 
+  const unreadQuery = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: getUnreadCount,
+    staleTime: 60 * 1000,
+  });
+  const unreadCount = unreadQuery.data ?? 0;
+
   const firstName = user?.first_name ?? "Étudiant";
   const initials = firstName[0]?.toUpperCase() ?? "E";
 
@@ -172,6 +180,20 @@ export default function HomeScreen() {
             onPress={() => router.push("/search")}
           >
             <Search size={18} color="#fff" strokeWidth={1.8} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/notifications")}
+          >
+            <Bell size={18} color="#fff" strokeWidth={1.8} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -364,6 +386,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#E14B36",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontFamily: "Poppins_700Bold",
+    fontSize: 9,
+    color: "#fff",
+    lineHeight: 11,
   },
   progressCard: {
     marginTop: 16,

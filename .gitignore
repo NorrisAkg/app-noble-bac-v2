@@ -50,3 +50,6 @@ templates
 # generated native folders
 /ios
 /android
+
+# IDE
+.idea/
