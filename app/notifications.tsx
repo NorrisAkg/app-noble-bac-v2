@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -11,15 +12,18 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, CheckCheck } from 'lucide-react-native';
+import { ChevronLeft, CheckCheck, Trash2 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteNotification,
+  deleteAllNotifications,
   type AppNotification,
 } from '@/services/notificationApiService';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyNotifications } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
@@ -41,9 +45,11 @@ function formatDate(dateStr: string): string {
 function NotificationRow({
   item,
   onMarkRead,
+  onDelete,
 }: {
   item: AppNotification;
   onMarkRead: (id: number) => void;
+  onDelete: (item: AppNotification) => void;
 }) {
   return (
     <TouchableOpacity
@@ -61,6 +67,13 @@ function NotificationRow({
         </Text>
         <Text style={styles.rowDate}>{formatDate(item.created_at)}</Text>
       </View>
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={() => onDelete(item)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Trash2 size={16} color={C.ink3} strokeWidth={2} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -94,13 +107,68 @@ export default function NotificationsScreen() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: NOTIF_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: UNREAD_COUNT_KEY });
+    },
+    onError: (err) => {
+      Alert.alert('Suppression impossible', getApiErrorMessage(err));
+    },
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: deleteAllNotifications,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: NOTIF_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: UNREAD_COUNT_KEY });
+    },
+    onError: (err) => {
+      Alert.alert('Suppression impossible', getApiErrorMessage(err));
+    },
+  });
+
+  const confirmDelete = useCallback(
+    (item: AppNotification) => {
+      Alert.alert('Supprimer cette notification ?', item.title, [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => deleteMutation.mutate(item.id),
+        },
+      ]);
+    },
+    [deleteMutation],
+  );
+
+  const confirmDeleteAll = () => {
+    Alert.alert(
+      'Tout effacer ?',
+      'Toutes tes notifications seront définitivement supprimées.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Tout effacer',
+          style: 'destructive',
+          onPress: () => deleteAllMutation.mutate(),
+        },
+      ],
+    );
+  };
+
   const hasUnread = notifications.some((n) => !n.is_read);
 
   const renderItem = useCallback(
     ({ item }: { item: AppNotification }) => (
-      <NotificationRow item={item} onMarkRead={(id) => markReadMutation.mutate(id)} />
+      <NotificationRow
+        item={item}
+        onMarkRead={(id) => markReadMutation.mutate(id)}
+        onDelete={confirmDelete}
+      />
     ),
-    [markReadMutation],
+    [markReadMutation, confirmDelete],
   );
 
   return (
@@ -113,17 +181,26 @@ export default function NotificationsScreen() {
           <ChevronLeft size={22} color={C.ink} strokeWidth={2} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        {hasUnread ? (
-          <TouchableOpacity
-            style={styles.markAllBtn}
-            onPress={() => markAllMutation.mutate()}
-            disabled={markAllMutation.isPending}
-          >
-            <CheckCheck size={18} color={C.green} strokeWidth={2} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
+        <View style={styles.headerActions}>
+          {hasUnread && (
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => markAllMutation.mutate()}
+              disabled={markAllMutation.isPending}
+            >
+              <CheckCheck size={18} color={C.green} strokeWidth={2} />
+            </TouchableOpacity>
+          )}
+          {notifications.length > 0 && (
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending}
+            >
+              <Trash2 size={18} color={C.danger} strokeWidth={2} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {isLoading ? (
@@ -182,11 +259,21 @@ const styles = StyleSheet.create({
     color: C.ink,
     textAlign: 'center',
   },
-  markAllBtn: {
+  headerActions: {
+    flexDirection: 'row',
+    minWidth: 40,
+    justifyContent: 'flex-end',
+  },
+  headerBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  deleteBtn: {
+    padding: 4,
+    marginTop: 2,
+    flexShrink: 0,
   },
   loader: {
     flex: 1,

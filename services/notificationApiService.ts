@@ -59,3 +59,17 @@ export async function markNotificationRead(id: number): Promise<AppNotification>
 export async function markAllNotificationsRead(): Promise<void> {
   await apiClient.post('/me/notifications/read-all');
 }
+
+/**
+ * DELETE /api/v1/me/notifications/{id}
+ */
+export async function deleteNotification(id: number): Promise<void> {
+  await apiClient.delete(`/me/notifications/${id}`);
+}
+
+/**
+ * DELETE /api/v1/me/notifications
+ */
+export async function deleteAllNotifications(): Promise<void> {
+  await apiClient.delete('/me/notifications');
+}
