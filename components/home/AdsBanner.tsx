@@ -77,7 +77,7 @@ export const AdsBanner: React.FC<Props> = ({ ads }) => {
                 onPress={() => Linking.openURL(item.link_url)}
               >
                 <Image
-                  source={{ uri: item.image_url }}
+                  source={{ uri: item.image_url ?? undefined }}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
                 />

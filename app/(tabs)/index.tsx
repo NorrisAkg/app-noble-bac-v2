@@ -131,7 +131,10 @@ export default function HomeScreen() {
     queryFn: adsService.getAds,
     staleTime: 15 * 60 * 1000,
   });
-  const ads: Advertisement[] = adsQuery.data ?? [];
+  // Une pub sans créa résolue (R2 non configuré en dev) ne doit rien afficher.
+  const ads: Advertisement[] = (adsQuery.data ?? []).filter(
+    (ad) => ad.image_url !== null,
+  );
 
   // Citations motivantes — rotation côté client (cf. maquette), liste stable.
   const quotesQuery = useQuery<Quote[]>({
@@ -364,6 +367,14 @@ export default function HomeScreen() {
           <View style={styles.bookCarouselLoader}>
             <ActivityIndicator color="#3DBE45" />
           </View>
+        ) : booksQuery.isError && books.length === 0 ? (
+          <EmptyState
+            illustration={IllustrationEmptyBooks}
+            title="Impossible de charger les livres"
+            description="Vérifie ta connexion puis réessaie."
+            ctaLabel="Réessayer"
+            onCtaPress={() => booksQuery.refetch()}
+          />
         ) : books.length === 0 ? (
           <EmptyState
             illustration={IllustrationEmptyBooks}

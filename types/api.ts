@@ -2,7 +2,8 @@
 
 export interface Advertisement {
   id: string;
-  image_url: string;
+  /** URL signée R2 ou URL externe ; null quand R2 n'est pas configuré (dev). */
+  image_url: string | null;
   link_url: string;
   order: number;
 }
