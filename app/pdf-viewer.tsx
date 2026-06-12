@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { catalogService } from '@/services/catalogService';
 import { courseService } from '@/services/courseService';
+import { upsertLastRead } from '@/services/meService';
 import { getCachedPdfUri } from '@/services/pdfCacheService';
 import { declareDownload, listDownloads } from '@/services/myDownloadsService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
@@ -95,6 +96,35 @@ export default function PdfViewerScreen() {
     (downloadsData?.downloads ?? []).some(
       (d) => d.downloadable_type === downloadable.type && d.downloadable_id === downloadable.id,
     );
+
+  // ── Déclaration « Reprendre » (fiches de révision uniquement) ─────────────
+  // Le viewer PDF.js remonte la page courante via postMessage (type 'page').
+  // On PATCH /me/last-read à la fermeture du viewer avec la position finale.
+  // Les livres et annales ne déclarent rien (périmètre : leçons + fiches).
+  const pageCurrentRef = useRef(1);
+  const pageTotalRef = useRef(0);
+  const renderedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (!revisionSheetId || !renderedRef.current) return;
+      const total = pageTotalRef.current;
+      const current = Math.min(pageCurrentRef.current, total || 1);
+
+      // Fire-and-forget : la déclaration ne doit jamais gêner la navigation.
+      upsertLastRead({
+        readable_type: 'revision_sheet',
+        readable_id: Number(revisionSheetId),
+        page_current: current,
+        page_total: total > 0 ? total : null,
+        progress_pct: total > 0 ? Math.round((current / total) * 100) : null,
+      })
+        .then(() =>
+          queryClient.invalidateQueries({ queryKey: ['me', 'last-read'] }),
+        )
+        .catch(() => {});
+    };
+  }, [revisionSheetId, queryClient]);
 
   const handleLoadError = useCallback((err: any, resourceLabel: string) => {
     console.error('Failed to load PDF URL:', err);
@@ -347,7 +377,12 @@ export default function PdfViewerScreen() {
               const msg = JSON.parse(event.nativeEvent.data);
               if (msg.type === 'rendered') {
                 setLoading(false);
+                renderedRef.current = true;
+                if (typeof msg.pages === 'number') pageTotalRef.current = msg.pages;
                 console.log('[PdfViewer] rendered', msg.pages, 'pages');
+              } else if (msg.type === 'page') {
+                if (typeof msg.current === 'number') pageCurrentRef.current = msg.current;
+                if (typeof msg.total === 'number') pageTotalRef.current = msg.total;
               } else if (msg.type === 'error') {
                 console.warn('[PdfViewer] PDF.js error:', msg.message);
                 // On NE BASCULE PLUS vers l'ecran d'erreur RN — on laisse la

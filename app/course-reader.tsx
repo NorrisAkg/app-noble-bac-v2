@@ -1,13 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { TexRenderer } from '@/components/courses/TexRenderer';
 import { courseService } from '@/services/courseService';
+import { upsertLastRead } from '@/services/meService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { C } from '@/constants/theme';
@@ -45,6 +46,42 @@ export default function CourseReaderScreen() {
     }
   }, [status, showPremium, router]);
 
+  // ── Déclaration « Reprendre » ────────────────────────────────────────────
+  // Mesure du scroll pour PATCH /me/last-read à la fermeture du reader.
+  // Refs (et non states) : lues dans le cleanup sans re-render.
+  const queryClient = useQueryClient();
+  const maxProgressPctRef = useRef(0);
+  const viewportHRef = useRef(0);
+  const contentHRef = useRef(0);
+  const lessonLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (status === 'ready' && lesson?.content) {
+      lessonLoadedRef.current = true;
+    }
+  }, [status, lesson?.content]);
+
+  useEffect(() => {
+    return () => {
+      if (!lessonLoadedRef.current || !lessonId) return;
+      // Leçon entièrement visible sans scroll → lue à 100 %.
+      const fitsViewport =
+        contentHRef.current > 0 && contentHRef.current <= viewportHRef.current;
+      const progressPct = fitsViewport ? 100 : maxProgressPctRef.current;
+
+      // Fire-and-forget : la déclaration ne doit jamais gêner la navigation.
+      upsertLastRead({
+        readable_type: 'lesson',
+        readable_id: Number(lessonId),
+        progress_pct: progressPct,
+      })
+        .then(() =>
+          queryClient.invalidateQueries({ queryKey: ['me', 'last-read'] }),
+        )
+        .catch(() => {});
+    };
+  }, [lessonId, queryClient]);
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -70,6 +107,27 @@ export default function CourseReaderScreen() {
         style={styles.content}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
+        onLayout={(e) => {
+          viewportHRef.current = e.nativeEvent.layout.height;
+        }}
+        onContentSizeChange={(_w, h) => {
+          contentHRef.current = h;
+        }}
+        scrollEventThrottle={100}
+        onScroll={(e) => {
+          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+          if (contentSize.height <= 0) return;
+          const pct = Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round(
+                ((contentOffset.y + layoutMeasurement.height) / contentSize.height) * 100,
+              ),
+            ),
+          );
+          if (pct > maxProgressPctRef.current) maxProgressPctRef.current = pct;
+        }}
       >
         {status === 'loading' && (
           <View style={styles.centered}>

@@ -13,9 +13,26 @@ export async function getMeStats(): Promise<MeStats> {
 
 /**
  * GET /api/v1/me/last-read
- * Dernière ressource ouverte (leçon ou annale), null si aucune.
+ * Dernière ressource ouverte (leçon ou fiche), null si aucune.
  */
 export async function getLastRead(): Promise<LastRead | null> {
   const { data } = await apiClient.get<ApiResponse<LastRead | null>>('/me/last-read');
+  return data.data;
+}
+
+/**
+ * PATCH /api/v1/me/last-read
+ * Déclare la lecture d'un contenu pour la carte « Reprendre » de l'accueil.
+ * Upsert côté backend : tous les champs sont réécrits, ne déclarer qu'à la
+ * fermeture du lecteur avec la progression finale de la session.
+ */
+export async function upsertLastRead(payload: {
+  readable_type: 'lesson' | 'revision_sheet';
+  readable_id: number;
+  page_current?: number | null;
+  page_total?: number | null;
+  progress_pct?: number | null;
+}): Promise<LastRead> {
+  const { data } = await apiClient.patch<ApiResponse<LastRead>>('/me/last-read', payload);
   return data.data;
 }

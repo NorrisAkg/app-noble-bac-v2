@@ -188,6 +188,8 @@
     pageIndicator.textContent = currentPage + ' / ' + totalPages;
     prevBtn.disabled = currentPage <= 1;
     nextBtn.disabled = currentPage >= totalPages;
+    // Remonte la position de lecture au RN (suivi « Reprendre » de l'accueil).
+    postRn({ type: 'page', current: currentPage, total: totalPages });
   }
 
   function renderPage(pageNum) {

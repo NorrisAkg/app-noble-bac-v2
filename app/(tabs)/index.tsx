@@ -32,7 +32,13 @@ import { getProfile } from "@/services/profileService";
 import { getUnreadCount } from "@/services/notificationApiService";
 import { quizService } from "@/services/quizService";
 import { quotesService } from "@/services/quotesService";
-import type { Advertisement, Book, LastRead, Quote, UserProfile } from "@/types/api";
+import type {
+  Advertisement,
+  Book,
+  LastRead,
+  Quote,
+  UserProfile,
+} from "@/types/api";
 
 // Plafond d'attente du skeleton : passé ce délai, on révèle l'écran avec les
 // états par section (spinner / EmptyState / erreur) même si une query traîne.
@@ -240,227 +246,248 @@ export default function HomeScreen() {
       <StatusBar style="light" />
 
       <Animated.View style={{ flex: 1 }} entering={FadeIn.duration(250)}>
-      {/* ── HERO HEADER ────────────────────────────────────────── */}
-      <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
-        {/* Dot-grid decoration */}
-        <View style={styles.dotGrid} pointerEvents="none">
-          {Array.from({ length: 25 }).map((_, i) => (
-            <View key={i} style={styles.dot} />
-          ))}
-        </View>
-
-        {/* Top row: avatar + name + search + bell */}
-        <View style={styles.heroTop}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+        {/* ── HERO HEADER ────────────────────────────────────────── */}
+        <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
+          {/* Dot-grid decoration */}
+          <View style={styles.dotGrid} pointerEvents="none">
+            {Array.from({ length: 25 }).map((_, i) => (
+              <View key={i} style={styles.dot} />
+            ))}
           </View>
 
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Salut,</Text>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {firstName} {user?.last_name ?? ""}
-            </Text>
+          {/* Top row: avatar + name + search + bell */}
+          <View style={styles.heroTop}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>Salut,</Text>
+              <Text style={styles.heroName} numberOfLines={1}>
+                {firstName} {user?.last_name ?? ""}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push("/search")}
+            >
+              <Search size={18} color="#fff" strokeWidth={1.8} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push("/notifications")}
+            >
+              <Bell size={18} color="#fff" strokeWidth={1.8} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push("/search")}
-          >
-            <Search size={18} color="#fff" strokeWidth={1.8} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push("/notifications")}
-          >
-            <Bell size={18} color="#fff" strokeWidth={1.8} />
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Progress card — countdown localise par pays, « prêt à X % »
+          {/* Progress card — countdown localise par pays, « prêt à X % »
             alimenté par /me/stats (moyenne des quiz, masqué sans session). */}
-        <View style={styles.progressCard}>
-          <View style={styles.daysBox}>
-            <Text style={styles.daysNum}>{bacDateParts.day}</Text>
-            <Text style={styles.daysMonth}>{bacDateParts.month}</Text>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.progressTitle} numberOfLines={1}>
-              {profile != null
-                ? `BAC ${bacDateFormatted} · ${profile.country.name} · Bac ${profile.series.code}`
-                : `BAC ${bacDateFormatted}`}
-            </Text>
-            <View style={styles.progressTrack}>
-              <View
-                style={[styles.progressFill, { width: `${readinessPct ?? 0}%` }]}
-              />
+          <View style={styles.progressCard}>
+            <View style={styles.daysBox}>
+              <Text style={styles.daysNum}>{bacDateParts.day}</Text>
+              <Text style={styles.daysMonth}>{bacDateParts.month}</Text>
             </View>
-            <Text style={styles.progressPct}>
-              Plus que <Text style={styles.progressPctBold}>{daysRemaining} jours</Text>
-              {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""}
-            </Text>
-          </View>
-        </View>
-      </View>
 
-      {/* ── Bande « Reprendre » — FIXE, chevauche le hero (cf. maquette).
-          Câblée sur /me/last-read, CTA d'amorçage quand rien n'est ouvert. */}
-      <View style={styles.resumeBand}>
-        <TouchableOpacity
-          style={styles.resumeCard}
-          activeOpacity={0.85}
-          onPress={() => {
-            if (lastRead?.readable_type === "lesson") {
-              router.push({
-                pathname: "/course-reader",
-                params: {
-                  lessonId: String(lastRead.readable_id),
-                  subject: lastRead.subject_name ?? "Cours",
-                },
-              });
-            } else if (lastRead != null) {
-              router.push("/(tabs)/library");
-            } else {
-              router.push("/(tabs)/courses");
-            }
-          }}
-        >
-          <View style={styles.resumeIcon}>
-            <Text style={styles.resumeEmoji}>📚</Text>
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.resumeEyebrow}>Reprendre</Text>
-            <Text style={styles.resumeTitle} numberOfLines={1}>
-              {lastRead != null
-                ? [lastRead.subject_name, lastRead.title]
-                    .filter(Boolean)
-                    .join(" · ") || "Ta dernière lecture"
-                : "Commence ta première leçon"}
-            </Text>
-            <View style={styles.resumeTrack}>
-              <View
-                style={[
-                  styles.resumeFill,
-                  { width: `${lastRead?.progress_pct ?? 0}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.resumeSubtitle}>
-              {lastRead != null
-                ? lastRead.page_current != null && lastRead.page_total != null
-                  ? `Page ${lastRead.page_current} / ${lastRead.page_total}`
-                  : "Reprends là où tu t'étais arrêté."
-                : "Choisis une matière pour démarrer."}
-            </Text>
-          </View>
-          <View style={styles.resumePlayBtn}>
-            <Text style={styles.resumePlayText}>›</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── SCROLLABLE BODY ─────────────────────────────────── */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={profileQuery.isRefetching || booksQuery.isRefetching}
-            onRefresh={() => {
-              profileQuery.refetch();
-              booksQuery.refetch();
-              adsQuery.refetch();
-              quotesQuery.refetch();
-              dailyQuizQuery.refetch();
-              lastReadQuery.refetch();
-              statsQuery.refetch();
-            }}
-            tintColor="#3DBE45"
-          />
-        }
-      >
-        {/* Quiz éclair du jour — masqué si rien n'est planifié pour la série */}
-        {dailyQuiz != null && <FlashQuizCard quiz={dailyQuiz} />}
-
-        {/* Bannière Premium — masquée pour les abonnés */}
-        {!isPremium && (
-          <PremiumBanner onPress={() => router.push("/subscription-plans")} />
-        )}
-
-        {/* Books carousel — donnees reelles depuis GET /courses/books */}
-        <SectionHeader
-          title="Bibliothèque"
-          subtitle="Ouvrages recommandés"
-          action="Voir tout"
-          onAction={() => router.push("/books")}
-        />
-        {booksQuery.isLoading && books.length === 0 ? (
-          <View style={styles.bookCarouselLoader}>
-            <ActivityIndicator color="#3DBE45" />
-          </View>
-        ) : booksQuery.isError && books.length === 0 ? (
-          <EmptyState
-            illustration={IllustrationEmptyBooks}
-            title="Impossible de charger les livres"
-            description="Vérifie ta connexion puis réessaie."
-            ctaLabel="Réessayer"
-            onCtaPress={() => booksQuery.refetch()}
-          />
-        ) : books.length === 0 ? (
-          <EmptyState
-            illustration={IllustrationEmptyBooks}
-            title="Aucun livre disponible"
-            description="De nouveaux livres seront bientôt ajoutés pour ta série."
-          />
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 14, paddingRight: 4 }}
-            style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
-          >
-            {books.map((b) => {
-              const palette = bookColors(b);
-              return (
-                <BookCover
-                  key={b.id}
-                  book={{
-                    title: b.title,
-                    subject: b.subject?.name ?? "Général",
-                    color: palette.color,
-                    accent: palette.accent,
-                    free: b.is_free,
-                  }}
-                  hidePremiumBadge={isPremium}
-                  onPress={() => handleBookPress(b)}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.progressTitle} numberOfLines={1}>
+                {profile != null
+                  ? `BAC ${bacDateFormatted} · ${profile.country.name} · Bac ${profile.series.code}`
+                  : `BAC ${bacDateFormatted}`}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${readinessPct ?? 0}%` },
+                  ]}
                 />
-              );
-            })}
-          </ScrollView>
-        )}
-
-        {/* Carrousel publicités externes — masqué sans pub active */}
-        <View style={{ marginTop: 26 }}>
-          <AdsBanner ads={ads} />
+              </View>
+              <Text style={styles.progressPct}>
+                Plus que{" "}
+                <Text style={styles.progressPctBold}>
+                  {daysRemaining} jours
+                </Text>
+                {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Citations motivantes — masquées sans citation active */}
-        {quotes.length > 0 && (
-          <>
-            <SectionHeader title="Un mot pour aujourd'hui" />
-            <QuoteCard quotes={quotes} />
-          </>
-        )}
-      </ScrollView>
+        {/* ── Bande « Reprendre » — FIXE, chevauche le hero (cf. maquette).
+          Câblée sur /me/last-read, CTA d'amorçage quand rien n'est ouvert. */}
+        <View style={styles.resumeBand}>
+          <TouchableOpacity
+            style={styles.resumeCard}
+            activeOpacity={0.85}
+            onPress={() => {
+              if (lastRead?.readable_type === "lesson") {
+                router.push({
+                  pathname: "/course-reader",
+                  params: {
+                    lessonId: String(lastRead.readable_id),
+                    subject: lastRead.subject_name ?? "Cours",
+                  },
+                });
+              } else if (lastRead?.readable_type === "revision_sheet") {
+                router.push({
+                  pathname: "/pdf-viewer",
+                  params: {
+                    revisionSheetId: String(lastRead.readable_id),
+                    title: lastRead.title ?? "Fiche de révision",
+                    subject: lastRead.subject_name ?? "",
+                  },
+                });
+              } else if (lastRead != null) {
+                router.push("/(tabs)/library");
+              } else {
+                router.push("/(tabs)/courses");
+              }
+            }}
+          >
+            <View style={styles.resumeIcon}>
+              <Text style={styles.resumeEmoji}>📚</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.resumeEyebrow}>
+                {lastRead != null ? "Reprendre" : "Pour commencer"}
+              </Text>
+              <Text style={styles.resumeTitle} numberOfLines={1}>
+                {lastRead != null
+                  ? [lastRead.subject_name, lastRead.title]
+                      .filter(Boolean)
+                      .join(" · ") || "Ta dernière lecture"
+                  : "Commence ta première leçon"}
+              </Text>
+              <View style={styles.resumeTrack}>
+                <View
+                  style={[
+                    styles.resumeFill,
+                    { width: `${lastRead?.progress_pct ?? 0}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.resumeSubtitle}>
+                {lastRead != null
+                  ? lastRead.page_current != null && lastRead.page_total != null
+                    ? `Page ${lastRead.page_current} / ${lastRead.page_total}`
+                    : "Reprends là où tu t'étais arrêté."
+                  : "Choisis une matière pour démarrer."}
+              </Text>
+            </View>
+            <View style={styles.resumePlayBtn}>
+              <Text style={styles.resumePlayText}>›</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── SCROLLABLE BODY ─────────────────────────────────── */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: 16,
+            paddingTop: 4,
+            paddingBottom: 20,
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={profileQuery.isRefetching || booksQuery.isRefetching}
+              onRefresh={() => {
+                profileQuery.refetch();
+                booksQuery.refetch();
+                adsQuery.refetch();
+                quotesQuery.refetch();
+                dailyQuizQuery.refetch();
+                lastReadQuery.refetch();
+                statsQuery.refetch();
+              }}
+              tintColor="#3DBE45"
+            />
+          }
+        >
+          {/* Quiz éclair du jour — masqué si rien n'est planifié pour la série */}
+          {dailyQuiz != null && <FlashQuizCard quiz={dailyQuiz} />}
+
+          {/* Bannière Premium — masquée pour les abonnés */}
+          {!isPremium && (
+            <PremiumBanner onPress={() => router.push("/subscription-plans")} />
+          )}
+
+          {/* Books carousel — donnees reelles depuis GET /courses/books */}
+          <SectionHeader
+            title="Bibliothèque"
+            subtitle="Ouvrages recommandés"
+            action="Voir tout"
+            onAction={() => router.push("/books")}
+          />
+          {booksQuery.isLoading && books.length === 0 ? (
+            <View style={styles.bookCarouselLoader}>
+              <ActivityIndicator color="#3DBE45" />
+            </View>
+          ) : booksQuery.isError && books.length === 0 ? (
+            <EmptyState
+              illustration={IllustrationEmptyBooks}
+              title="Impossible de charger les livres"
+              description="Vérifie ta connexion puis réessaie."
+              ctaLabel="Réessayer"
+              onCtaPress={() => booksQuery.refetch()}
+            />
+          ) : books.length === 0 ? (
+            <EmptyState
+              illustration={IllustrationEmptyBooks}
+              title="Aucun livre disponible"
+              description="De nouveaux livres seront bientôt ajoutés pour ta série."
+            />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 14, paddingRight: 4 }}
+              style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
+            >
+              {books.map((b) => {
+                const palette = bookColors(b);
+                return (
+                  <BookCover
+                    key={b.id}
+                    book={{
+                      title: b.title,
+                      subject: b.subject?.name ?? "Général",
+                      color: palette.color,
+                      accent: palette.accent,
+                      free: b.is_free,
+                    }}
+                    hidePremiumBadge={isPremium}
+                    onPress={() => handleBookPress(b)}
+                  />
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {/* Carrousel publicités externes — masqué sans pub active */}
+          <View style={{ marginTop: 26 }}>
+            <AdsBanner ads={ads} />
+          </View>
+
+          {/* Citations motivantes — masquées sans citation active */}
+          {quotes.length > 0 && (
+            <>
+              <SectionHeader title="Citations inspirantes" />
+              <QuoteCard quotes={quotes} />
+            </>
+          )}
+        </ScrollView>
       </Animated.View>
 
       {/* Premium gate handled globally via PremiumGateProvider (cf. _layout.tsx). */}
