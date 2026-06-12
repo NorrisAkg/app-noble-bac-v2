@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import type { ApiResponse, MeStats } from '@/types/api';
+import type { ApiResponse, LastRead, MeStats } from '@/types/api';
 
 /**
  * GET /api/v1/me/stats
@@ -8,5 +8,14 @@ import type { ApiResponse, MeStats } from '@/types/api';
  */
 export async function getMeStats(): Promise<MeStats> {
   const { data } = await apiClient.get<ApiResponse<MeStats>>('/me/stats');
+  return data.data;
+}
+
+/**
+ * GET /api/v1/me/last-read
+ * Dernière ressource ouverte (leçon ou annale), null si aucune.
+ */
+export async function getLastRead(): Promise<LastRead | null> {
+  const { data } = await apiClient.get<ApiResponse<LastRead | null>>('/me/last-read');
   return data.data;
 }

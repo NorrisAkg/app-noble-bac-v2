@@ -16,16 +16,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePremiumGate } from "@/hooks/usePremiumGate";
 import { AdsBanner } from "@/components/home/AdsBanner";
-import { QuickAction } from "@/components/home/QuickAction";
 import { BookCover } from "@/components/home/BookCover";
+import { FlashQuizCard } from "@/components/home/FlashQuizCard";
+import { PremiumBanner } from "@/components/home/PremiumBanner";
+import { QuoteCard } from "@/components/home/QuoteCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IllustrationEmptyBooks } from "@/components/ui/EmptyIllustrations";
 import { getNextBacDate } from "@/constants/bacDates";
 import { adsService } from "@/services/adsService";
 import { catalogService } from "@/services/catalogService";
+import { getLastRead, getMeStats } from "@/services/meService";
 import { getProfile } from "@/services/profileService";
 import { getUnreadCount } from "@/services/notificationApiService";
-import type { Advertisement, Book, UserProfile } from "@/types/api";
+import { quizService } from "@/services/quizService";
+import { quotesService } from "@/services/quotesService";
+import type { Advertisement, Book, LastRead, Quote, UserProfile } from "@/types/api";
 
 // Palette deterministe pour habiller les covers livres (le backend n'expose
 // pas de couleur de couverture). Indexe par subject.id, fallback gris.
@@ -108,6 +113,10 @@ export default function HomeScreen() {
       }),
     [countryCode],
   );
+  const daysRemaining = useMemo(() => {
+    const ms = getNextBacDate(countryCode).getTime() - Date.now();
+    return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+  }, [countryCode]);
 
   // Top 6 livres du catalog backend (filtres par scope cote backend via Sanctum user).
   const booksQuery = useQuery({
@@ -123,6 +132,41 @@ export default function HomeScreen() {
     staleTime: 15 * 60 * 1000,
   });
   const ads: Advertisement[] = adsQuery.data ?? [];
+
+  // Citations motivantes — rotation côté client (cf. maquette), liste stable.
+  const quotesQuery = useQuery<Quote[]>({
+    queryKey: ["home", "quotes"],
+    queryFn: quotesService.getQuotes,
+    staleTime: 60 * 60 * 1000,
+  });
+  const quotes: Quote[] = quotesQuery.data ?? [];
+
+  // Quiz éclair du jour — planifié par série, change à minuit.
+  const dailyQuizQuery = useQuery({
+    queryKey: ["home", "daily-quiz"],
+    queryFn: quizService.getDailyQuiz,
+    staleTime: 5 * 60 * 1000,
+  });
+  const dailyQuiz = dailyQuizQuery.data ?? null;
+
+  // Stats agrégées : alimente le « prêt à X % » du countdown.
+  const statsQuery = useQuery({
+    queryKey: ["me", "stats"],
+    queryFn: getMeStats,
+    staleTime: 60 * 1000,
+  });
+  const readinessPct =
+    statsQuery.data != null && statsQuery.data.quiz_count > 0
+      ? Math.round(statsQuery.data.average_score_pct)
+      : null;
+
+  // Dernière lecture pour la carte « Reprendre » (null si rien d'ouvert).
+  const lastReadQuery = useQuery<LastRead | null>({
+    queryKey: ["me", "last-read"],
+    queryFn: getLastRead,
+    staleTime: 60 * 1000,
+  });
+  const lastRead = lastReadQuery.data ?? null;
 
   const { guard, isPremium } = usePremiumGate();
 
@@ -197,9 +241,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Progress card — countdown localise par pays. Le pourcentage de
-            preparation est masque tant qu'aucun endpoint /me/stats n'existe
-            cote backend (a livrer en post-MVP, cf PLAN M-P2.7 TBD). */}
+        {/* Progress card — countdown localise par pays, « prêt à X % »
+            alimenté par /me/stats (moyenne des quiz, masqué sans session). */}
         <View style={styles.progressCard}>
           <View style={styles.daysBox}>
             <Text style={styles.daysNum}>{bacDateParts.day}</Text>
@@ -207,20 +250,84 @@ export default function HomeScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.progressTitle}>{bacDateFormatted}</Text>
-            <Text style={styles.progressPct}>
+            <Text style={styles.progressTitle} numberOfLines={1}>
               {profile != null
-                ? `${profile.country.name} · Bac ${profile.series.code}`
-                : "Chargement de ton scope…"}
+                ? `BAC ${bacDateFormatted} · ${profile.country.name} · Bac ${profile.series.code}`
+                : `BAC ${bacDateFormatted}`}
+            </Text>
+            <View style={styles.progressTrack}>
+              <View
+                style={[styles.progressFill, { width: `${readinessPct ?? 0}%` }]}
+              />
+            </View>
+            <Text style={styles.progressPct}>
+              Plus que <Text style={styles.progressPctBold}>{daysRemaining} jours</Text>
+              {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* ── SCROLLABLE BODY (overlaps hero bottom) ──────────── */}
+      {/* ── Bande « Reprendre » — FIXE, chevauche le hero (cf. maquette).
+          Câblée sur /me/last-read, CTA d'amorçage quand rien n'est ouvert. */}
+      <View style={styles.resumeBand}>
+        <TouchableOpacity
+          style={styles.resumeCard}
+          activeOpacity={0.85}
+          onPress={() => {
+            if (lastRead?.readable_type === "lesson") {
+              router.push({
+                pathname: "/course-reader",
+                params: {
+                  lessonId: String(lastRead.readable_id),
+                  subject: lastRead.subject_name ?? "Cours",
+                },
+              });
+            } else if (lastRead != null) {
+              router.push("/(tabs)/library");
+            } else {
+              router.push("/(tabs)/courses");
+            }
+          }}
+        >
+          <View style={styles.resumeIcon}>
+            <Text style={styles.resumeEmoji}>📚</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.resumeEyebrow}>Reprendre</Text>
+            <Text style={styles.resumeTitle} numberOfLines={1}>
+              {lastRead != null
+                ? [lastRead.subject_name, lastRead.title]
+                    .filter(Boolean)
+                    .join(" · ") || "Ta dernière lecture"
+                : "Commence ta première leçon"}
+            </Text>
+            <View style={styles.resumeTrack}>
+              <View
+                style={[
+                  styles.resumeFill,
+                  { width: `${lastRead?.progress_pct ?? 0}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.resumeSubtitle}>
+              {lastRead != null
+                ? lastRead.page_current != null && lastRead.page_total != null
+                  ? `Page ${lastRead.page_current} / ${lastRead.page_total}`
+                  : "Reprends là où tu t'étais arrêté."
+                : "Choisis une matière pour démarrer."}
+            </Text>
+          </View>
+          <View style={styles.resumePlayBtn}>
+            <Text style={styles.resumePlayText}>›</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── SCROLLABLE BODY ─────────────────────────────────── */}
       <ScrollView
-        style={{ flex: 1, marginTop: -36 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -228,47 +335,23 @@ export default function HomeScreen() {
             onRefresh={() => {
               profileQuery.refetch();
               booksQuery.refetch();
+              adsQuery.refetch();
+              quotesQuery.refetch();
+              dailyQuizQuery.refetch();
+              lastReadQuery.refetch();
+              statsQuery.refetch();
             }}
             tintColor="#3DBE45"
           />
         }
       >
-        {/* Quick actions */}
-        <View style={styles.quickRow}>
-          <AdsBanner ads={ads} />
-          <QuickAction
-            label="Premium"
-            icon="star"
-            accent
-            onPress={() => router.push("/subscription-plans")}
-          />
-        </View>
+        {/* Quiz éclair du jour — masqué si rien n'est planifié pour la série */}
+        {dailyQuiz != null && <FlashQuizCard quiz={dailyQuiz} />}
 
-        {/* Section « Reprendre » — CTA tant que le backend n'expose pas
-            l'historique de lecture (`/me/last-read` ou équivalent). On
-            affiche une carte d'amorçage qui pointe vers les cours, plutôt
-            que de masquer entièrement la section comme avant. */}
-        <TouchableOpacity
-          style={styles.resumeCard}
-          activeOpacity={0.85}
-          onPress={() => router.push("/(tabs)/courses")}
-        >
-          <View style={styles.resumeIcon}>
-            <Text style={styles.resumeEmoji}>📚</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.resumeTitle}>Commence ta première leçon</Text>
-            <Text style={styles.resumeSubtitle}>
-              Choisis une matière pour démarrer.
-            </Text>
-            <View style={styles.resumeTrack}>
-              <View style={[styles.resumeFill, { width: "0%" }]} />
-            </View>
-          </View>
-          <View style={styles.resumePlayBtn}>
-            <Text style={styles.resumePlayText}>›</Text>
-          </View>
-        </TouchableOpacity>
+        {/* Bannière Premium — masquée pour les abonnés */}
+        {!isPremium && (
+          <PremiumBanner onPress={() => router.push("/subscription-plans")} />
+        )}
 
         {/* Books carousel — donnees reelles depuis GET /courses/books */}
         <SectionHeader
@@ -312,6 +395,19 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
+        )}
+
+        {/* Carrousel publicités externes — masqué sans pub active */}
+        <View style={{ marginTop: 26 }}>
+          <AdsBanner ads={ads} />
+        </View>
+
+        {/* Citations motivantes — masquées sans citation active */}
+        {quotes.length > 0 && (
+          <>
+            <SectionHeader title="Un mot pour aujourd'hui" />
+            <QuoteCard quotes={quotes} />
+          </>
         )}
       </ScrollView>
 
@@ -462,17 +558,16 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.85)",
     marginTop: 4,
   },
+  progressPctBold: {
+    fontFamily: "Poppins_700Bold",
+    color: "#fff",
+  },
   bookCarouselLoader: {
     paddingVertical: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   // Body
-  quickRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 22,
-  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "baseline",
@@ -499,20 +594,32 @@ const styles = StyleSheet.create({
     color: "#3DBE45",
     flexShrink: 0,
   },
-  // Resume card
+  // Resume band (fixe, chevauche le hero — cf. maquette)
+  resumeBand: {
+    marginTop: -36,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    zIndex: 5,
+  },
   resumeCard: {
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    marginBottom: 22,
     shadowColor: "#1A2027",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  resumeEyebrow: {
+    fontFamily: "Poppins_700Bold",
+    fontSize: 10.5,
+    color: "#3DBE45",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   resumeIcon: {
     width: 48,

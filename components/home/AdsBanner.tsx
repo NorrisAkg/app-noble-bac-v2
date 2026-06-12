@@ -3,19 +3,25 @@ import {
   FlatList,
   Linking,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import type { Advertisement } from '@/types/api';
 
-const SLIDE_INTERVAL_MS = 3500;
-const CARD_HEIGHT = 92;
+const SLIDE_INTERVAL_MS = 4000;
+const CARD_HEIGHT = 124;
 
 interface Props {
   ads: Advertisement[];
 }
 
+/**
+ * Carrousel de publicités externes pleine largeur (cf. maquette home-v2) :
+ * créa image fournie par le back-office, tag « Publicité », rotation auto,
+ * dots sous le viewport. Rien n'est rendu quand aucune pub n'est active.
+ */
 export const AdsBanner: React.FC<Props> = ({ ads }) => {
   const listRef = useRef<FlatList<Advertisement>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -41,48 +47,53 @@ export const AdsBanner: React.FC<Props> = ({ ads }) => {
   }, [ads.length, scrollToNext]);
 
   if (ads.length === 0) {
-    return <View style={styles.placeholder} />;
+    return null;
   }
 
   return (
-    <View
-      style={styles.wrapper}
-      onLayout={(e) => setSlideWidth(e.nativeEvent.layout.width)}
-    >
-      {slideWidth > 0 && (
-        <FlatList
-          ref={listRef}
-          data={ads}
-          keyExtractor={(item) => item.id}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEnabled={false}
-          getItemLayout={(_, index) => ({
-            length: slideWidth,
-            offset: slideWidth * index,
-            index,
-          })}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={{ width: slideWidth, height: CARD_HEIGHT }}
-              onPress={() => Linking.openURL(item.link_url)}
-            >
-              <Image
-                source={{ uri: item.image_url }}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-              />
-            </TouchableOpacity>
-          )}
-        />
-      )}
+    <View style={styles.wrapper}>
+      <View
+        style={styles.viewport}
+        onLayout={(e) => setSlideWidth(e.nativeEvent.layout.width)}
+      >
+        {slideWidth > 0 && (
+          <FlatList
+            ref={listRef}
+            data={ads}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={false}
+            getItemLayout={(_, index) => ({
+              length: slideWidth,
+              offset: slideWidth * index,
+              index,
+            })}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={{ width: slideWidth, height: CARD_HEIGHT }}
+                onPress={() => Linking.openURL(item.link_url)}
+              >
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                />
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>Publicité</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        )}
+      </View>
       {ads.length > 1 && (
         <View style={styles.dots}>
-          {ads.map((_, i) => (
+          {ads.map((ad, i) => (
             <View
-              key={i}
+              key={ad.id}
               style={[styles.dot, i === activeIndex && styles.dotActive]}
             />
           ))}
@@ -94,40 +105,44 @@ export const AdsBanner: React.FC<Props> = ({ ads }) => {
 
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,
+    marginBottom: 26,
+  },
+  viewport: {
     height: CARD_HEIGHT,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#fff',
-    shadowColor: '#1A2027',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  placeholder: {
-    flex: 1,
-    height: CARD_HEIGHT,
-    borderRadius: 16,
     backgroundColor: '#E6E8EB',
   },
-  dots: {
+  tag: {
     position: 'absolute',
-    bottom: 6,
-    left: 0,
-    right: 0,
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 8.5,
+    letterSpacing: 0.5,
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'uppercase',
+  },
+  dots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 4,
+    gap: 5,
+    marginTop: 10,
   },
   dot: {
-    width: 5,
-    height: 5,
+    width: 6,
+    height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: '#E6E8EB',
   },
   dotActive: {
-    backgroundColor: '#fff',
-    width: 12,
+    width: 16,
+    backgroundColor: '#3DBE45',
   },
 });

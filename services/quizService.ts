@@ -20,6 +20,27 @@ export interface QuizSessionQuestion {
   options: QuizSessionOption[];
 }
 
+/** Question du jour renvoyée par GET /quiz/daily (null si rien de planifié). */
+export interface DailyQuiz {
+  id: string;
+  date: string;
+  question: {
+    id: number;
+    statement: string;
+    question_type: string;
+    difficulty: string | null;
+    subject: { id: number; name: string };
+    options: { id: number; label: string; order: number }[];
+  };
+}
+
+/** Verdict renvoyé par POST /quiz/daily/answer. */
+export interface DailyQuizAnswerResult {
+  is_correct: boolean;
+  correct_option_id: number;
+  explanation: string | null;
+}
+
 /** Session active renvoyée par /quiz/sessions (POST) et /quiz/sessions/{id} (GET). */
 export interface QuizSession {
   id: number;
@@ -167,5 +188,27 @@ export const quizService = {
       { params: { page, per_page: perPage, ...(subjectId ? { subject_id: subjectId } : {}) } },
     );
     return { data: response.data.data, meta: response.data.meta };
+  },
+
+  /**
+   * GET /api/v1/quiz/daily
+   * Question du jour planifiée pour la série de l'utilisateur.
+   * Renvoie null quand aucun quiz éclair n'est planifié aujourd'hui.
+   */
+  getDailyQuiz: async (): Promise<DailyQuiz | null> => {
+    const response = await apiClient.get<ApiResponse<DailyQuiz | null>>("/quiz/daily");
+    return response.data.data;
+  },
+
+  /**
+   * POST /api/v1/quiz/daily/answer
+   * Vérifie l'option choisie côté serveur : verdict + bonne réponse + explication.
+   */
+  answerDailyQuiz: async (optionId: number): Promise<DailyQuizAnswerResult> => {
+    const response = await apiClient.post<ApiResponse<DailyQuizAnswerResult>>(
+      "/quiz/daily/answer",
+      { option_id: optionId },
+    );
+    return response.data.data;
   },
 };

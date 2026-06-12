@@ -110,4 +110,54 @@ describe('quizService', () => {
     expect(result.data).toEqual([]);
     expect(result.meta?.current_page).toBe(1);
   });
+
+  it('getDailyQuiz returns the planned question for the user series', async () => {
+    const daily = {
+      id: 'dq-1',
+      date: '2026-06-12',
+      question: {
+        id: 7,
+        statement: 'Quelle est la dérivée de f(x) = x² ?',
+        question_type: 'mcq_single',
+        difficulty: 'easy',
+        subject: { id: 3, name: 'Mathématiques' },
+        options: [
+          { id: 21, label: 'x²', order: 1 },
+          { id: 22, label: '2x', order: 2 },
+        ],
+      },
+    };
+    mockedApiClient.get.mockResolvedValueOnce({
+      data: { success: true, message: 'OK', data: daily },
+    });
+
+    const result = await quizService.getDailyQuiz();
+
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/quiz/daily');
+    expect(result).toEqual(daily);
+  });
+
+  it('getDailyQuiz returns null when nothing is planned today', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({
+      data: { success: true, message: 'OK', data: null },
+    });
+
+    await expect(quizService.getDailyQuiz()).resolves.toBeNull();
+  });
+
+  it('answerDailyQuiz posts the option and returns the verdict', async () => {
+    mockedApiClient.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        message: 'OK',
+        data: { is_correct: false, correct_option_id: 22, explanation: 'La dérivée de x² est 2x.' },
+      },
+    });
+
+    const result = await quizService.answerDailyQuiz(21);
+
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/quiz/daily/answer', { option_id: 21 });
+    expect(result.is_correct).toBe(false);
+    expect(result.correct_option_id).toBe(22);
+  });
 });

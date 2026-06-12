@@ -7,6 +7,13 @@ export interface Advertisement {
   order: number;
 }
 
+/** Citation motivante renvoyée par GET /api/v1/quotes (rotation côté client). */
+export interface Quote {
+  id: string;
+  text: string;
+  author: string | null;
+}
+
 export interface User {
   id: string;
   first_name: string;
@@ -280,6 +287,22 @@ export interface MeStats {
   quiz_count: number;
   average_score_pct: number;
   exams_consulted: number;
+}
+
+/**
+ * Shape renvoyée par GET /api/v1/me/last-read (LastReadResource côté backend,
+ * null quand l'utilisateur n'a encore rien ouvert). Alimente la carte
+ * « Reprendre » de l'accueil.
+ */
+export interface LastRead {
+  readable_type: string;
+  readable_id: number;
+  title: string | null;
+  subject_name: string | null;
+  page_current: number | null;
+  page_total: number | null;
+  progress_pct: number | null;
+  last_opened_at: string | null;
 }
 
 // ─── Catalog (annales BAC) ────────────────────────────────────────────────────
