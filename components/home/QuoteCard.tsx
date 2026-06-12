@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Quote as QuoteIcon } from 'lucide-react-native';
 import type { Quote } from '@/types/api';
@@ -11,33 +12,57 @@ interface Props {
 }
 
 /**
- * Bloc « Un mot pour aujourd'hui » : carrousel auto de citations
- * motivantes (cf. maquette home-v2, rotation côté client).
+ * Bloc « Citations inspirantes » : carrousel de citations motivantes
+ * (cf. maquette home-v2). Rotation auto côté client + swipe manuel
+ * gauche/droite ; chaque interaction ré-arme le timer auto à zéro.
  */
 export const QuoteCard: React.FC<Props> = ({ quotes }) => {
   const [index, setIndex] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    if (quotes.length <= 1) {
-      return;
-    }
-    const timer = setInterval(() => {
+  // Transition fade out → changement de citation → fade in, partagée par
+  // l'auto-rotation et les gestes de swipe.
+  const transitionTo = useCallback(
+    (nextIndex: number) => {
       Animated.timing(opacity, {
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
       }).start(() => {
-        setIndex((i) => (i + 1) % quotes.length);
+        setIndex(nextIndex);
         Animated.timing(opacity, {
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
         }).start();
       });
-    }, ROTATE_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [quotes.length, opacity]);
+    },
+    [opacity],
+  );
+
+  // setTimeout dépendant de l'index : un swipe manuel ré-arme le délai plein.
+  useEffect(() => {
+    if (quotes.length <= 1) {
+      return;
+    }
+    const timer = setTimeout(
+      () => transitionTo((index + 1) % quotes.length),
+      ROTATE_INTERVAL_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [index, quotes.length, transitionTo]);
+
+  const flingLeft = Gesture.Fling()
+    .direction(Directions.LEFT)
+    .enabled(quotes.length > 1)
+    .runOnJS(true)
+    .onEnd(() => transitionTo((index + 1) % quotes.length));
+
+  const flingRight = Gesture.Fling()
+    .direction(Directions.RIGHT)
+    .enabled(quotes.length > 1)
+    .runOnJS(true)
+    .onEnd(() => transitionTo((index - 1 + quotes.length) % quotes.length));
 
   if (quotes.length === 0) {
     return null;
@@ -46,27 +71,29 @@ export const QuoteCard: React.FC<Props> = ({ quotes }) => {
   const quote = quotes[index % quotes.length];
 
   return (
-    <LinearGradient
-      colors={['#11331F', '#0B2417']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.card}
-    >
-      <View style={styles.mark}>
-        <QuoteIcon size={36} color="#fff" strokeWidth={2} />
-      </View>
-      <Animated.View style={{ opacity }}>
-        <Text style={styles.text}>« {quote.text} »</Text>
-        {quote.author && <Text style={styles.author}>{quote.author}</Text>}
-      </Animated.View>
-      {quotes.length > 1 && (
-        <View style={styles.dots}>
-          {quotes.map((q, i) => (
-            <View key={q.id} style={[styles.dot, i === index && styles.dotActive]} />
-          ))}
+    <GestureDetector gesture={Gesture.Race(flingLeft, flingRight)}>
+      <LinearGradient
+        colors={['#11331F', '#0B2417']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}
+      >
+        <View style={styles.mark}>
+          <QuoteIcon size={36} color="#fff" strokeWidth={2} />
         </View>
-      )}
-    </LinearGradient>
+        <Animated.View style={{ opacity }}>
+          <Text style={styles.text}>« {quote.text} »</Text>
+          {quote.author && <Text style={styles.author}>{quote.author}</Text>}
+        </Animated.View>
+        {quotes.length > 1 && (
+          <View style={styles.dots}>
+            {quotes.map((q, i) => (
+              <View key={q.id} style={[styles.dot, i === index && styles.dotActive]} />
+            ))}
+          </View>
+        )}
+      </LinearGradient>
+    </GestureDetector>
   );
 };
 

@@ -26,6 +26,7 @@ export const AdsBanner: React.FC<Props> = ({ ads }) => {
   const listRef = useRef<FlatList<Advertisement>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [slideWidth, setSlideWidth] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const indexRef = useRef(0);
 
   const scrollToNext = useCallback(() => {
@@ -38,13 +39,16 @@ export const AdsBanner: React.FC<Props> = ({ ads }) => {
     listRef.current?.scrollToIndex({ index: next, animated: true });
   }, [ads.length]);
 
+  // setTimeout ré-armé à chaque changement d'index (auto ou swipe manuel) :
+  // une interaction utilisateur repart donc pour un délai plein, et aucune
+  // avance auto ne se déclenche pendant un drag en cours.
   useEffect(() => {
-    if (ads.length <= 1) {
+    if (ads.length <= 1 || isDragging) {
       return;
     }
-    const timer = setInterval(scrollToNext, SLIDE_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [ads.length, scrollToNext]);
+    const timer = setTimeout(scrollToNext, SLIDE_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [activeIndex, isDragging, ads.length, scrollToNext]);
 
   if (ads.length === 0) {
     return null;
@@ -64,7 +68,18 @@ export const AdsBanner: React.FC<Props> = ({ ads }) => {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            scrollEnabled={false}
+            onScrollBeginDrag={() => setIsDragging(true)}
+            onMomentumScrollEnd={(e) => {
+              if (slideWidth > 0) {
+                const idx = Math.min(
+                  ads.length - 1,
+                  Math.max(0, Math.round(e.nativeEvent.contentOffset.x / slideWidth)),
+                );
+                indexRef.current = idx;
+                setActiveIndex(idx);
+              }
+              setIsDragging(false);
+            }}
             getItemLayout={(_, index) => ({
               length: slideWidth,
               offset: slideWidth * index,
