@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -18,6 +19,7 @@ import { usePremiumGate } from "@/hooks/usePremiumGate";
 import { AdsBanner } from "@/components/home/AdsBanner";
 import { BookCover } from "@/components/home/BookCover";
 import { FlashQuizCard } from "@/components/home/FlashQuizCard";
+import { HomeSkeleton } from "@/components/home/HomeSkeleton";
 import { PremiumBanner } from "@/components/home/PremiumBanner";
 import { QuoteCard } from "@/components/home/QuoteCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -31,6 +33,10 @@ import { getUnreadCount } from "@/services/notificationApiService";
 import { quizService } from "@/services/quizService";
 import { quotesService } from "@/services/quotesService";
 import type { Advertisement, Book, LastRead, Quote, UserProfile } from "@/types/api";
+
+// Plafond d'attente du skeleton : passé ce délai, on révèle l'écran avec les
+// états par section (spinner / EmptyState / erreur) même si une query traîne.
+const SKELETON_MAX_WAIT_MS = 6000;
 
 // Palette deterministe pour habiller les covers livres (le backend n'expose
 // pas de couleur de couverture). Indexe par subject.id, fallback gris.
@@ -180,6 +186,30 @@ export default function HomeScreen() {
   });
   const unreadCount = unreadQuery.data ?? 0;
 
+  // ── Skeleton global au premier chargement à froid ──────────────────────
+  // `isPending` n'est true que sans données (ni réseau ni cache persisté) :
+  // les ouvertures avec cache et les pull-to-refresh ne le déclenchent jamais.
+  // Le reveal attend que toutes les queries soient settled (succès OU échec),
+  // avec un plafond de 6 s en dégradé gracieux (états par section). Le badge
+  // de notifications (unreadQuery) ne gate pas le reveal.
+  const isColdLoading = [
+    profileQuery,
+    booksQuery,
+    adsQuery,
+    quotesQuery,
+    dailyQuizQuery,
+    statsQuery,
+    lastReadQuery,
+  ].some((q) => q.isPending);
+
+  const [revealForced, setRevealForced] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setRevealForced(true), SKELETON_MAX_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const showSkeleton = isColdLoading && !revealForced;
+
   const firstName = user?.first_name ?? "Étudiant";
   const initials = firstName[0]?.toUpperCase() ?? "E";
 
@@ -196,10 +226,20 @@ export default function HomeScreen() {
     });
   };
 
+  if (showSkeleton) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#F5F5F5" }}>
+        <StatusBar style="light" />
+        <HomeSkeleton topInset={insets.top} />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: "#F5F5F5" }}>
       <StatusBar style="light" />
 
+      <Animated.View style={{ flex: 1 }} entering={FadeIn.duration(250)}>
       {/* ── HERO HEADER ────────────────────────────────────────── */}
       <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
         {/* Dot-grid decoration */}
@@ -421,6 +461,7 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+      </Animated.View>
 
       {/* Premium gate handled globally via PremiumGateProvider (cf. _layout.tsx). */}
     </View>
