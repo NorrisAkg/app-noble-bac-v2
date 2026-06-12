@@ -68,6 +68,11 @@ export default function CoursesScreen() {
   const chapters = chaptersQuery.data;
   const chaptersLoading = chaptersQuery.isLoading;
 
+  // Onglets Fiches / Vidéos : on n'affiche que les chapitres ayant au moins
+  // une fiche / vidéo publiée (flags `has_revision_sheet` / `has_video`).
+  const sheetChapters = (chapters ?? []).filter((c) => c.has_revision_sheet);
+  const videoChapters = (chapters ?? []).filter((c) => c.has_video);
+
   // Pour le tab `cours`, on garde la 1re section ouverte par défaut quand la
   // liste change (changement de matière). Pour les autres tabs (flat list),
   // pas d'état d'ouverture nécessaire.
@@ -206,6 +211,22 @@ export default function CoursesScreen() {
             />
           )}
 
+          {!chaptersLoading && chapters && chapters.length > 0 && tab === 'fiches' && sheetChapters.length === 0 && (
+            <EmptyState
+              illustration={IllustrationEmptyCourses}
+              title="Aucune fiche"
+              description="Aucune fiche n'est encore disponible pour cette matière."
+            />
+          )}
+
+          {!chaptersLoading && chapters && chapters.length > 0 && tab === 'videos' && videoChapters.length === 0 && (
+            <EmptyState
+              illustration={IllustrationEmptyCourses}
+              title="Aucune vidéo"
+              description="Aucune vidéo n'est encore disponible pour cette matière."
+            />
+          )}
+
           {/* Cours : accordéon avec liste de leçons par chapitre. */}
           {!chaptersLoading && chapters && tab === 'cours' && chapters.map((chapter) => (
             <ChapterAccordion
@@ -221,7 +242,7 @@ export default function CoursesScreen() {
           {/* Fiches / Vidéos : liste plate de chapitres (aligné maquette
               `screens-courses.jsx:362-385`). Le tap charge la 1re fiche /
               1re vidéo et navigue directement vers le viewer. */}
-          {!chaptersLoading && chapters && tab === 'fiches' && chapters.map((chapter) => (
+          {!chaptersLoading && chapters && tab === 'fiches' && sheetChapters.map((chapter) => (
             <ChapterRowCard
               key={chapter.id}
               title={chapter.title}
@@ -232,7 +253,7 @@ export default function CoursesScreen() {
             />
           ))}
 
-          {!chaptersLoading && chapters && tab === 'videos' && chapters.filter(c => c.has_video).map((chapter) => (
+          {!chaptersLoading && chapters && tab === 'videos' && videoChapters.map((chapter) => (
             <ChapterRowCard
               key={chapter.id}
               title={chapter.title}

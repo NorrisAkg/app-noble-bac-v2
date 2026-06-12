@@ -78,6 +78,8 @@ export interface Chapter {
   quiz_published?: boolean;
   /** true si le chapitre possède une vidéo publiée. */
   has_video?: boolean;
+  /** true si le chapitre possède une fiche de révision publiée. */
+  has_revision_sheet?: boolean;
 }
 
 export interface Lesson {
