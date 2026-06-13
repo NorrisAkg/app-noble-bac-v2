@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Noble Bac UEMOA",
-    "slug": "noble-bac-uemoa",
+    "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
