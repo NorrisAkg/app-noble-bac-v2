@@ -36,6 +36,11 @@ export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
       for (const chapter of subject.chapters) {
         // lessons per chapter — matches ['courses', 'lessons', chapterId]
         queryClient.setQueryData(['courses', 'lessons', chapter.id], chapter.lessons);
+
+        // lesson detail per lesson — matches ['courses', 'lesson', lessonId] (course-reader.tsx)
+        for (const lesson of chapter.lessons) {
+          queryClient.setQueryData(['courses', 'lesson', lesson.id], lesson);
+        }
       }
     }
   }
