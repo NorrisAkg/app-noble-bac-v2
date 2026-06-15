@@ -40,7 +40,12 @@ export default function SignupScreen() {
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
 
   // Référentiel API préchargé (résolution du country_id backend au submit).
-  const { data: apiCountries = [], isLoading: loadingApiCountries } = useQuery({
+  const {
+    data: apiCountries = [],
+    isLoading: loadingApiCountries,
+    isError: referentialError,
+    error: referentialErrorObj,
+  } = useQuery({
     queryKey: ['countries'],
     queryFn: getCountries,
     staleTime: Infinity,
@@ -191,9 +196,9 @@ export default function SignupScreen() {
             <Text className="font-poppins text-xs text-brand-ink-medium text-center mt-3">
               Chargement du référentiel…
             </Text>
-          ) : apiCountries.length === 0 ? (
+          ) : referentialError ? (
             <Text className="font-poppins-medium text-xs text-red-500 text-center mt-3">
-              Référentiel indisponible. Vérifie le serveur API.
+              {getApiErrorMessage(referentialErrorObj)}
             </Text>
           ) : null}
 
