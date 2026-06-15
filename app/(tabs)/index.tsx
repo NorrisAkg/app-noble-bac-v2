@@ -156,9 +156,10 @@ export default function HomeScreen() {
   });
   const quotes: Quote[] = quotesQuery.data ?? [];
 
-  // Quiz éclair du jour — planifié par série, change à minuit.
+  // Quiz éclair du jour — la date dans la clé invalide le cache automatiquement chaque jour.
+  const today = new Date().toISOString().slice(0, 10);
   const dailyQuizQuery = useQuery({
-    queryKey: ["home", "daily-quiz"],
+    queryKey: ["home", "daily-quiz", today],
     queryFn: quizService.getDailyQuiz,
     staleTime: 5 * 60 * 1000,
   });
