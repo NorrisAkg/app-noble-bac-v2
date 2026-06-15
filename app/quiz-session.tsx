@@ -225,7 +225,7 @@ export default function QuizSessionScreen() {
       </View>
 
       {/* Question + options */}
-      <View style={styles.scrollContent}>
+      <View style={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Text style={styles.questionText}>{q.statement}</Text>
 
         <View style={styles.optionsCard}>
@@ -364,7 +364,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 20,
   },
   questionText: {
     fontFamily: 'Poppins_600SemiBold',
