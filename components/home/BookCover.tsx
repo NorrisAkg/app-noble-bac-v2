@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Lock } from 'lucide-react-native';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Lock } from "lucide-react-native";
 
 // Design matches the template "Book Cover (faux 3D paperback)"
 interface BookCoverProps {
@@ -20,8 +20,16 @@ interface BookCoverProps {
   hidePremiumBadge?: boolean;
 }
 
-export const BookCover: React.FC<BookCoverProps> = ({ book, onPress, hidePremiumBadge = false }) => (
-  <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.wrapper}>
+export const BookCover: React.FC<BookCoverProps> = ({
+  book,
+  onPress,
+  hidePremiumBadge = false,
+}) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.88}
+    style={styles.wrapper}
+  >
     <View style={[styles.cover, { backgroundColor: book.color }]}>
       {/* Spine highlight */}
       <View style={styles.spine} />
@@ -32,7 +40,9 @@ export const BookCover: React.FC<BookCoverProps> = ({ book, onPress, hidePremium
       </Text>
 
       {/* Title */}
-      <Text style={styles.title} numberOfLines={3}>{book.title}</Text>
+      <Text style={styles.title} numberOfLines={3}>
+        {book.title}
+      </Text>
 
       {/* Brand mark */}
       <Text style={styles.brand}>NOBLE BAC</Text>
@@ -53,8 +63,8 @@ export const BookCover: React.FC<BookCoverProps> = ({ book, onPress, hidePremium
     </View>
 
     {/* Below cover: title + subject */}
-    <Text style={styles.cardTitle} numberOfLines={2}>{book.title}</Text>
-    <Text style={styles.cardSubject}>{book.subject}</Text>
+    {/* <Text style={styles.cardTitle} numberOfLines={2}>{book.title}</Text>
+    <Text style={styles.cardSubject}>{book.subject}</Text> */}
   </TouchableOpacity>
 );
 
@@ -67,87 +77,87 @@ const styles = StyleSheet.create({
     width: 116,
     height: 156,
     borderRadius: 6,
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#000',
+    overflow: "hidden",
+    position: "relative",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 8,
   },
   spine: {
-    position: 'absolute',
+    position: "absolute",
     left: 8,
     top: 0,
     bottom: 0,
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   subject: {
-    position: 'absolute',
+    position: "absolute",
     top: 14,
     left: 14,
     right: 10,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 9,
     letterSpacing: 1,
   },
   title: {
-    position: 'absolute',
+    position: "absolute",
     top: 36,
     left: 14,
     right: 10,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 12,
-    color: '#fff',
+    color: "#fff",
     lineHeight: 16,
   },
   brand: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 12,
     left: 14,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 7.5,
-    color: 'rgba(255,255,255,0.65)',
+    color: "rgba(255,255,255,0.65)",
     letterSpacing: 1.5,
   },
   freeBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     right: 0,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#3DBE45',
+    backgroundColor: "#3DBE45",
     borderBottomLeftRadius: 6,
   },
   freeBadgeText: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: "Poppins_700Bold",
     fontSize: 7.5,
-    color: '#fff',
+    color: "#fff",
     letterSpacing: 1,
   },
   lockBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 6,
     right: 6,
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardTitle: {
     marginTop: 8,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 12,
-    color: '#1A2027',
+    color: "#1A2027",
     lineHeight: 16,
   },
   cardSubject: {
     marginTop: 2,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: "Poppins_400Regular",
     fontSize: 10.5,
-    color: '#9AA3AC',
+    color: "#9AA3AC",
   },
 });

@@ -324,9 +324,14 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Carrousel publicités externes — masqué sans pub active */}
+        <View style={styles.advertisementsContainer}>
+          <AdsBanner ads={ads} />
+        </View>
+
         {/* ── Bande « Reprendre » — FIXE, chevauche le hero (cf. maquette).
           Câblée sur /me/last-read, CTA d'amorçage quand rien n'est ouvert. */}
-        <View style={styles.resumeBand}>
+        {/* <View style={styles.resumeBand}>
           <TouchableOpacity
             style={styles.resumeCard}
             activeOpacity={0.85}
@@ -389,7 +394,7 @@ export default function HomeScreen() {
               <Text style={styles.resumePlayText}>›</Text>
             </View>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* ── SCROLLABLE BODY ─────────────────────────────────── */}
         <ScrollView
@@ -475,11 +480,6 @@ export default function HomeScreen() {
               })}
             </ScrollView>
           )}
-
-          {/* Carrousel publicités externes — masqué sans pub active */}
-          <View style={{ marginTop: 26 }}>
-            <AdsBanner ads={ads} />
-          </View>
 
           {/* Citations motivantes — masquées sans citation active */}
           {quotes.length > 0 && (
@@ -673,6 +673,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#3DBE45",
     flexShrink: 0,
+  },
+  advertisementsContainer: {
+    marginTop: -36,
+    paddingHorizontal: 16,
+    // paddingBottom: 14,
+    zIndex: 5,
+    shadowColor: "#1A2027",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 6,
   },
   // Resume band (fixe, chevauche le hero — cf. maquette)
   resumeBand: {
