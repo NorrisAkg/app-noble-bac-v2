@@ -248,7 +248,17 @@ export default function HomeScreen() {
 
       <Animated.View style={{ flex: 1 }} entering={FadeIn.duration(250)}>
         {/* ── HERO HEADER ────────────────────────────────────────── */}
-        <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
+        <View
+          style={[
+            styles.hero,
+            {
+              paddingTop: insets.top + 14,
+              // 64 quand une pub chevauche le bas du hero, 28 sinon (pas de
+              // carte flottante → on évite une grande zone verte vide).
+              paddingBottom: ads.length > 0 ? 64 : 28,
+            },
+          ]}
+        >
           {/* Dot-grid decoration */}
           <View style={styles.dotGrid} pointerEvents="none">
             {Array.from({ length: 25 }).map((_, i) => (
@@ -324,10 +334,14 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Carrousel publicités externes — masqué sans pub active */}
-        <View style={styles.advertisementsContainer}>
-          <AdsBanner ads={ads} />
-        </View>
+        {/* Carrousel publicités externes — masqué sans pub active. Le conteneur
+          n'est monté qu'avec une pub : sinon son marginTop négatif (chevauchement
+          du hero) remonterait le body vide de 36 px sur le vert. */}
+        {ads.length > 0 && (
+          <View style={styles.advertisementsContainer}>
+            <AdsBanner ads={ads} />
+          </View>
+        )}
 
         {/* ── Bande « Reprendre » — FIXE, chevauche le hero (cf. maquette).
           Câblée sur /me/last-read, CTA d'amorçage quand rien n'est ouvert. */}
@@ -459,7 +473,11 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 14, paddingRight: 4 }}
-              style={{ marginHorizontal: -16, paddingHorizontal: 16 }}
+              style={{
+                marginHorizontal: -16,
+                paddingHorizontal: 16,
+                paddingBottom: 14,
+              }}
             >
               {books.map((b) => {
                 const palette = bookColors(b);
@@ -502,7 +520,6 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: "#3DBE45",
     paddingHorizontal: 20,
-    paddingBottom: 64,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     position: "relative",
