@@ -11,10 +11,10 @@
         "buildType": "apk"
       },
       "env": {
-        // "EXPO_PUBLIC_API_URL": "https://api.noble-bac-uemoa.tech/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.noble-bac-uemoa.tech/api/v1"
 
         // "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8000/api/v1"
-        "EXPO_PUBLIC_API_URL": "https://copper-railway-spookily.ngrok-free.dev/api/v1"
+        // "EXPO_PUBLIC_API_URL": "https://copper-railway-spookily.ngrok-free.dev/api/v1"
       }
     },
     "client-test": {
