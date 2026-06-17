@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ScrollView,
   Animated,
   ActivityIndicator,
   Alert,
@@ -19,6 +20,7 @@ import { useQuizStore } from '@/store/useQuizStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { C } from '@/constants/theme';
+import { MathText } from '@/components/quiz/MathText';
 
 type PendingAnswer = { questionId: number; optionId: number };
 
@@ -198,8 +200,8 @@ export default function QuizSessionScreen() {
   if (loading || !session || !q) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color="#fff" />
+        <StatusBar style="dark" />
+        <ActivityIndicator size="large" color={C.green} />
         <Text style={styles.loaderText}>Préparation du quiz…</Text>
       </View>
     );
@@ -209,24 +211,43 @@ export default function QuizSessionScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Top bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 14 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} activeOpacity={0.7}>
-          <X size={20} color="#fff" strokeWidth={2.4} />
-        </TouchableOpacity>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={styles.headerTitle}>{subjectLabel}</Text>
 
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} activeOpacity={0.7}>
+            <X size={22} color={C.ink2} strokeWidth={2.4} />
+          </TouchableOpacity>
+
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+          </View>
+
+          <Text style={styles.progressText}>{idx + 1}/{total}</Text>
         </View>
-
-        <Text style={styles.progressText}>{idx + 1}/{total}</Text>
       </View>
 
       {/* Question + options */}
-      <View style={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-        <Text style={styles.questionText}>{q.statement}</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 20) + 16 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.questionCard}>
+          <MathText
+            content={q.statement}
+            align="center"
+            color={C.ink}
+            fontSize={18}
+            textStyle={styles.questionText}
+          />
+        </View>
 
         <View style={styles.optionsCard}>
           {q.options.map((opt, i) => {
@@ -258,12 +279,19 @@ export default function QuizSessionScreen() {
                 {showCheck && <Check size={18} color="#fff" strokeWidth={2.6} style={styles.optIcon} />}
                 {showCross && <X size={18} color="#fff" strokeWidth={2.6} style={styles.optIcon} />}
                 {!showCheck && !showCross && <View style={styles.optIconPlaceholder} />}
-                <Text style={[styles.optText, isWhiteText && styles.optTextWhite]}>{opt.label}</Text>
+                <View style={styles.optTextWrap}>
+                  <MathText
+                    content={opt.label}
+                    padding={2}
+                    color={isWhiteText ? '#fff' : C.ink}
+                    textStyle={styles.optText}
+                  />
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
-      </View>
+      </ScrollView>
 
       {/* Explanation drawer */}
       {drawerVisible && (
@@ -317,66 +345,78 @@ export default function QuizSessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E8A090',
+    backgroundColor: C.bg,
   },
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   loaderText: {
-    color: '#fff',
+    color: C.ink2,
     marginTop: 10,
     fontFamily: 'Poppins_500Medium',
   },
-  topBar: {
+  header: {
     paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  headerTitle: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 17,
+    color: C.ink2,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingBottom: 16,
   },
   closeBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: -8,
   },
   progressContainer: {
     flex: 1,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: C.muted,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4F86F7',
+    backgroundColor: C.green,
     borderRadius: 4,
   },
   progressText: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 13,
-    color: '#fff',
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 14,
+    color: C.green,
+  },
+  scroll: {
+    flex: 1,
   },
   scrollContent: {
-    flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
   },
+  questionCard: {
+    backgroundColor: C.muted,
+    borderRadius: 18,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    marginBottom: 24,
+  },
   questionText: {
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 19,
-    color: '#fff',
-    lineHeight: 27,
+    fontSize: 18,
+    lineHeight: 26,
     letterSpacing: -0.3,
-    textAlign: 'center',
-    marginBottom: 28,
-    paddingHorizontal: 8,
   },
   optionsCard: {
-    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 20,
     overflow: 'hidden',
@@ -387,11 +427,10 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   optRow: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingVertical: 18,
     gap: 12,
   },
   optBorder: {
@@ -405,7 +444,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.green,
   },
   optWrong: {
-    backgroundColor: '#E14B36',
+    backgroundColor: C.salmon,
   },
   optOffline: {
     backgroundColor: C.ink2,
@@ -416,14 +455,13 @@ const styles = StyleSheet.create({
   optIconPlaceholder: {
     width: 22,
   },
-  optText: {
+  optTextWrap: {
     flex: 1,
+  },
+  optText: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 15,
     color: C.ink,
-  },
-  optTextWhite: {
-    color: '#fff',
   },
   // Drawer
   drawer: {
