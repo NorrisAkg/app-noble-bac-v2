@@ -7,6 +7,25 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import {
+  useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  Poppins_900Black,
+} from '@expo-google-fonts/poppins';
+import 'react-native-reanimated';
+import '@/global.css';
+
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
+import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
+import { QueryProvider, queryClient } from '@/providers/QueryProvider';
+import { registerAuthCleanup } from '@/services/apiClient';
+import { prefetchAllData } from '@/services/prefetchService';
+import { useAuthStore } from '@/store/useAuthStore';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // ─── DEV: silence un log natif inoffensif de expo-video v3 ───────────────────
 // Pendant un Fast Refresh (HMR), le shared object natif du player Android peut
@@ -35,25 +54,6 @@ if (__DEV__) {
     originalConsoleError(...args);
   };
 }
-import {
-  useFonts,
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_800ExtraBold,
-  Poppins_900Black,
-} from '@expo-google-fonts/poppins';
-import 'react-native-reanimated';
-import '@/global.css';
-
-import { OfflineBanner } from '@/components/ui/OfflineBanner';
-import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
-import { QueryProvider, queryClient } from '@/providers/QueryProvider';
-import { registerAuthCleanup } from '@/services/apiClient';
-import { prefetchAllData } from '@/services/prefetchService';
-import { useAuthStore } from '@/store/useAuthStore';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 function PushNotificationInitializer() {
   usePushNotifications();

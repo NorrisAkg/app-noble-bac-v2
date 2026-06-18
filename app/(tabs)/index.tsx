@@ -182,7 +182,6 @@ export default function HomeScreen() {
     queryFn: getLastRead,
     staleTime: 60 * 1000,
   });
-  const lastRead = lastReadQuery.data ?? null;
 
   const { guard, isPremium } = usePremiumGate();
 
