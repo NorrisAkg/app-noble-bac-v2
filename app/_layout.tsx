@@ -25,11 +25,15 @@ if (__DEV__) {
   LogBox.ignoreLogs(expoVideoHmrPatterns);
 
   // 2) Filtre la même erreur dans le terminal Metro. On override console.error
-  //    en testant uniquement la première string ; tout autre log passe.
+  //    en concaténant tous les arguments (le logger natif peut transmettre un
+  //    objet Error ou placer le message au-delà du 1er argument) ; tout autre
+  //    log passe intact.
   const originalConsoleError = console.error.bind(console);
   console.error = (...args: unknown[]) => {
-    const first = typeof args[0] === 'string' ? args[0] : '';
-    if (expoVideoHmrPatterns.some((p) => p.test(first))) {
+    const combined = args
+      .map((a) => (a instanceof Error ? a.message : typeof a === 'string' ? a : String(a)))
+      .join(' ');
+    if (expoVideoHmrPatterns.some((p) => p.test(combined))) {
       return;
     }
     originalConsoleError(...args);
