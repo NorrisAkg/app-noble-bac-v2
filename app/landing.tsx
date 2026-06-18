@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── Landing Screen ──────────────────────────────────────────────────────────
 // Full-bleed video background avec dégradés conformes à la maquette :
@@ -20,11 +20,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function LandingScreen() {
   const router = useRouter();
 
-  const player = useVideoPlayer(require('@/assets/videos/landing-bg.mp4'), (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
+  const player = useVideoPlayer(
+    require("@/assets/videos/landing-bg.mp4"),
+    (p) => {
+      p.loop = true;
+      p.muted = true;
+      p.play();
+    },
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -47,7 +50,7 @@ export default function LandingScreen() {
   );
 
   useEffect(() => {
-    AsyncStorage.setItem('hasSeenOnboarding', 'true').catch(() => {
+    AsyncStorage.setItem("hasSeenOnboarding", "true").catch(() => {
       // Silencieux : si le storage est inaccessible, l'utilisateur reverra
       // le landing au prochain démarrage. Pas critique.
     });
@@ -68,10 +71,10 @@ export default function LandingScreen() {
       <LinearGradient
         pointerEvents="none"
         colors={[
-          'rgba(11,20,16,0.55)',
-          'rgba(11,20,16,0.30)',
-          'rgba(11,20,16,0.55)',
-          'rgba(11,20,16,0.85)',
+          "rgba(11,20,16,0.55)",
+          "rgba(11,20,16,0.30)",
+          "rgba(11,20,16,0.55)",
+          "rgba(11,20,16,0.85)",
         ]}
         locations={[0, 0.35, 0.7, 1]}
         style={styles.overlay}
@@ -82,7 +85,7 @@ export default function LandingScreen() {
               on approxime avec une translation diagonale. */}
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(61,190,69,0.18)', 'rgba(61,190,69,0)']}
+        colors={["rgba(61,190,69,0.18)", "rgba(61,190,69,0)"]}
         start={{ x: 0.3, y: 0.2 }}
         end={{ x: 0.85, y: 0.75 }}
         style={styles.overlay}
@@ -91,7 +94,7 @@ export default function LandingScreen() {
       {/* 3. Vignette périphérique — assombrit les bords */}
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
+        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0)", "rgba(0,0,0,0.55)"]}
         locations={[0, 0.4, 1]}
         start={{ x: 0.5, y: 0.5 }}
         end={{ x: 1, y: 1 }}
@@ -103,7 +106,7 @@ export default function LandingScreen() {
           <TouchableOpacity
             style={styles.btnPrimary}
             activeOpacity={0.85}
-            onPress={() => router.push('/(auth)/signup')}
+            onPress={() => router.push("/(auth)/signup")}
           >
             <Text style={styles.btnPrimaryText}>Commencer</Text>
           </TouchableOpacity>
@@ -111,9 +114,11 @@ export default function LandingScreen() {
           <TouchableOpacity
             style={styles.btnSecondary}
             activeOpacity={0.85}
-            onPress={() => router.push('/(auth)/login')}
+            onPress={() => router.push("/(auth)/login")}
           >
-            <Text style={styles.btnSecondaryText}>J&apos;ai déjà un compte</Text>
+            <Text style={styles.btnSecondaryText}>
+              J&apos;ai déjà un compte
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -124,7 +129,7 @@ export default function LandingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1410',
+    backgroundColor: "#0B1410",
   },
   video: {
     ...StyleSheet.absoluteFillObject,
@@ -134,47 +139,47 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
     paddingHorizontal: 28,
-    paddingBottom: 52,
+    paddingBottom: 100,
     zIndex: 2,
   },
   buttonContainer: {
     gap: 12,
   },
   btnPrimary: {
-    width: '100%',
+    width: "100%",
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#3DBE45',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#3DBE45',
+    backgroundColor: "#3DBE45",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#3DBE45",
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.55,
     shadowRadius: 30,
     elevation: 8,
   },
   btnPrimaryText: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 15.5,
-    color: '#fff',
+    color: "#fff",
     letterSpacing: 0.2,
   },
   btnSecondary: {
-    width: '100%',
+    width: "100%",
     height: 54,
     borderRadius: 27,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: "rgba(255,255,255,0.10)",
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255,255,255,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   btnSecondaryText: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: "Poppins_600SemiBold",
     fontSize: 15.5,
-    color: '#fff',
+    color: "#fff",
     letterSpacing: 0.2,
   },
 });
