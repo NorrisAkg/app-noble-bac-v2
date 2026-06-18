@@ -69,7 +69,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const { initialize, isAuthenticated } = useAuthStore();
-  const segments = useSegments();
+  const segments = useSegments() as string[];
   const router = useRouter();
 
   const [loaded, error] = useFonts({
