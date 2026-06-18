@@ -20,13 +20,17 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
   // 1. Course snapshot: subjects + chapters + full lesson content in one call.
   //    Populate individual cache keys so useQuery() calls find data immediately.
+  // `.catch()` only guards against a rejected promise — a resolved but empty
+  // body (`data: null`/`undefined`) would still slip through, so we normalise
+  // to an array before touching `.length`.
   const snapshot = await courseService.getSnapshot().catch(() => []);
+  const subjects = Array.isArray(snapshot) ? snapshot : [];
 
-  if (snapshot.length > 0) {
+  if (subjects.length > 0) {
     // subjects list — matches ['courses', 'subjects'] query key
-    queryClient.setQueryData(['courses', 'subjects'], snapshot.map(({ chapters: _c, ...s }) => s));
+    queryClient.setQueryData(['courses', 'subjects'], subjects.map(({ chapters: _c, ...s }) => s));
 
-    for (const subject of snapshot) {
+    for (const subject of subjects) {
       // chapters per subject — matches ['courses', 'chapters', subjectId]
       queryClient.setQueryData(
         ['courses', 'chapters', subject.id],

@@ -19,7 +19,7 @@ export const courseService = {
    */
   getSnapshot: async (): Promise<CourseSnapshotSubject[]> => {
     const response = await apiClient.get<ApiResponse<CourseSnapshotSubject[]>>("/courses/snapshot");
-    return response.data.data;
+    return response.data.data ?? [];
   },
 
   /**
