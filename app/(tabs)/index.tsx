@@ -20,7 +20,7 @@ import { AdsBanner } from "@/components/home/AdsBanner";
 import { BookCover } from "@/components/home/BookCover";
 import { FlashQuizCard } from "@/components/home/FlashQuizCard";
 import { HomeSkeleton } from "@/components/home/HomeSkeleton";
-import { PremiumBanner } from "@/components/home/PremiumBanner";
+// import { PremiumBanner } from "@/components/home/PremiumBanner";
 import { QuoteCard } from "@/components/home/QuoteCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IllustrationEmptyBooks } from "@/components/ui/EmptyIllustrations";
@@ -438,10 +438,10 @@ export default function HomeScreen() {
           {/* Quiz éclair du jour — masqué si rien n'est planifié pour la série */}
           {dailyQuiz != null && <FlashQuizCard quiz={dailyQuiz} />}
 
-          {/* Bannière Premium — masquée pour les abonnés */}
+          {/* Bannière Premium — masquée temporairement
           {!isPremium && (
             <PremiumBanner onPress={() => router.push("/subscription-plans")} />
-          )}
+          )} */}
 
           {/* Books carousel — donnees reelles depuis GET /courses/books */}
           <SectionHeader
