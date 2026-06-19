@@ -9,16 +9,19 @@ import {
   TouchableOpacity,
   Alert,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
 import { ChevronLeft, Smartphone } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getOperators } from '@/services/referentialService';
+import { getOperators, getCountries } from '@/services/referentialService';
 import { initiatePayment, getPaymentStatus } from '@/services/paymentService';
-import { getApiErrorMessage } from '@/utils/apiError';
+import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
 import { displayCurrency } from '@/utils/currency';
 import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -63,8 +66,10 @@ export default function PaymentCheckoutScreen() {
   const planCurrency = plan_currency ?? 'XOF';
 
   const [selectedOperatorId, setSelectedOperatorId] = useState<number | null>(null);
-  const [phone, setPhone] = useState<string>(user?.phone ?? '');
+  const [localPhone, setLocalPhone] = useState<string>('');
   const [step, setStep] = useState<'select' | 'processing'>('select');
+  // true = checkout hébergé (page FedaPay ouverte) ; false = débit direct (USSD).
+  const [hostedCheckout, setHostedCheckout] = useState(true);
   const [transactionId, setTransactionId] = useState<number | null>(null);
   const [status, setStatus] = useState<TransactionStatus>('pending');
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
@@ -78,8 +83,37 @@ export default function PaymentCheckoutScreen() {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Le pays de paiement est celui du compte (les operateurs y sont rattaches) :
+  // on en deduit l'indicatif, affiche en lecture seule. L'utilisateur ne tape
+  // que la partie locale, ce qui evite les erreurs de format E.164.
+  const countriesQuery = useQuery({
+    queryKey: ['countries'],
+    queryFn: getCountries,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const userCountry = countriesQuery.data?.find(
+    (c) => String(c.id) === String(user?.country_id),
+  );
+  const phonePrefix = userCountry?.phone_code ?? '';
+
+  // Pre-remplit le numero local a partir du telephone du profil (E.164) en
+  // retirant l'indicatif, des que le pays est connu.
+  useEffect(() => {
+    if (!phonePrefix || !user?.phone) return;
+    setLocalPhone((prev) =>
+      prev.length > 0
+        ? prev
+        : user.phone.startsWith(phonePrefix)
+          ? user.phone.slice(phonePrefix.length)
+          : '',
+    );
+  }, [phonePrefix, user?.phone]);
+
   const operators = operatorsQuery.data ?? [];
-  const phoneValid = E164_RE.test(phone.trim());
+  const localDigits = localPhone.replace(/\D/g, '');
+  const fullPhone = phonePrefix + localDigits;
+  const phoneValid = phonePrefix.length > 0 && E164_RE.test(fullPhone);
   const canPay = selectedOperatorId !== null && phoneValid && !!planId;
 
   // Bloque le bouton retour materiel pendant le traitement pour eviter de
@@ -173,15 +207,42 @@ export default function PaymentCheckoutScreen() {
     startedAtRef.current = Date.now();
     setStep('processing');
     try {
-      const { transaction } = await initiatePayment({
+      const { transaction, payment_url } = await initiatePayment({
         subscriptionPlanId: planId,
         operatorId: selectedOperatorId,
-        phoneNumber: phone.trim(),
+        phoneNumber: fullPhone,
       });
+      // Démarre le polling avant tout : la confirmation peut arriver pendant
+      // que la page FedaPay est ouverte / que l'USSD est en cours.
       setTransactionId(transaction.id);
+      setHostedCheckout(!!payment_url);
+      if (payment_url) {
+        // Mode hébergé : ouvre la page FedaPay. La promesse se résout à la
+        // fermeture du navigateur ; le polling prend alors le relais.
+        await WebBrowser.openBrowserAsync(payment_url);
+      }
+      // Mode débit direct (payment_url null) : le push USSD a déjà été envoyé
+      // côté backend, le polling détecte la confirmation.
     } catch (e) {
       setStep('select');
-      Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de demarrer le paiement.'));
+      const validationErrors = getValidationErrors(e);
+      if (validationErrors.phone_number) {
+        // Seul champ saisi par l'utilisateur : on remonte un message actionnable.
+        Alert.alert('Numéro invalide', validationErrors.phone_number);
+      } else if (Object.keys(validationErrors).length > 0) {
+        // Offre / operateur invalides : non corrigeables cote utilisateur
+        // (champs pilotes par l'app). On logue le detail technique pour le
+        // diagnostic et on affiche un message generique, jamais le message
+        // brut du backend ("subscription plan id est invalide", etc.).
+        console.warn('[payment-checkout] validation backend:', validationErrors);
+        Alert.alert(
+          'Paiement indisponible',
+          'Impossible de démarrer le paiement pour le moment. Réessaie dans un instant ou contacte le support.',
+        );
+      } else {
+        // Erreur passerelle (502) ou reseau : message backend deja lisible.
+        Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de démarrer le paiement.'));
+      }
     }
   };
 
@@ -208,10 +269,13 @@ export default function PaymentCheckoutScreen() {
       {step === 'processing' ? (
         <View style={styles.processingBox}>
           <ActivityIndicator size="large" color={C.green} />
-          <Text style={styles.processingTitle}>Confirme sur ton téléphone</Text>
+          <Text style={styles.processingTitle}>
+            {hostedCheckout ? 'Finalise ton paiement' : 'Confirme sur ton téléphone'}
+          </Text>
           <Text style={styles.processingDesc}>
-            Une demande de paiement a été envoyée à ton numéro. Valide-la avec ton
-            code mobile money pour activer ton abonnement. Ne ferme pas cet écran.
+            {hostedCheckout
+              ? "Termine le paiement dans la page qui s'est ouverte. Une fois validé, reviens sur cet écran : la confirmation est automatique. Ne ferme pas cet écran."
+              : 'Une demande de paiement a été envoyée à ton numéro. Valide-la avec ton code mobile money pour activer ton abonnement. Ne ferme pas cet écran.'}
           </Text>
           {status !== 'pending' && status !== 'confirmed' && (
             <Text style={styles.statusText}>
@@ -220,9 +284,15 @@ export default function PaymentCheckoutScreen() {
           )}
         </View>
       ) : (
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={insets.top + 64}
+        >
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Récap plan */}
           <View style={styles.planCard}>
@@ -266,17 +336,27 @@ export default function PaymentCheckoutScreen() {
           {selectedOperatorId !== null && (
             <View style={styles.phoneBlock}>
               <Text style={styles.fieldLabel}>Numéro à débiter</Text>
-              <TextInput
-                style={[styles.phoneInput, phone.length > 0 && !phoneValid && styles.phoneInputError]}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+225 07 00 00 00 00"
-                placeholderTextColor={C.ink3}
-                keyboardType="phone-pad"
-                autoCapitalize="none"
-              />
-              {phone.length > 0 && !phoneValid && (
-                <Text style={styles.fieldError}>Numéro invalide (format international attendu).</Text>
+              <View style={styles.phoneRow}>
+                <View style={styles.prefixBox}>
+                  <Text style={styles.prefixFlag}>{userCountry?.flag_emoji ?? '🌍'}</Text>
+                  <Text style={styles.prefixText}>{phonePrefix || '…'}</Text>
+                </View>
+                <TextInput
+                  style={[
+                    styles.phoneInput,
+                    styles.phoneInputFlex,
+                    localPhone.length > 0 && !phoneValid && styles.phoneInputError,
+                  ]}
+                  value={localPhone}
+                  onChangeText={setLocalPhone}
+                  placeholder="07 00 00 00 00"
+                  placeholderTextColor={C.ink3}
+                  keyboardType="phone-pad"
+                  autoCapitalize="none"
+                />
+              </View>
+              {localPhone.length > 0 && !phoneValid && (
+                <Text style={styles.fieldError}>Numéro invalide pour {userCountry?.name ?? 'ce pays'}.</Text>
               )}
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
@@ -286,6 +366,7 @@ export default function PaymentCheckoutScreen() {
             </View>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       {step === 'select' && operators.length > 0 && (
@@ -438,6 +519,20 @@ const styles = StyleSheet.create({
     color: C.ink2,
     marginBottom: 6,
   },
+  phoneRow: { flexDirection: 'row', gap: 8 },
+  prefixBox: {
+    height: 54,
+    paddingHorizontal: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: C.line,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  prefixFlag: { fontSize: 18 },
+  prefixText: { fontFamily: 'Poppins_600SemiBold', fontSize: 15, color: C.ink },
   phoneInput: {
     height: 54,
     paddingHorizontal: 16,
@@ -449,6 +544,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: C.ink,
   },
+  phoneInputFlex: { flex: 1 },
   phoneInputError: { borderColor: C.danger },
   fieldError: {
     fontFamily: 'Poppins_400Regular',

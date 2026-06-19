@@ -32,9 +32,10 @@ describe('paymentService', () => {
     it('POST /payments/initiate avec le bon body (plan + operateur + numero) et deballe data', async () => {
       const response: InitiatePaymentResponse = {
         transaction: transactionFixture,
+        payment_url: 'https://sandbox-process.fedapay.com/test-token',
       };
       mockedApiClient.post.mockResolvedValueOnce({
-        data: { success: true, message: 'Confirme le paiement sur ton téléphone.', data: response },
+        data: { success: true, message: 'Ouvre la page de paiement pour finaliser ton abonnement.', data: response },
       });
 
       const result = await initiatePayment({
@@ -50,6 +51,7 @@ describe('paymentService', () => {
       });
       expect(result.transaction.id).toBe(101);
       expect(result.transaction.status).toBe('pending');
+      expect(result.payment_url).toBe('https://sandbox-process.fedapay.com/test-token');
     });
 
     it('omet phone_number quand il n\'est pas fourni (numero du profil utilise cote backend)', async () => {

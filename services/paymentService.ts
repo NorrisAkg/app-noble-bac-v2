@@ -4,11 +4,13 @@ import type { ApiResponse, PaymentTransaction } from '@/types/api';
 /**
  * Reponse de POST /api/v1/payments/initiate.
  * `transaction` contient le statut initial (pending) + l'internal_reference.
- * Le debit mobile money est declenche cote backend (push USSD sur le
- * telephone) : il n'y a plus d'URL hebergee a charger.
+ * `payment_url` est la page de paiement hebergee FedaPay a ouvrir : le client
+ * la charge, l'utilisateur paie, puis le mobile poll getPaymentStatus pour
+ * detecter la confirmation (l'activation se fait via webhook / poll backend).
  */
 export interface InitiatePaymentResponse {
   transaction: PaymentTransaction;
+  payment_url: string | null;
 }
 
 /**
@@ -24,10 +26,10 @@ export interface InitiatePaymentPayload {
 
 /**
  * POST /api/v1/payments/initiate
- * Cree une Transaction (status=pending) et declenche le debit mobile money
- * direct via FedaPay (push de confirmation sur le telephone). L'activation
- * reelle de l'abonnement se fait via le webhook backend, jamais via la
- * reponse synchrone (cf api/.claude/CLAUDE.md). Le mobile poll ensuite
+ * Cree une Transaction (status=pending) et renvoie `payment_url`, la page de
+ * paiement hebergee FedaPay a ouvrir. L'activation reelle de l'abonnement se
+ * fait via le webhook backend / le poll de statut, jamais via la reponse
+ * synchrone (cf api/.claude/CLAUDE.md). Le mobile poll ensuite
  * getPaymentStatus pour detecter la confirmation.
  */
 export async function initiatePayment(
