@@ -328,7 +328,7 @@ export default function HomeScreen() {
                 <Text style={styles.progressPctBold}>
                   {daysRemaining} jours
                 </Text>
-                {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""}
+                {/* {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""} */}
               </Text>
             </View>
           </View>
