@@ -29,28 +29,45 @@ describe('paymentService', () => {
   });
 
   describe('initiatePayment', () => {
-    it('POST /payments/initiate avec le bon body et deballe data', async () => {
+    it('POST /payments/initiate avec le bon body (plan + operateur + numero) et deballe data', async () => {
       const response: InitiatePaymentResponse = {
         transaction: transactionFixture,
-        payment_url: 'https://checkout.fedapay.com/payment/abc123',
       };
       mockedApiClient.post.mockResolvedValueOnce({
-        data: { success: true, message: 'Paiement initié.', data: response },
+        data: { success: true, message: 'Confirme le paiement sur ton téléphone.', data: response },
       });
 
-      const result = await initiatePayment(1);
+      const result = await initiatePayment({
+        subscriptionPlanId: 1,
+        operatorId: 7,
+        phoneNumber: '+22507000000',
+      });
 
       expect(mockedApiClient.post).toHaveBeenCalledWith('/payments/initiate', {
         subscription_plan_id: 1,
+        operator_id: 7,
+        phone_number: '+22507000000',
       });
-      expect(result.payment_url).toBe('https://checkout.fedapay.com/payment/abc123');
       expect(result.transaction.id).toBe(101);
       expect(result.transaction.status).toBe('pending');
     });
 
+    it('omet phone_number quand il n\'est pas fourni (numero du profil utilise cote backend)', async () => {
+      mockedApiClient.post.mockResolvedValueOnce({
+        data: { success: true, message: 'OK', data: { transaction: transactionFixture } },
+      });
+
+      await initiatePayment({ subscriptionPlanId: 1, operatorId: 7 });
+
+      expect(mockedApiClient.post).toHaveBeenCalledWith('/payments/initiate', {
+        subscription_plan_id: 1,
+        operator_id: 7,
+      });
+    });
+
     it('propage l\'erreur axios telle quelle (plan introuvable, scope mismatch, etc.)', async () => {
       mockedApiClient.post.mockRejectedValueOnce(new Error('Forbidden'));
-      await expect(initiatePayment(99)).rejects.toThrow('Forbidden');
+      await expect(initiatePayment({ subscriptionPlanId: 99, operatorId: 1 })).rejects.toThrow('Forbidden');
     });
   });
 

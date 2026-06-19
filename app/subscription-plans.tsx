@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -16,8 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@tanstack/react-query';
 
 import { getActiveSubscription, getSubscriptionPlans } from '@/services/subscriptionService';
-import { initiatePayment } from '@/services/paymentService';
-import { getApiErrorMessage } from '@/utils/apiError';
 import { displayCurrency } from '@/utils/currency';
 import { C } from '@/constants/theme';
 import type { SubscriptionPlan } from '@/types/api';
@@ -74,7 +71,6 @@ export default function SubscriptionPlansScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
-  const [isInitiating, setIsInitiating] = useState(false);
 
   const plansQuery = useQuery({
     queryKey: ['subscription-plans'],
@@ -109,23 +105,19 @@ export default function SubscriptionPlansScreen() {
 
   const selectedPlan = visiblePlans.find((p) => p.id === selectedPlanId) ?? null;
 
-  const handleContinue = async () => {
-    if (!selectedPlan || isInitiating) return;
-    setIsInitiating(true);
-    try {
-      const { transaction, payment_url } = await initiatePayment(selectedPlan.id);
-      router.push({
-        pathname: '/payment-checkout',
-        params: {
-          transaction_id: String(transaction.id),
-          payment_url: encodeURIComponent(payment_url),
-        },
-      });
-    } catch (e) {
-      Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de démarrer le paiement.'));
-    } finally {
-      setIsInitiating(false);
-    }
+  const handleContinue = () => {
+    if (!selectedPlan) return;
+    // L'initiation du paiement se fait sur l'écran checkout, après le choix
+    // de l'opérateur mobile money et la saisie du numéro à débiter.
+    router.push({
+      pathname: '/payment-checkout',
+      params: {
+        plan_id: String(selectedPlan.id),
+        plan_label: selectedPlan.label,
+        plan_amount: String(selectedPlan.price_fcfa),
+        plan_currency: selectedPlan.currency,
+      },
+    });
   };
 
   const isLoading = plansQuery.isLoading;
@@ -217,17 +209,12 @@ export default function SubscriptionPlansScreen() {
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity
             onPress={handleContinue}
-            disabled={isInitiating}
             activeOpacity={0.85}
-            style={[styles.cta, isInitiating && styles.ctaDisabled]}
+            style={styles.cta}
           >
-            {isInitiating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.ctaText}>
-                Continuer · {formatPrice(selectedPlan.price_fcfa)} {displayCurrency(selectedPlan.currency)}
-              </Text>
-            )}
+            <Text style={styles.ctaText}>
+              Continuer · {formatPrice(selectedPlan.price_fcfa)} {displayCurrency(selectedPlan.currency)}
+            </Text>
           </TouchableOpacity>
           <Text style={styles.footerLegal}>
             Annulable à tout moment · Paiement sécurisé

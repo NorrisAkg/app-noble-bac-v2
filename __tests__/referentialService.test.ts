@@ -1,6 +1,6 @@
-import { getCountries } from '../services/referentialService';
+import { getCountries, getOperators } from '../services/referentialService';
 import apiClient from '../services/apiClient';
-import type { Country } from '../types/api';
+import type { Country, Operator } from '../types/api';
 
 jest.mock('../services/apiClient');
 
@@ -50,5 +50,30 @@ describe('referentialService', () => {
   it('propage l\'erreur axios telle quelle', async () => {
     mockedApiClient.get.mockRejectedValueOnce(new Error('Network down'));
     await expect(getCountries()).rejects.toThrow('Network down');
+  });
+
+  it('getOperators GET /countries/{id}/operators et deballe data.data', async () => {
+    const operatorsFixture: Operator[] = [
+      { id: 1, code: 'orange_ci', name: 'Orange Money', color: '#FF6600', logo_url: null },
+      { id: 2, code: 'mtn_ci', name: 'MTN MoMo', color: '#FFCC00', logo_url: null },
+    ];
+    mockedApiClient.get.mockResolvedValueOnce({
+      data: { success: true, message: 'OK', data: operatorsFixture },
+    });
+
+    const result = await getOperators('2');
+
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/countries/2/operators');
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe('Orange Money');
+  });
+
+  it('getOperators renvoie une liste vide quand le pays n\'a pas d\'operateur', async () => {
+    mockedApiClient.get.mockResolvedValueOnce({
+      data: { success: true, message: 'OK', data: [] },
+    });
+
+    const result = await getOperators(99);
+    expect(result).toEqual([]);
   });
 });

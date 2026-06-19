@@ -46,6 +46,23 @@ export interface Series {
   label: string;
 }
 
+/**
+ * Opérateur mobile money disponible pour un pays (Orange Money, MTN MoMo…).
+ * Le mode FedaPay interne n'est jamais exposé : seul `id` est renvoyé au
+ * backend lors de l'initiation du paiement.
+ */
+export interface Operator {
+  id: number;
+  /** Slug interne, ex: 'orange_ci'. */
+  code: string;
+  /** Libellé affiché, ex: 'Orange Money'. */
+  name: string;
+  /** Couleur de badge (hex), ex: '#FF6600'. */
+  color: string | null;
+  /** URL signée du logo, ou null. */
+  logo_url: string | null;
+}
+
 export interface Subject {
   id: number;
   name: string;
