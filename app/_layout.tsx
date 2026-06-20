@@ -72,7 +72,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { initialize, isAuthenticated } = useAuthStore();
+  const { initialize, isAuthenticated, isHydrated } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -114,13 +114,13 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (loaded || error) {
+    if ((loaded || error) && isHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [loaded, error, isHydrated]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !isHydrated) return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // DEV BYPASS — set EXPO_PUBLIC_BYPASS_AUTH=true in .env.local to skip the
@@ -138,9 +138,14 @@ export default function RootLayout() {
     // sert d'ecran de bienvenue (video + CTA). Le flag AsyncStorage
     // 'hasSeenOnboarding' evite de re-presenter le landing apres la 1ere
     // visite (le landing lui-meme s'occupe de poser ce flag).
+    // On ne presente l'onboarding qu'aux utilisateurs non connectes : un
+    // utilisateur authentifie a forcement deja onboarde. Cela evite le flash
+    // vers /landing quand le flag AsyncStorage manque alors que le token
+    // SecureStore persiste (ex. reinstall iOS : keychain conserve, AsyncStorage
+    // efface), cas ou ce guard et le redirect de index.tsx se contrediraient.
     const checkOnboarding = async () => {
       const seen = await AsyncStorage.getItem('hasSeenOnboarding');
-      if (seen !== 'true') {
+      if (seen !== 'true' && !isAuthenticated) {
         router.replace('/landing');
         return;
       }
@@ -155,7 +160,7 @@ export default function RootLayout() {
       }
     };
     checkOnboarding();
-  }, [isAuthenticated, segments, loaded, router]);
+  }, [isAuthenticated, isHydrated, segments, loaded, router]);
 
 
   if (!loaded && !error) {

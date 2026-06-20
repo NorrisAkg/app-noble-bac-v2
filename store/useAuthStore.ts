@@ -14,6 +14,8 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  /** True once initialize() has finished reading SecureStore on app boot */
+  isHydrated: boolean;
   /** Call after a successful login or OTP verification */
   setAuth: (user: User, accessToken: string, refreshToken: string) => Promise<void>;
   /** Revokes the token on the server then clears local storage */
@@ -29,6 +31,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
+  isHydrated: false,
 
   setAuth: async (user, accessToken, refreshToken) => {
     await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
@@ -55,20 +58,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initialize: async () => {
-    const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
-    const refreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
-    const rawUser = await SecureStore.getItemAsync(STORAGE_KEYS.USER);
+    try {
+      const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
+      const refreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
+      const rawUser = await SecureStore.getItemAsync(STORAGE_KEYS.USER);
 
-    if (accessToken && rawUser) {
-      try {
-        const user: User = JSON.parse(rawUser);
-        set({ user, accessToken, refreshToken, isAuthenticated: true });
-      } catch {
-        // Corrupted storage — clear it
-        await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
-        await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
-        await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+      if (accessToken && rawUser) {
+        try {
+          const user: User = JSON.parse(rawUser);
+          set({ user, accessToken, refreshToken, isAuthenticated: true });
+        } catch {
+          // Corrupted storage — clear it
+          await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
+          await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
+          await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+        }
       }
+    } finally {
+      // Mark hydration complete in all cases so the routing guards can run.
+      set({ isHydrated: true });
     }
   },
 }));
