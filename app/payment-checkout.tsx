@@ -217,8 +217,30 @@ export default function PaymentCheckoutScreen() {
       setTransactionId(transaction.id);
       setHostedCheckout(!!payment_url);
       if (payment_url) {
-        // Mode hébergé : ouvre la page FedaPay. La promesse se résout à la
-        // fermeture du navigateur ; le polling prend alors le relais.
+        // Mode hébergé : le débit direct n'est pas disponible pour cet
+        // opérateur, on bascule sur la page FedaPay. On prévient avant d'ouvrir
+        // le navigateur pour que la sortie de l'app ne surprenne pas
+        // l'utilisateur (cf. opérateurs sans push : Orange, Wave, Moov…).
+        const proceed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Page de paiement sécurisée',
+            "Ce moyen de paiement va ouvrir une page sécurisée FedaPay dans ton navigateur. Choisis ton opérateur, valide le paiement, puis reviens sur cet écran : la confirmation est automatique.",
+            [
+              { text: 'Annuler', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Continuer', onPress: () => resolve(true) },
+            ],
+            { cancelable: true, onDismiss: () => resolve(false) },
+          );
+        });
+        if (!proceed) {
+          // Abandon avant redirection : on stoppe le polling et on revient au
+          // formulaire en conservant l'opérateur/numéro déjà saisis.
+          finishedRef.current = true;
+          setStep('select');
+          return;
+        }
+        // La promesse se résout à la fermeture du navigateur ; le polling
+        // prend alors le relais.
         await WebBrowser.openBrowserAsync(payment_url);
       }
       // Mode débit direct (payment_url null) : le push USSD a déjà été envoyé
