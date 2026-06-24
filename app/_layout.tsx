@@ -5,7 +5,6 @@ import { useEffect, useRef } from 'react';
 import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
 // ─── DEV: silence un log natif inoffensif de expo-video v3 ───────────────────
@@ -72,7 +71,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { initialize, isAuthenticated } = useAuthStore();
+  const { initialize, isAuthenticated, isHydrated } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -114,13 +113,18 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (loaded || error) {
+    if ((loaded || error) && isHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [loaded, error, isHydrated]);
 
+  // Filet de securite RUNTIME uniquement (post-login / post-logout). La
+  // decision du cold-start appartient a app/index.tsx (<Redirect> declaratif,
+  // resolu au render donc pre-paint) : ce guard ne touche jamais la route
+  // d'entree, ce qui supprime la race index.tsx vs guard a l'origine du flash
+  // d'onboarding pour un utilisateur connecte.
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !isHydrated) return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // DEV BYPASS — set EXPO_PUBLIC_BYPASS_AUTH=true in .env.local to skip the
@@ -130,32 +134,27 @@ export default function RootLayout() {
     // ─────────────────────────────────────────────────────────────────────────
     if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') return;
 
-    const inTabsGroup = segments[0] === '(tabs)';
-    const inAuthGroup = segments[0] === '(auth)';
-    const isLanding = segments[0] === 'landing';
+    const root = segments[0];
+    const inTabsGroup = root === '(tabs)';
+    const inAuthGroup = root === '(auth)';
+    const isLanding = root === 'landing';
 
-    // Onboarding au premier lancement : on bascule vers landing.tsx qui
-    // sert d'ecran de bienvenue (video + CTA). Le flag AsyncStorage
-    // 'hasSeenOnboarding' evite de re-presenter le landing apres la 1ere
-    // visite (le landing lui-meme s'occupe de poser ce flag).
-    const checkOnboarding = async () => {
-      const seen = await AsyncStorage.getItem('hasSeenOnboarding');
-      if (seen !== 'true') {
-        router.replace('/landing');
-        return;
-      }
-      if (!isAuthenticated && inTabsGroup) {
-        router.replace('/landing');
-      } else if (isAuthenticated && (inAuthGroup || isLanding)) {
-        // L'écran congrats est volontairement post-auth (affiché après le succès
-        // de verifyOtp). Sans cette exception, le guard court-circuiterait le
-        // flow inscription → OTP → congrats → setup en redirigeant vers (tabs).
-        if (segments[1] === 'congrats') return;
-        router.replace('/(tabs)');
-      }
-    };
-    checkOnboarding();
-  }, [isAuthenticated, segments, loaded, router]);
+    // Cold-start (route '/' / index) : on laisse index.tsx trancher.
+    if (!inTabsGroup && !inAuthGroup && !isLanding) return;
+
+    if (!isAuthenticated && inTabsGroup) {
+      // Logout ou clearLocal (refresh token invalide) en cours de session.
+      router.replace('/landing');
+    } else if (isAuthenticated && (inAuthGroup || isLanding)) {
+      // L'écran congrats est volontairement post-auth (affiché après le succès
+      // de verifyOtp). Sans cette exception, le guard court-circuiterait le
+      // flow inscription → OTP → congrats → setup en redirigeant vers (tabs).
+      if (segments[1] === 'congrats') return;
+      // Post-login : login.tsx ne navigue pas lui-meme, c'est ce guard qui
+      // bascule vers (tabs) une fois setAuth() appele.
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, isHydrated, segments, loaded, router]);
 
 
   if (!loaded && !error) {

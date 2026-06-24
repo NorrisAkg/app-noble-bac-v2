@@ -29,6 +29,7 @@ describe('useAuthStore', () => {
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      isHydrated: false,
     });
   });
 
@@ -118,6 +119,7 @@ describe('useAuthStore', () => {
     expect(state.user?.id).toBe('u-1');
     expect(state.accessToken).toBe('stored-access');
     expect(state.refreshToken).toBe('stored-refresh');
+    expect(state.isHydrated).toBe(true);
   });
 
   it('initialize ne fait rien si pas d\'access token stocke', async () => {
@@ -127,6 +129,7 @@ describe('useAuthStore', () => {
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().user).toBeNull();
+    expect(useAuthStore.getState().isHydrated).toBe(true);
   });
 
   it('initialize nettoie SecureStore si le JSON user est corrompu', async () => {
@@ -142,6 +145,7 @@ describe('useAuthStore', () => {
     await useAuthStore.getState().initialize();
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().isHydrated).toBe(true);
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('access_token');
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('refresh_token');
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('auth_user');
