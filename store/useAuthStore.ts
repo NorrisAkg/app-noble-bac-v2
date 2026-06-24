@@ -58,6 +58,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initialize: async () => {
+    // Build the final state in memory and commit it in a single set() so the
+    // routing layer never observes an intermediate {isAuthenticated:true,
+    // isHydrated:false} frame (which would race index.tsx vs the layout guard).
+    let next: Partial<AuthState> = { isHydrated: true };
     try {
       const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
       const refreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
@@ -66,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (accessToken && rawUser) {
         try {
           const user: User = JSON.parse(rawUser);
-          set({ user, accessToken, refreshToken, isAuthenticated: true });
+          next = { user, accessToken, refreshToken, isAuthenticated: true, isHydrated: true };
         } catch {
           // Corrupted storage — clear it
           await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
@@ -76,7 +80,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } finally {
       // Mark hydration complete in all cases so the routing guards can run.
-      set({ isHydrated: true });
+      set(next);
     }
   },
 }));
