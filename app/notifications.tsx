@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { ChevronLeft, CheckCheck, Trash2 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -24,6 +24,7 @@ import {
   type AppNotification,
 } from '@/services/notificationApiService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { resolveNotificationLink } from '@/utils/notificationLink';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyNotifications } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
@@ -46,16 +47,23 @@ function NotificationRow({
   item,
   onMarkRead,
   onDelete,
+  onOpen,
 }: {
   item: AppNotification;
   onMarkRead: (id: number) => void;
   onDelete: (item: AppNotification) => void;
+  onOpen: (item: AppNotification) => void;
 }) {
   return (
     <TouchableOpacity
       style={[styles.row, !item.is_read && styles.rowUnread]}
       activeOpacity={0.7}
-      onPress={() => !item.is_read && onMarkRead(item.id)}
+      onPress={() => {
+        if (!item.is_read) {
+          onMarkRead(item.id);
+        }
+        onOpen(item);
+      }}
     >
       <View style={[styles.dot, item.is_read && styles.dotRead]} />
       <View style={{ flex: 1, gap: 3 }}>
@@ -160,15 +168,26 @@ export default function NotificationsScreen() {
 
   const hasUnread = notifications.some((n) => !n.is_read);
 
+  const openNotification = useCallback(
+    (item: AppNotification) => {
+      const link = resolveNotificationLink(item.data);
+      if (link) {
+        router.push(link as Href);
+      }
+    },
+    [router],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: AppNotification }) => (
       <NotificationRow
         item={item}
         onMarkRead={(id) => markReadMutation.mutate(id)}
         onDelete={confirmDelete}
+        onOpen={openNotification}
       />
     ),
-    [markReadMutation, confirmDelete],
+    [markReadMutation, confirmDelete, openNotification],
   );
 
   return (
