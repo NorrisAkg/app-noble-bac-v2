@@ -16,6 +16,7 @@ import { Search, Bell } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePremiumGate } from "@/hooks/usePremiumGate";
+import { useDailyQuizSeen } from "@/hooks/useDailyQuizSeen";
 import { AdsBanner } from "@/components/home/AdsBanner";
 import { BookCover } from "@/components/home/BookCover";
 import { FlashQuizCard } from "@/components/home/FlashQuizCard";
@@ -164,6 +165,7 @@ export default function HomeScreen() {
     staleTime: 5 * 60 * 1000,
   });
   const dailyQuiz = dailyQuizQuery.data ?? null;
+  const dailyQuizSeen = useDailyQuizSeen(today);
 
   // Stats agrégées : alimente le « prêt à X % » du countdown.
   const statsQuery = useQuery({
@@ -435,8 +437,10 @@ export default function HomeScreen() {
             />
           }
         >
-          {/* Quiz éclair du jour — masqué si rien n'est planifié pour la série */}
-          {dailyQuiz != null && <FlashQuizCard quiz={dailyQuiz} />}
+          {/* Quiz éclair du jour — masqué si rien n'est planifié, ou déjà répondu aujourd'hui */}
+          {dailyQuiz != null && dailyQuizSeen.loaded && !dailyQuizSeen.seen && (
+            <FlashQuizCard quiz={dailyQuiz} onAnswered={dailyQuizSeen.markSeen} />
+          )}
 
           {/* Bannière Premium — masquée temporairement
           {!isPremium && (

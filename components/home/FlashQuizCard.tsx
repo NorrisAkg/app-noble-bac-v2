@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { Zap } from 'lucide-react-native';
 import { useMutation } from '@tanstack/react-query';
 import { quizService } from '@/services/quizService';
@@ -7,24 +8,42 @@ import type { DailyQuiz, DailyQuizAnswerResult } from '@/services/quizService';
 
 interface Props {
   quiz: DailyQuiz;
+  /** Appelé une fois la réponse enregistrée — sert à persister le « vu aujourd'hui ». */
+  onAnswered: () => void;
 }
+
+/** Délai d'affichage de la correction avant le fondu de sortie. */
+const DISMISS_DELAY_MS = 3000;
 
 /**
  * Bloc « Quiz éclair du jour » de l'accueil (cf. maquette home-v2).
  * Une seule question, gratuite pour tous, réponse unique : la correction
  * est demandée au backend (anti-triche, is_correct jamais embarqué).
  */
-export const FlashQuizCard: React.FC<Props> = ({ quiz }) => {
+export const FlashQuizCard: React.FC<Props> = ({ quiz, onAnswered }) => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [result, setResult] = useState<DailyQuizAnswerResult | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   const answerMutation = useMutation({
     mutationFn: quizService.answerDailyQuiz,
-    onSuccess: setResult,
+    onSuccess: (res) => {
+      setResult(res);
+      onAnswered();
+    },
     onError: () => setSelectedId(null),
   });
 
   const answered = result !== null;
+
+  // Une fois répondu : on laisse voir la correction, puis le bloc s'efface.
+  useEffect(() => {
+    if (!answered) {
+      return;
+    }
+    const timer = setTimeout(() => setDismissed(true), DISMISS_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [answered]);
 
   const handlePress = (optionId: number) => {
     if (answered || answerMutation.isPending) {
@@ -70,8 +89,12 @@ export const FlashQuizCard: React.FC<Props> = ({ quiz }) => {
     return styles.optionText;
   };
 
+  if (dismissed) {
+    return null;
+  }
+
   return (
-    <View style={styles.card}>
+    <Animated.View style={styles.card} exiting={FadeOut.duration(400)}>
       <View style={styles.head}>
         <View style={styles.badgeIcon}>
           <Zap size={14} color="#3DBE45" strokeWidth={2} />
@@ -110,7 +133,7 @@ export const FlashQuizCard: React.FC<Props> = ({ quiz }) => {
           {feedback}
         </Text>
       )}
-    </View>
+    </Animated.View>
   );
 };
 
