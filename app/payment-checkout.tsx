@@ -29,17 +29,28 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { C } from '@/constants/theme';
 import type { Operator, TransactionStatus } from '@/types/api';
 
-/**
- * Intervalle entre deux polls de statut. FedaPay confirme generalement en
- * ~10-30s apres validation utilisateur. 4s est un compromis charge/UX.
- */
-const POLL_INTERVAL_MS = 4_000;
+/** Schéma deep link enregistré dans app.json (cf. C2 Moneroo). */
+const DEEP_LINK_SCHEME = 'noblebac://payment/callback';
 
 /**
- * Borne haute du polling (en cas de webhook bloque, on n'attend pas
- * indefiniment). 5 min couvre largement le temps d'un paiement Mobile Money.
+ * Polling initial après retour du checkout hébergé.
+ * Court : la confirmation webhook arrive généralement dans les ~5 s qui
+ * suivent le redirect Moneroo.
  */
-const POLL_TIMEOUT_MS = 5 * 60 * 1_000;
+const POLL_INITIAL_MS = 2_000;
+
+/**
+ * Après un 2e poll infructueux, on passe à un intervalle plus lent pour
+ * économiser la batterie (backoff linéaire, plafonné à POLL_MAX_MS).
+ */
+const POLL_STEP_MS = 1_500;
+const POLL_MAX_MS = 8_000;
+
+/**
+ * Plafond total du polling (90 s). Au-delà, on affiche le message
+ * "paiement en cours de validation, vous serez notifié" (spec C3).
+ */
+const POLL_TIMEOUT_MS = 90_000;
 
 /** Format E.164 attendu par le backend (E164PhoneRule). */
 const E164_RE = /^\+[1-9]\d{7,14}$/;
@@ -75,6 +86,8 @@ export default function PaymentCheckoutScreen() {
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
   const finishedRef = useRef(false);
   const startedAtRef = useRef<number>(0);
+  /** Résout la promesse interne « checkout terminé » pour déclencher un poll immédiat. */
+  const checkoutDoneRef = useRef<(() => void) | null>(null);
 
   const operatorsQuery = useQuery({
     queryKey: ['operators', user?.country_id],
@@ -128,20 +141,25 @@ export default function PaymentCheckoutScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Polling du statut une fois le paiement initie. S'arrete des qu'on quitte
-  // 'pending' ou apres POLL_TIMEOUT_MS.
+  // Polling avec backoff linéaire. Déclenché dès que transactionId est connu.
+  // Le premier tick est court (POLL_INITIAL_MS) ; chaque tick infructueux
+  // allonge l'intervalle de POLL_STEP_MS jusqu'au plafond POLL_MAX_MS.
+  // Un poll immédiat est déclenché par checkoutDoneRef quand openAuthSessionAsync
+  // revient (deep link intercepté = checkout terminé).
   useEffect(() => {
     if (transactionId === null) return;
 
-    const interval = setInterval(async () => {
+    let currentInterval = POLL_INITIAL_MS;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const poll = async () => {
       if (finishedRef.current) return;
 
       if (Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
         finishedRef.current = true;
-        clearInterval(interval);
         Alert.alert(
-          'Paiement en cours',
-          'La confirmation prend plus de temps que prevu. Tu peux verifier le statut dans "Mon abonnement".',
+          'Paiement en cours de validation',
+          'La confirmation prend plus de temps que prévu. Tu seras notifié dès que ton abonnement sera activé. Tu peux vérifier le statut dans "Mon abonnement".',
           [{ text: 'OK', onPress: () => router.replace('/my-subscription') }],
         );
         return;
@@ -151,32 +169,48 @@ export default function PaymentCheckoutScreen() {
         const tx = await getPaymentStatus(transactionId);
         if (tx.status === 'confirmed') {
           finishedRef.current = true;
-          clearInterval(interval);
           await queryClient.invalidateQueries({ queryKey: ['subscription', 'active'] });
           await queryClient.invalidateQueries({ queryKey: ['active-subscription'] });
           await queryClient.invalidateQueries({ queryKey: ['profile'] });
           await queryClient.invalidateQueries({ queryKey: ['my-subscription-transactions'] });
           setStatus('confirmed');
           setShowSuccessSheet(true);
+          return;
         } else if (tx.status === 'failed' || tx.status === 'expired') {
           finishedRef.current = true;
-          clearInterval(interval);
           setStatus(tx.status);
           setStep('select');
           Alert.alert(
             'Paiement non abouti',
             tx.status === 'expired'
-              ? 'Le delai de paiement a expire. Reessaie.'
-              : 'Le paiement a echoue. Aucun montant n\'a ete debite.',
+              ? 'Le délai de paiement a expiré. Réessaie.'
+              : "Le paiement a échoué. Aucun montant n'a été débité.",
           );
+          return;
         }
       } catch (e) {
-        // Erreur reseau ponctuelle : on retentera au prochain tick.
+        // Erreur réseau ponctuelle : on retentera au prochain tick.
         console.warn('[payment-checkout] poll status failed:', getApiErrorMessage(e));
       }
-    }, POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+      // Toujours pending : planifie le prochain tick avec backoff.
+      currentInterval = Math.min(currentInterval + POLL_STEP_MS, POLL_MAX_MS);
+      timeoutId = setTimeout(poll, currentInterval);
+    };
+
+    // Permet à openAuthSessionAsync de déclencher un poll immédiat.
+    checkoutDoneRef.current = () => {
+      clearTimeout(timeoutId);
+      currentInterval = POLL_INITIAL_MS;
+      void poll();
+    };
+
+    timeoutId = setTimeout(poll, currentInterval);
+
+    return () => {
+      clearTimeout(timeoutId);
+      checkoutDoneRef.current = null;
+    };
   }, [transactionId, queryClient, router]);
 
   const handleBack = () => {
@@ -217,14 +251,13 @@ export default function PaymentCheckoutScreen() {
       setTransactionId(transaction.id);
       setHostedCheckout(!!payment_url);
       if (payment_url) {
-        // Mode hébergé : le débit direct n'est pas disponible pour cet
-        // opérateur, on bascule sur la page FedaPay. On prévient avant d'ouvrir
-        // le navigateur pour que la sortie de l'app ne surprenne pas
-        // l'utilisateur (cf. opérateurs sans push : Orange, Wave, Moov…).
+        // Mode hébergé : ouvre la page de paiement dans un navigateur in-app.
+        // openAuthSessionAsync intercepte le deep link noblebac:// que l'API
+        // renvoie comme return_url → l'app reprend la main automatiquement.
         const proceed = await new Promise<boolean>((resolve) => {
           Alert.alert(
             'Page de paiement sécurisée',
-            "Ce moyen de paiement va ouvrir une page sécurisée FedaPay dans ton navigateur. Choisis ton opérateur, valide le paiement, puis reviens sur cet écran : la confirmation est automatique.",
+            "Une page de paiement sécurisée va s'ouvrir. Valide ton paiement, puis reviens sur cet écran : la confirmation est automatique.",
             [
               { text: 'Annuler', style: 'cancel', onPress: () => resolve(false) },
               { text: 'Continuer', onPress: () => resolve(true) },
@@ -233,15 +266,16 @@ export default function PaymentCheckoutScreen() {
           );
         });
         if (!proceed) {
-          // Abandon avant redirection : on stoppe le polling et on revient au
-          // formulaire en conservant l'opérateur/numéro déjà saisis.
+          // Abandon avant redirection : stoppe le polling, revient au formulaire.
           finishedRef.current = true;
           setStep('select');
           return;
         }
-        // La promesse se résout à la fermeture du navigateur ; le polling
-        // prend alors le relais.
-        await WebBrowser.openBrowserAsync(payment_url);
+        // openAuthSessionAsync se résout dès que le navigateur intercepte le
+        // deep link noblebac:// (ou à la fermeture manuelle).
+        // On déclenche ensuite un poll immédiat via checkoutDoneRef.
+        await WebBrowser.openAuthSessionAsync(payment_url, DEEP_LINK_SCHEME);
+        checkoutDoneRef.current?.();
       }
       // Mode débit direct (payment_url null) : le push USSD a déjà été envoyé
       // côté backend, le polling détecte la confirmation.
@@ -292,11 +326,11 @@ export default function PaymentCheckoutScreen() {
         <View style={styles.processingBox}>
           <ActivityIndicator size="large" color={C.green} />
           <Text style={styles.processingTitle}>
-            {hostedCheckout ? 'Finalise ton paiement' : 'Confirme sur ton téléphone'}
+            {hostedCheckout ? 'Vérification en cours…' : 'Confirme sur ton téléphone'}
           </Text>
           <Text style={styles.processingDesc}>
             {hostedCheckout
-              ? "Termine le paiement dans la page qui s'est ouverte. Une fois validé, reviens sur cet écran : la confirmation est automatique. Ne ferme pas cet écran."
+              ? "Le paiement est en cours de validation. Tu peux fermer la page de paiement si ce n'est pas déjà fait. La confirmation est automatique."
               : 'Une demande de paiement a été envoyée à ton numéro. Valide-la avec ton code mobile money pour activer ton abonnement. Ne ferme pas cet écran.'}
           </Text>
           {status !== 'pending' && status !== 'confirmed' && (
