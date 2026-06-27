@@ -127,7 +127,10 @@ export default function PaymentCheckoutScreen() {
   const localDigits = localPhone.replace(/\D/g, '');
   const fullPhone = phonePrefix + localDigits;
   const phoneValid = phonePrefix.length > 0 && E164_RE.test(fullPhone);
-  const canPay = selectedOperatorId !== null && phoneValid && !!planId;
+  // Pour le checkout hébergé (Moneroo), l'opérateur est sélectionné sur la page
+  // de paiement — seul le plan est obligatoire. Un opérateur pré-sélectionné améliore
+  // le routing mais n'est pas requis.
+  const canPay = !!planId && (selectedOperatorId === null || phoneValid);
 
   // Bloque le bouton retour materiel pendant le traitement pour eviter de
   // claquer l'ecran entre la validation operateur et la confirmation webhook.
@@ -243,8 +246,8 @@ export default function PaymentCheckoutScreen() {
     try {
       const { transaction, payment_url } = await initiatePayment({
         subscriptionPlanId: planId,
-        operatorId: selectedOperatorId,
-        phoneNumber: fullPhone,
+        ...(selectedOperatorId !== null ? { operatorId: selectedOperatorId } : {}),
+        ...(selectedOperatorId !== null && phoneValid ? { phoneNumber: fullPhone } : {}),
       });
       // Démarre le polling avant tout : la confirmation peut arriver pendant
       // que la page FedaPay est ouverte / que l'USSD est en cours.
@@ -364,7 +367,10 @@ export default function PaymentCheckoutScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>Choisis ton mode de paiement</Text>
+          <Text style={styles.sectionTitle}>Pré-sélectionner un opérateur (optionnel)</Text>
+          <Text style={styles.sectionHint}>
+            Tu peux payer directement — tu choisiras ton opérateur sur la page de paiement sécurisée.
+          </Text>
 
           {operatorsQuery.isLoading ? (
             <View style={styles.stateBox}>
@@ -425,7 +431,7 @@ export default function PaymentCheckoutScreen() {
         </KeyboardAvoidingView>
       )}
 
-      {step === 'select' && operators.length > 0 && (
+      {step === 'select' && (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity
             onPress={handlePay}
@@ -531,7 +537,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 14,
     color: C.ink,
-    marginBottom: 10,
+    marginBottom: 4,
+  },
+  sectionHint: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
+    color: C.ink3,
+    marginBottom: 12,
+    lineHeight: 17,
   },
 
   operatorsList: { gap: 8 },

@@ -15,12 +15,13 @@ export interface InitiatePaymentResponse {
 
 /**
  * Payload de POST /api/v1/payments/initiate.
- * `operatorId` cible le reseau mobile money choisi ; `phoneNumber` (E.164)
- * surcharge le numero du profil (optionnel).
+ * `operatorId` est optionnel pour le checkout hébergé (Moneroo) — l'utilisateur
+ * sélectionne son opérateur sur la page de paiement. Requis uniquement pour
+ * FedaPay direct charge.
  */
 export interface InitiatePaymentPayload {
   subscriptionPlanId: number;
-  operatorId: number;
+  operatorId?: number;
   phoneNumber?: string;
 }
 
@@ -39,7 +40,7 @@ export async function initiatePayment(
     '/payments/initiate',
     {
       subscription_plan_id: payload.subscriptionPlanId,
-      operator_id: payload.operatorId,
+      ...(payload.operatorId !== undefined ? { operator_id: payload.operatorId } : {}),
       ...(payload.phoneNumber ? { phone_number: payload.phoneNumber } : {}),
     },
   );
