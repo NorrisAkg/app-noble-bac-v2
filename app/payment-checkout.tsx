@@ -6,14 +6,15 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
+import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { ChevronLeft } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { TouchableOpacity } from 'react-native';
 
 import { initiatePayment, getPaymentStatus } from '@/services/paymentService';
 import { getApiErrorMessage } from '@/utils/apiError';
@@ -21,8 +22,12 @@ import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
 import { C } from '@/constants/theme';
 import type { TransactionStatus } from '@/types/api';
 
-/** Schéma deep link enregistré dans app.json (cf. C2 Moneroo). */
-const DEEP_LINK_SCHEME = 'noblebac://payment/callback';
+/**
+ * URL de retour côté backend — le serveur redirige ensuite vers le deep link.
+ * On intercepte cette URL dans la WebView pour détecter la fin du paiement
+ * sans quitter l'app.
+ */
+const MONEROO_RETURN_PATH = '/payments/moneroo/return';
 
 const POLL_INITIAL_MS = 2_000;
 const POLL_STEP_MS = 1_500;
@@ -38,10 +43,11 @@ export default function PaymentCheckoutScreen() {
   const planId = plan_id ? Number(plan_id) : null;
 
   // 'initiating' → appel API en cours
-  // 'processing' → browser Moneroo ouvert ou polling webhook
-  const [step, setStep] = useState<'initiating' | 'processing'>('initiating');
-  const [processingLabel, setProcessingLabel] = useState('Préparation du paiement…');
-  const [processingDesc, setProcessingDesc] = useState('');
+  // 'checkout'   → WebView Moneroo visible
+  // 'polling'    → WebView fermée, attente confirmation webhook
+  const [step, setStep] = useState<'initiating' | 'checkout' | 'polling'>('initiating');
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [webViewReady, setWebViewReady] = useState(false);
   const [transactionId, setTransactionId] = useState<number | null>(null);
   const [status, setStatus] = useState<TransactionStatus>('pending');
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
@@ -50,7 +56,7 @@ export default function PaymentCheckoutScreen() {
   const startedAtRef = useRef<number>(0);
   const checkoutDoneRef = useRef<(() => void) | null>(null);
 
-  // Bloque le bouton retour pendant le traitement.
+  // Bloque le bouton retour matériel pendant le traitement.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       handleBack();
@@ -60,7 +66,7 @@ export default function PaymentCheckoutScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-initiation au montage : pas d'écran intermédiaire de sélection.
+  // Auto-initiation au montage : appel API immédiat, pas d'écran intermédiaire.
   useEffect(() => {
     if (!planId) return;
     let cancelled = false;
@@ -76,51 +82,12 @@ export default function PaymentCheckoutScreen() {
         setTransactionId(transaction.id);
 
         if (payment_url) {
-          // Hosted checkout (Moneroo) : confirmation puis ouverture du navigateur.
-          const proceed = await new Promise<boolean>((resolve) => {
-            Alert.alert(
-              'Page de paiement sécurisée',
-              "Une page de paiement sécurisée va s'ouvrir. Valide ton paiement, puis reviens sur cet écran : la confirmation est automatique.",
-              [
-                { text: 'Annuler', style: 'cancel', onPress: () => resolve(false) },
-                { text: 'Continuer', onPress: () => resolve(true) },
-              ],
-              { cancelable: true, onDismiss: () => resolve(false) },
-            );
-          });
-
-          if (cancelled) return;
-
-          if (!proceed) {
-            finishedRef.current = true;
-            router.back();
-            return;
-          }
-
-          setStep('processing');
-          setProcessingLabel('Page de paiement ouverte…');
-          setProcessingDesc(
-            "Valide ton paiement sur la page sécurisée. La confirmation est automatique dès que le paiement est reçu.",
-          );
-
-          // openAuthSessionAsync intercepte le deep link noblebac:// et revient
-          // automatiquement dans l'app (nécessite un dev build, pas Expo Go).
-          await WebBrowser.openAuthSessionAsync(payment_url, DEEP_LINK_SCHEME);
-
-          if (cancelled) return;
-
-          setProcessingLabel('Vérification en cours…');
-          setProcessingDesc(
-            "Le paiement est en cours de validation. La confirmation est automatique.",
-          );
-          checkoutDoneRef.current?.();
+          // Hosted checkout : ouvre la page Moneroo dans la WebView intégrée.
+          setCheckoutUrl(payment_url);
+          setStep('checkout');
         } else {
-          // Direct charge (FedaPay USSD) : le push a été envoyé, on poll.
-          setStep('processing');
-          setProcessingLabel('Confirme sur ton téléphone');
-          setProcessingDesc(
-            'Une demande de paiement a été envoyée à ton numéro. Valide-la avec ton code mobile money pour activer ton abonnement. Ne ferme pas cet écran.',
-          );
+          // Direct charge (FedaPay USSD) : push déjà envoyé, on poll.
+          setStep('polling');
         }
       } catch (e) {
         if (!cancelled) {
@@ -130,14 +97,12 @@ export default function PaymentCheckoutScreen() {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
     // mount-only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Polling avec backoff linéaire. Déclenché dès que transactionId est posé.
+  // Polling avec backoff linéaire, déclenché dès que transactionId est posé.
   useEffect(() => {
     if (transactionId === null) return;
 
@@ -194,16 +159,40 @@ export default function PaymentCheckoutScreen() {
       void poll();
     };
 
-    timeoutId = setTimeout(poll, currentInterval);
+    // Pour le direct charge, le polling démarre immédiatement.
+    // Pour le hosted checkout, checkoutDoneRef déclenche le poll au bon moment.
+    if (step !== 'checkout') {
+      timeoutId = setTimeout(poll, currentInterval);
+    }
 
     return () => {
       clearTimeout(timeoutId);
       checkoutDoneRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId, queryClient, router]);
 
+  /**
+   * Intercepte chaque navigation dans la WebView.
+   * Quand Moneroo redirige vers notre return URL (ou un deep link noblebac://),
+   * on ferme la WebView et on déclenche le polling immédiatement.
+   */
+  const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest): boolean => {
+    const url = request.url;
+    if (url.startsWith('noblebac://') || url.includes(MONEROO_RETURN_PATH)) {
+      setCheckoutUrl(null);
+      setWebViewReady(false);
+      setStep('polling');
+      // Réinitialise le timer de timeout à partir de la fermeture de la WebView.
+      startedAtRef.current = Date.now();
+      checkoutDoneRef.current?.();
+      return false; // bloque la navigation dans la WebView
+    }
+    return true;
+  };
+
   const handleBack = () => {
-    if (finishedRef.current || step === 'initiating') {
+    if (step === 'initiating' || finishedRef.current) {
       router.back();
       return;
     }
@@ -244,18 +233,47 @@ export default function PaymentCheckoutScreen() {
       <View style={{ height: insets.top, backgroundColor: C.green }} />
       <Header onBack={handleBack} />
 
-      <View style={styles.processingBox}>
-        <ActivityIndicator size="large" color={C.green} />
-        <Text style={styles.processingTitle}>{processingLabel}</Text>
-        {processingDesc.length > 0 && (
-          <Text style={styles.processingDesc}>{processingDesc}</Text>
-        )}
-        {status !== 'pending' && status !== 'confirmed' && (
-          <Text style={styles.statusText}>
-            Statut : {status === 'expired' ? 'Expiré' : 'Échoué'}
+      {/* Écran de chargement / polling */}
+      {step !== 'checkout' && (
+        <View style={styles.processingBox}>
+          <ActivityIndicator size="large" color={C.green} />
+          <Text style={styles.processingTitle}>
+            {step === 'initiating' ? 'Préparation du paiement…' : 'Vérification en cours…'}
           </Text>
-        )}
-      </View>
+          {step === 'polling' && (
+            <Text style={styles.processingDesc}>
+              Le paiement est en cours de validation. La confirmation est automatique dès que le
+              paiement est reçu.
+            </Text>
+          )}
+          {status !== 'pending' && status !== 'confirmed' && (
+            <Text style={styles.statusText}>
+              Statut : {status === 'expired' ? 'Expiré' : 'Échoué'}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* WebView Moneroo — visible uniquement pendant step === 'checkout' */}
+      {checkoutUrl !== null && (
+        <View style={styles.webViewContainer}>
+          {!webViewReady && (
+            <View style={styles.webViewLoader}>
+              <ActivityIndicator size="large" color={C.green} />
+              <Text style={styles.webViewLoaderText}>Chargement de la page de paiement…</Text>
+            </View>
+          )}
+          <WebView
+            style={webViewReady ? styles.webView : styles.webViewHidden}
+            source={{ uri: checkoutUrl }}
+            onLoad={() => setWebViewReady(true)}
+            onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState={false}
+          />
+        </View>
+      )}
 
       <PremiumSuccessSheet
         isOpen={showSuccessSheet}
@@ -317,6 +335,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: C.danger,
     marginTop: 16,
+  },
+
+  webViewContainer: { flex: 1 },
+  webView: { flex: 1 },
+  webViewHidden: { flex: 0, height: 0 },
+  webViewLoader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  webViewLoaderText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: C.ink2,
   },
 
   stateBox: { paddingVertical: 40, alignItems: 'center', justifyContent: 'center' },
