@@ -46,9 +46,8 @@ export default function SignupScreen() {
     isError: referentialError,
     error: referentialErrorObj,
   } = useQuery({
-    queryKey: ['countries'],
+    queryKey: ['referential', 'countries'],
     queryFn: getCountries,
-    staleTime: Infinity,
   });
 
   const e164Phone = buildE164Phone(country.dial, phone);
