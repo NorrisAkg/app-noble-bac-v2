@@ -270,6 +270,13 @@ export default function PaymentCheckoutScreen() {
             javaScriptEnabled
             domStorageEnabled
             startInLoadingState={false}
+            // Empêche les liens target="_blank" / window.open d'ouvrir
+            // le navigateur système — toute navigation reste dans la WebView.
+            setSupportMultipleWindows={false}
+            onOpenWindow={(e) => {
+              // iOS : intercepte window.open() et charge l'URL dans la WebView.
+              setCheckoutUrl(e.nativeEvent.targetUrl);
+            }}
           />
         </View>
       )}
