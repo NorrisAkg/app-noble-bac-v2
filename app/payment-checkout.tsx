@@ -23,11 +23,10 @@ import { C } from '@/constants/theme';
 import type { TransactionStatus } from '@/types/api';
 
 /**
- * URL de retour côté backend — le serveur redirige ensuite vers le deep link.
- * On intercepte cette URL dans la WebView pour détecter la fin du paiement
- * sans quitter l'app.
+ * Chemins de retour des gateways — interceptés dans la WebView pour détecter
+ * la fin du paiement sans quitter l'app.
  */
-const MONEROO_RETURN_PATH = '/payments/moneroo/return';
+const RETURN_PATHS = ['/payments/moneroo/return', '/payment/confirm'];
 
 const POLL_INITIAL_MS = 2_000;
 const POLL_STEP_MS = 1_500;
@@ -179,7 +178,7 @@ export default function PaymentCheckoutScreen() {
    */
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest): boolean => {
     const url = request.url;
-    if (url.startsWith('noblebac://') || url.includes(MONEROO_RETURN_PATH)) {
+    if (url.startsWith('noblebac://') || RETURN_PATHS.some((p) => url.includes(p))) {
       setCheckoutUrl(null);
       setWebViewReady(false);
       setStep('polling');
