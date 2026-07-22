@@ -498,6 +498,7 @@ export default function HomeScreen() {
                       color: palette.color,
                       accent: palette.accent,
                       free: b.is_free,
+                      cover_url: b.cover_url,
                     }}
                     hidePremiumBadge={isPremium}
                     onPress={() => handleBookPress(b)}

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { Lock } from "lucide-react-native";
 
 // Design matches the template "Book Cover (faux 3D paperback)"
@@ -10,6 +11,7 @@ interface BookCoverProps {
     color: string;
     accent: string;
     free: boolean;
+    cover_url?: string | null;
   };
   onPress: () => void;
   /**
@@ -31,21 +33,32 @@ export const BookCover: React.FC<BookCoverProps> = ({
     style={styles.wrapper}
   >
     <View style={[styles.cover, { backgroundColor: book.color }]}>
-      {/* Spine highlight */}
-      <View style={styles.spine} />
+      {book.cover_url ? (
+        <Image
+          source={{ uri: book.cover_url }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={300}
+        />
+      ) : (
+        <>
+          {/* Spine highlight */}
+          <View style={styles.spine} />
 
-      {/* Subject label */}
-      <Text style={[styles.subject, { color: book.accent }]} numberOfLines={1}>
-        {book.subject.toUpperCase()}
-      </Text>
+          {/* Subject label */}
+          <Text style={[styles.subject, { color: book.accent }]} numberOfLines={1}>
+            {book.subject.toUpperCase()}
+          </Text>
 
-      {/* Title */}
-      <Text style={styles.title} numberOfLines={3}>
-        {book.title}
-      </Text>
+          {/* Title */}
+          <Text style={styles.title} numberOfLines={3}>
+            {book.title}
+          </Text>
 
-      {/* Brand mark */}
-      <Text style={styles.brand}>NOBLE BAC</Text>
+          {/* Brand mark */}
+          <Text style={styles.brand}>NOBLE BAC</Text>
+        </>
+      )}
 
       {/* Free badge */}
       {book.free && (
