@@ -1,4 +1,4 @@
-import { getProfile, updateProfile } from '../services/profileService';
+import { getProfile, updateProfile, switchActiveCountry } from '../services/profileService';
 import apiClient from '../services/apiClient';
 import type { UserProfile } from '../types/api';
 
@@ -17,6 +17,8 @@ const profileFixture: UserProfile = {
   avatar_url: null,
   country: { id: 1, name: 'Sénégal', code: 'SN', flag_emoji: '🇸🇳' },
   series: { id: 7, label: 'S2', code: 'S2' },
+  active_country: { id: 1, name: 'Sénégal', code: 'SN', flag_emoji: '🇸🇳' },
+  active_series: { id: 7, label: 'S2', code: 'S2' },
   phone_verified_at: '2026-04-01T10:00:00Z',
   is_active: true,
   is_admin: false,
@@ -70,5 +72,25 @@ describe('profileService', () => {
     mockedApiClient.patch.mockRejectedValueOnce(error);
 
     await expect(updateProfile({ first_name: 'X' })).rejects.toThrow('Network error');
+  });
+
+  it('switchActiveCountry PATCH /profile/active-country avec le bon payload', async () => {
+    const updated = {
+      ...profileFixture,
+      active_country: { id: 2, name: 'Bénin', code: 'BJ', flag_emoji: '🇧🇯' },
+      active_series: { id: 9, label: 'D', code: 'D' },
+    };
+    mockedApiClient.patch.mockResolvedValueOnce({
+      data: { success: true, message: 'Pays actif mis à jour.', data: updated },
+    });
+
+    const result = await switchActiveCountry({ active_country_id: 2, active_series_id: 9 });
+
+    expect(mockedApiClient.patch).toHaveBeenCalledWith('/profile/active-country', {
+      active_country_id: 2,
+      active_series_id: 9,
+    });
+    expect(result.active_country.code).toBe('BJ');
+    expect(result.country.code).toBe('SN'); // origine inchangée
   });
 });

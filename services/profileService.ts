@@ -1,5 +1,10 @@
 import apiClient from './apiClient';
-import type { ProfileResponse, UpdateProfilePayload, UserProfile } from '@/types/api';
+import type {
+  ProfileResponse,
+  SwitchActiveCountryPayload,
+  UpdateProfilePayload,
+  UserProfile,
+} from '@/types/api';
 
 /**
  * GET /api/v1/profile
@@ -24,5 +29,17 @@ export async function getProfile(): Promise<UserProfile> {
  */
 export async function updateProfile(payload: UpdateProfilePayload): Promise<UserProfile> {
   const { data } = await apiClient.patch<ProfileResponse>('/profile', payload);
+  return data.data;
+}
+
+/**
+ * PATCH /api/v1/profile/active-country
+ * Change le pays/série ACTIFS (celui dont le contenu est affiché), jamais le
+ * pays/série d'ORIGINE (country/series du profil, figés à l'inscription).
+ * Backend valide via SwitchActiveCountryRequest : active_series_id doit
+ * appartenir à active_country_id.
+ */
+export async function switchActiveCountry(payload: SwitchActiveCountryPayload): Promise<UserProfile> {
+  const { data } = await apiClient.patch<ProfileResponse>('/profile/active-country', payload);
   return data.data;
 }

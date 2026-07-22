@@ -16,7 +16,7 @@ import { CountryMap } from '@/components/ui/CountryMap';
 import { Heading } from '@/components/ui/Heading';
 import { C } from '@/constants/theme';
 import { getCountries } from '@/services/referentialService';
-import { getProfile, updateProfile } from '@/services/profileService';
+import { getProfile, switchActiveCountry } from '@/services/profileService';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { withCountryPreposition } from '@/utils/countryLocative';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,22 +44,23 @@ export default function SetupScreen() {
 
   const handleCountrySelect = (c: Country) => {
     setSelectedCountry(c);
-    if (profile && c.code === profile.country.code) {
-      const profileSeries = c.series.find((s) => s.id === String(profile.series.id));
-      setSelectedSeries(profileSeries ?? null);
+    if (profile && c.code === profile.active_country.code) {
+      const activeSeries = c.series.find((s) => s.id === String(profile.active_series.id));
+      setSelectedSeries(activeSeries ?? null);
     } else {
       setSelectedSeries(null);
     }
   };
 
-  const registeredCountryCode = profile?.country.code;
-  const isDifferentCountry =
+  const activeCountryCode = profile?.active_country.code;
+  const isDifferentActiveCountry =
     selectedCountry !== null &&
-    registeredCountryCode !== undefined &&
-    selectedCountry.code !== registeredCountryCode;
+    activeCountryCode !== undefined &&
+    selectedCountry.code !== activeCountryCode;
 
-  const updateMutation = useMutation({
-    mutationFn: (seriesId: number) => updateProfile({ series_id: seriesId }),
+  const switchMutation = useMutation({
+    mutationFn: (payload: { active_country_id: number; active_series_id: number }) =>
+      switchActiveCountry(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       router.replace('/(tabs)');
@@ -69,8 +70,14 @@ export default function SetupScreen() {
     },
   });
 
+  const confirmAndSwitch = (country: Country, series: Series) => {
+    const numericCountryId = parseInt(country.id, 10);
+    const numericSeriesId = parseInt(series.id, 10);
+    switchMutation.mutate({ active_country_id: numericCountryId, active_series_id: numericSeriesId });
+  };
+
   const handleContinue = () => {
-    if (!selectedSeries) return;
+    if (!selectedSeries || !selectedCountry) return;
 
     // Filet de sécurité : si le profil n'a pas pu être chargé (token absent
     // ou expiré), on ne peut pas savoir si le user change de pays/série.
@@ -85,25 +92,31 @@ export default function SetupScreen() {
       return;
     }
 
-    if (isDifferentCountry && selectedCountry) {
-      Alert.alert(
-        "Ce pays n'est pas encore le tien",
-        `Ton compte est enregistré ${withCountryPreposition(profile.country.code, profile.country.name)}. Les épreuves, corrigés et quiz sont adaptés à ce pays, donc le passage ${withCountryPreposition(selectedCountry.code, selectedCountry.name)} ne peut pas se faire automatiquement. Contacte le support depuis ton profil pour en faire la demande.`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Compris', onPress: () => router.replace('/(tabs)') },
-        ],
-      );
-      return;
-    }
-
     const numericSeriesId = parseInt(selectedSeries.id, 10);
-    if (Number.isNaN(numericSeriesId) || numericSeriesId === profile.series.id) {
+
+    // Pays actif ET série actives inchangés : rien à faire.
+    if (!isDifferentActiveCountry && numericSeriesId === profile.active_series.id) {
       router.replace('/(tabs)');
       return;
     }
 
-    updateMutation.mutate(numericSeriesId);
+    // Pays actif inchangé, seule la série change : pas besoin de confirmation,
+    // aucun contenu "pays" n'est affecté.
+    if (!isDifferentActiveCountry) {
+      confirmAndSwitch(selectedCountry, selectedSeries);
+      return;
+    }
+
+    // Changement de pays actif : le contenu affiché va changer et l'abonnement
+    // ne suit pas automatiquement — on prévient avant de confirmer.
+    Alert.alert(
+      'Changer de pays actif ?',
+      `Tu vas passer ${withCountryPreposition(selectedCountry.code, selectedCountry.name)}. Tu ne verras plus que le contenu de ce pays — ton pays d'origine (${profile.country.name}) reste enregistré et tu pourras y revenir à tout moment. Ton abonnement est propre à chaque pays et série : s'il n'est pas déjà actif ${withCountryPreposition(selectedCountry.code, selectedCountry.name)} pour cette série, il faudra se réabonner pour débloquer le contenu Premium.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Changer', onPress: () => confirmAndSwitch(selectedCountry, selectedSeries) },
+      ],
+    );
   };
 
   const isLoading = loadingCountries || loadingProfile;
@@ -139,7 +152,7 @@ export default function SetupScreen() {
 
       {showSeries && selectedSeries && (
         <View className="px-6 pt-3 bg-background" style={{ paddingBottom: Math.max(insets.bottom, 24) }}>
-          <Button onPress={handleContinue} loading={updateMutation.isPending}>
+          <Button onPress={handleContinue} loading={switchMutation.isPending}>
             Continuer
           </Button>
         </View>
