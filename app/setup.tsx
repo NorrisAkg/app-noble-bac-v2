@@ -18,6 +18,7 @@ import { C } from '@/constants/theme';
 import { getCountries } from '@/services/referentialService';
 import { getProfile, updateProfile } from '@/services/profileService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { withCountryPreposition } from '@/utils/countryLocative';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Country, Series } from '@/types/api';
 
@@ -84,13 +85,13 @@ export default function SetupScreen() {
       return;
     }
 
-    if (isDifferentCountry) {
+    if (isDifferentCountry && selectedCountry) {
       Alert.alert(
-        'Changement de pays',
-        `Tu es inscrit en ${profile.country.name}. Pour changer de pays, contacte le support depuis ton profil. On garde tes préférences actuelles.`,
+        "Ce pays n'est pas encore le tien",
+        `Ton compte est enregistré ${withCountryPreposition(profile.country.code, profile.country.name)}. Les épreuves, corrigés et quiz sont adaptés à ce pays, donc le passage ${withCountryPreposition(selectedCountry.code, selectedCountry.name)} ne peut pas se faire automatiquement. Contacte le support depuis ton profil pour en faire la demande.`,
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: 'Continuer', onPress: () => router.replace('/(tabs)') },
+          { text: 'Compris', onPress: () => router.replace('/(tabs)') },
         ],
       );
       return;
