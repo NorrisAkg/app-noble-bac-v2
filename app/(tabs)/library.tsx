@@ -71,18 +71,18 @@ export default function LibraryScreen() {
     [subjects, subjectId],
   );
 
-  // Liste des exams filtres par sujet + scope (country/series du profile).
+  // Liste des exams filtres par sujet + scope (pays/série ACTIFS, pas l'origine).
   const examsQuery = useQuery({
     queryKey: [
       'catalog',
       'exams',
-      { subjectId, countryId: profile?.country.id, seriesId: profile?.series.id },
+      { subjectId, countryId: profile?.active_country.id, seriesId: profile?.active_series.id },
     ],
     queryFn: () =>
       catalogService.getExams({
         subject_id: subjectId ?? undefined,
-        country_id: profile?.country.id,
-        series_id: profile?.series.id,
+        country_id: profile?.active_country.id,
+        series_id: profile?.active_series.id,
         per_page: 100,
       }),
     enabled: subjectId != null,
@@ -180,7 +180,7 @@ export default function LibraryScreen() {
 
   // ─── Rendu ────────────────────────────────────────────────────────────────
 
-  const profileMeta = profile != null ? `${profile.country.name} · Bac ${profile.series.code}` : '';
+  const profileMeta = profile != null ? `${profile.active_country.name} · Bac ${profile.active_series.code}` : '';
 
   const isLoadingExams = examsQuery.isLoading;
   const noExamsForSubject = !isLoadingExams && exams.length === 0;

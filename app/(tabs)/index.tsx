@@ -111,7 +111,7 @@ export default function HomeScreen() {
   });
   const profile = profileQuery.data;
 
-  const countryCode = profile?.country.code ?? null;
+  const countryCode = profile?.active_country.code ?? null;
   const bacDateParts = useMemo(() => {
     const d = getNextBacDate(countryCode);
     return {
@@ -313,7 +313,7 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.progressTitle} numberOfLines={1}>
                 {profile != null
-                  ? `BAC ${bacDateFormatted} · ${profile.country.name} · Bac ${profile.series.code}`
+                  ? `BAC ${bacDateFormatted} · ${profile.active_country.name} · Bac ${profile.active_series.code}`
                   : `BAC ${bacDateFormatted}`}
               </Text>
               <View style={styles.progressTrack}>

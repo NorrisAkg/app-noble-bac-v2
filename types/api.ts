@@ -268,13 +268,28 @@ export interface UserProfile {
   gender: 'M' | 'F' | 'Other' | null;
   birth_date: string | null;
   avatar_url: string | null;
+  /** Pays d'origine, choisi à l'inscription. Ne change jamais. */
   country: {
     id: number;
     name: string;
     code: string;
     flag_emoji: string | null;
   };
+  /** Série d'origine, liée au pays d'origine. Ne change jamais. */
   series: {
+    id: number;
+    label: string;
+    code: string;
+  };
+  /** Pays actif : celui dont le contenu est affiché. Modifiable via switchActiveCountry(). */
+  active_country: {
+    id: number;
+    name: string;
+    code: string;
+    flag_emoji: string | null;
+  };
+  /** Série active, liée au pays actif. Modifiable via switchActiveCountry(). */
+  active_series: {
     id: number;
     label: string;
     code: string;
@@ -288,6 +303,8 @@ export interface UserProfile {
 /**
  * Payload PATCH /api/v1/profile (UpdateProfileRequest cote backend).
  * Tous les champs sont 'sometimes' : seuls les champs presents sont valides.
+ * Modifie le pays/série D'ORIGINE — n'est plus appelé par le flux de
+ * changement de pays actif (voir SwitchActiveCountryPayload).
  */
 export interface UpdateProfilePayload {
   first_name?: string;
@@ -295,6 +312,15 @@ export interface UpdateProfilePayload {
   gender?: 'M' | 'F' | 'Other';
   birth_date?: string;
   series_id?: number;
+}
+
+/**
+ * Payload PATCH /api/v1/profile/active-country (SwitchActiveCountryRequest
+ * cote backend). Change le pays/série ACTIFS, jamais l'origine.
+ */
+export interface SwitchActiveCountryPayload {
+  active_country_id: number;
+  active_series_id: number;
 }
 
 export type ProfileResponse = ApiResponse<UserProfile>;
