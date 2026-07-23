@@ -269,9 +269,13 @@ export default function HomeScreen() {
 
           {/* Top row: avatar + name + search + bell */}
           <View style={styles.heroTop}>
-            <View style={styles.avatar}>
+            <TouchableOpacity
+              style={styles.avatar}
+              onPress={() => router.push('/(tabs)/profile')}
+              activeOpacity={0.75}
+            >
               <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            </TouchableOpacity>
 
             <View style={{ flex: 1 }}>
               <Text style={styles.greeting}>Salut,</Text>
@@ -493,6 +497,7 @@ export default function HomeScreen() {
                       color: palette.color,
                       accent: palette.accent,
                       free: b.is_free,
+                      cover_url: b.cover_url,
                     }}
                     hidePremiumBadge={isPremium}
                     onPress={() => handleBookPress(b)}

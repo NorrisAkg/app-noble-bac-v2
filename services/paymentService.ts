@@ -15,12 +15,14 @@ export interface InitiatePaymentResponse {
 
 /**
  * Payload de POST /api/v1/payments/initiate.
- * `operatorId` cible le reseau mobile money choisi ; `phoneNumber` (E.164)
- * surcharge le numero du profil (optionnel).
+ * `operatorId` pilote le mode FedaPay : fourni + éligible → débit direct (USSD,
+ * payment_url null) ; absent (ou opérateur non éligible) → checkout hébergé où
+ * l'utilisateur choisit son opérateur sur la page de paiement. `phoneNumber`
+ * est optionnel ; le backend retombe sur le numéro du profil s'il est absent.
  */
 export interface InitiatePaymentPayload {
   subscriptionPlanId: number;
-  operatorId: number;
+  operatorId?: number;
   phoneNumber?: string;
 }
 
@@ -39,7 +41,7 @@ export async function initiatePayment(
     '/payments/initiate',
     {
       subscription_plan_id: payload.subscriptionPlanId,
-      operator_id: payload.operatorId,
+      ...(payload.operatorId !== undefined ? { operator_id: payload.operatorId } : {}),
       ...(payload.phoneNumber ? { phone_number: payload.phoneNumber } : {}),
     },
   );

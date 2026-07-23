@@ -3,56 +3,46 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TextInput,
   ActivityIndicator,
-  TouchableOpacity,
   Alert,
   BackHandler,
-  KeyboardAvoidingView,
-  Platform,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import * as WebBrowser from 'expo-web-browser';
-import { ChevronLeft, Smartphone } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
+import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
+import { ChevronLeft, ChevronDown } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getOperators, getCountries } from '@/services/referentialService';
 import { initiatePayment, getPaymentStatus } from '@/services/paymentService';
-import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
+import { getProfile } from '@/services/profileService';
+import { getOperators } from '@/services/referentialService';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { displayCurrency } from '@/utils/currency';
 import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { useAuthStore } from '@/store/useAuthStore';
+import { OperatorPickerSheet } from '@/components/ui/OperatorPickerSheet';
 import { C } from '@/constants/theme';
 import type { Operator, TransactionStatus } from '@/types/api';
 
 /**
- * Intervalle entre deux polls de statut. FedaPay confirme generalement en
- * ~10-30s apres validation utilisateur. 4s est un compromis charge/UX.
+ * Chemins de retour des gateways — interceptés dans la WebView pour détecter
+ * la fin du paiement sans quitter l'app.
  */
-const POLL_INTERVAL_MS = 4_000;
+const RETURN_PATHS = ['/payments/moneroo/return', '/payment/confirm'];
 
-/**
- * Borne haute du polling (en cas de webhook bloque, on n'attend pas
- * indefiniment). 5 min couvre largement le temps d'un paiement Mobile Money.
- */
-const POLL_TIMEOUT_MS = 5 * 60 * 1_000;
-
-/** Format E.164 attendu par le backend (E164PhoneRule). */
-const E164_RE = /^\+[1-9]\d{7,14}$/;
-
-function formatPrice(amount: number): string {
-  return new Intl.NumberFormat('fr-FR').format(amount);
-}
+const POLL_INITIAL_MS = 2_000;
+const POLL_STEP_MS = 1_500;
+const POLL_MAX_MS = 8_000;
+const POLL_TIMEOUT_MS = 90_000;
 
 export default function PaymentCheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
 
   const { plan_id, plan_label, plan_amount, plan_currency } = useLocalSearchParams<{
     plan_id?: string;
@@ -60,88 +50,101 @@ export default function PaymentCheckoutScreen() {
     plan_amount?: string;
     plan_currency?: string;
   }>();
-
   const planId = plan_id ? Number(plan_id) : null;
-  const planAmount = plan_amount ? Number(plan_amount) : 0;
-  const planCurrency = plan_currency ?? 'XOF';
 
-  const [selectedOperatorId, setSelectedOperatorId] = useState<number | null>(null);
-  const [localPhone, setLocalPhone] = useState<string>('');
-  const [step, setStep] = useState<'select' | 'processing'>('select');
-  // true = checkout hébergé (page FedaPay ouverte) ; false = débit direct (USSD).
-  const [hostedCheckout, setHostedCheckout] = useState(true);
+  // 'select'     → choix opérateur + numéro, avant initiation
+  // 'initiating' → appel API en cours
+  // 'checkout'   → WebView hébergée visible
+  // 'polling'    → WebView fermée, attente confirmation webhook
+  const [step, setStep] = useState<'select' | 'initiating' | 'checkout' | 'polling'>('select');
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [webViewReady, setWebViewReady] = useState(false);
   const [transactionId, setTransactionId] = useState<number | null>(null);
   const [status, setStatus] = useState<TransactionStatus>('pending');
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
+
+  // Sélection avant initiation.
+  const [selectedOperator, setSelectedOperator] = useState<Operator | null>(null);
+  const [phone, setPhone] = useState('');
+  const [operatorSheetOpen, setOperatorSheetOpen] = useState(false);
+  const phonePrefilledRef = useRef(false);
+
   const finishedRef = useRef(false);
   const startedAtRef = useRef<number>(0);
+  const checkoutDoneRef = useRef<(() => void) | null>(null);
+
+  const profileQuery = useQuery({ queryKey: ['profile'], queryFn: getProfile });
+  const countryId = profileQuery.data?.country.id ?? null;
 
   const operatorsQuery = useQuery({
-    queryKey: ['operators', user?.country_id],
-    queryFn: () => getOperators(user!.country_id),
-    enabled: !!user?.country_id,
+    queryKey: ['operators', countryId],
+    queryFn: () => getOperators(countryId as number),
+    enabled: countryId !== null,
     staleTime: 10 * 60 * 1000,
   });
-
-  // Le pays de paiement est celui du compte (les operateurs y sont rattaches) :
-  // on en deduit l'indicatif, affiche en lecture seule. L'utilisateur ne tape
-  // que la partie locale, ce qui evite les erreurs de format E.164.
-  const countriesQuery = useQuery({
-    queryKey: ['countries'],
-    queryFn: getCountries,
-    staleTime: 24 * 60 * 60 * 1000,
-  });
-
-  const userCountry = countriesQuery.data?.find(
-    (c) => String(c.id) === String(user?.country_id),
-  );
-  const phonePrefix = userCountry?.phone_code ?? '';
-
-  // Pre-remplit le numero local a partir du telephone du profil (E.164) en
-  // retirant l'indicatif, des que le pays est connu.
-  useEffect(() => {
-    if (!phonePrefix || !user?.phone) return;
-    setLocalPhone((prev) =>
-      prev.length > 0
-        ? prev
-        : user.phone.startsWith(phonePrefix)
-          ? user.phone.slice(phonePrefix.length)
-          : '',
-    );
-  }, [phonePrefix, user?.phone]);
-
   const operators = operatorsQuery.data ?? [];
-  const localDigits = localPhone.replace(/\D/g, '');
-  const fullPhone = phonePrefix + localDigits;
-  const phoneValid = phonePrefix.length > 0 && E164_RE.test(fullPhone);
-  const canPay = selectedOperatorId !== null && phoneValid && !!planId;
 
-  // Bloque le bouton retour materiel pendant le traitement pour eviter de
-  // claquer l'ecran entre la validation operateur et la confirmation webhook.
+  // Préremplit le numéro à débiter avec celui du profil (une seule fois).
+  useEffect(() => {
+    if (!phonePrefilledRef.current && profileQuery.data?.phone) {
+      setPhone(profileQuery.data.phone);
+      phonePrefilledRef.current = true;
+    }
+  }, [profileQuery.data]);
+
+  // Bloque le bouton retour matériel pendant le traitement.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       handleBack();
       return true;
     });
     return () => sub.remove();
-    // handleBack capture les refs/state au moment du clic ; mount-only suffit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [step]);
 
-  // Polling du statut une fois le paiement initie. S'arrete des qu'on quitte
-  // 'pending' ou apres POLL_TIMEOUT_MS.
+  const startPayment = async () => {
+    if (planId === null || step === 'initiating') return;
+    setStep('initiating');
+
+    try {
+      const { transaction, payment_url } = await initiatePayment({
+        subscriptionPlanId: planId,
+        operatorId: selectedOperator?.id,
+        phoneNumber: phone.trim() || undefined,
+      });
+
+      startedAtRef.current = Date.now();
+      setTransactionId(transaction.id);
+
+      if (payment_url) {
+        // Checkout hébergé : ouvre la page de paiement dans la WebView intégrée.
+        setCheckoutUrl(payment_url);
+        setStep('checkout');
+      } else {
+        // Débit direct (FedaPay USSD) : push déjà envoyé, on poll.
+        setStep('polling');
+      }
+    } catch (e) {
+      setStep('select');
+      Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de démarrer le paiement.'));
+    }
+  };
+
+  // Polling avec backoff linéaire, déclenché dès que transactionId est posé.
   useEffect(() => {
     if (transactionId === null) return;
 
-    const interval = setInterval(async () => {
+    let currentInterval = POLL_INITIAL_MS;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const poll = async () => {
       if (finishedRef.current) return;
 
       if (Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
         finishedRef.current = true;
-        clearInterval(interval);
         Alert.alert(
-          'Paiement en cours',
-          'La confirmation prend plus de temps que prevu. Tu peux verifier le statut dans "Mon abonnement".',
+          'Paiement en cours de validation',
+          'La confirmation prend plus de temps que prévu. Tu seras notifié dès que ton abonnement sera activé. Tu peux vérifier le statut dans "Mon abonnement".',
           [{ text: 'OK', onPress: () => router.replace('/my-subscription') }],
         );
         return;
@@ -151,42 +154,79 @@ export default function PaymentCheckoutScreen() {
         const tx = await getPaymentStatus(transactionId);
         if (tx.status === 'confirmed') {
           finishedRef.current = true;
-          clearInterval(interval);
           await queryClient.invalidateQueries({ queryKey: ['subscription', 'active'] });
           await queryClient.invalidateQueries({ queryKey: ['active-subscription'] });
           await queryClient.invalidateQueries({ queryKey: ['profile'] });
           await queryClient.invalidateQueries({ queryKey: ['my-subscription-transactions'] });
           setStatus('confirmed');
           setShowSuccessSheet(true);
+          return;
         } else if (tx.status === 'failed' || tx.status === 'expired') {
           finishedRef.current = true;
-          clearInterval(interval);
           setStatus(tx.status);
-          setStep('select');
           Alert.alert(
             'Paiement non abouti',
             tx.status === 'expired'
-              ? 'Le delai de paiement a expire. Reessaie.'
-              : 'Le paiement a echoue. Aucun montant n\'a ete debite.',
+              ? 'Le délai de paiement a expiré. Réessaie.'
+              : "Le paiement a échoué. Aucun montant n'a été débité.",
+            [{ text: 'OK', onPress: () => router.back() }],
           );
+          return;
         }
       } catch (e) {
-        // Erreur reseau ponctuelle : on retentera au prochain tick.
         console.warn('[payment-checkout] poll status failed:', getApiErrorMessage(e));
       }
-    }, POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+      currentInterval = Math.min(currentInterval + POLL_STEP_MS, POLL_MAX_MS);
+      timeoutId = setTimeout(poll, currentInterval);
+    };
+
+    checkoutDoneRef.current = () => {
+      clearTimeout(timeoutId);
+      currentInterval = POLL_INITIAL_MS;
+      void poll();
+    };
+
+    // Pour le direct charge, le polling démarre immédiatement.
+    // Pour le hosted checkout, checkoutDoneRef déclenche le poll au bon moment.
+    if (step !== 'checkout') {
+      timeoutId = setTimeout(poll, currentInterval);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      checkoutDoneRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId, queryClient, router]);
 
+  /**
+   * Intercepte chaque navigation dans la WebView.
+   * Quand la gateway redirige vers notre return URL (ou un deep link noblebac://),
+   * on ferme la WebView et on déclenche le polling immédiatement.
+   */
+  const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest): boolean => {
+    const url = request.url;
+    if (url.startsWith('noblebac://') || RETURN_PATHS.some((p) => url.includes(p))) {
+      setCheckoutUrl(null);
+      setWebViewReady(false);
+      setStep('polling');
+      // Réinitialise le timer de timeout à partir de la fermeture de la WebView.
+      startedAtRef.current = Date.now();
+      checkoutDoneRef.current?.();
+      return false; // bloque la navigation dans la WebView
+    }
+    return true;
+  };
+
   const handleBack = () => {
-    if (step !== 'processing' || finishedRef.current) {
+    if (step === 'select' || step === 'initiating' || finishedRef.current) {
       router.back();
       return;
     }
     Alert.alert(
       'Annuler le paiement ?',
-      'Si tu as deja confirme cote operateur, la transaction sera traitee en arriere-plan.',
+      'Si tu as déjà confirmé côté opérateur, la transaction sera traitée en arrière-plan.',
       [
         { text: 'Continuer le paiement', style: 'cancel' },
         {
@@ -199,73 +239,6 @@ export default function PaymentCheckoutScreen() {
         },
       ],
     );
-  };
-
-  const handlePay = async () => {
-    if (!canPay || planId === null || selectedOperatorId === null) return;
-    finishedRef.current = false;
-    startedAtRef.current = Date.now();
-    setStep('processing');
-    try {
-      const { transaction, payment_url } = await initiatePayment({
-        subscriptionPlanId: planId,
-        operatorId: selectedOperatorId,
-        phoneNumber: fullPhone,
-      });
-      // Démarre le polling avant tout : la confirmation peut arriver pendant
-      // que la page FedaPay est ouverte / que l'USSD est en cours.
-      setTransactionId(transaction.id);
-      setHostedCheckout(!!payment_url);
-      if (payment_url) {
-        // Mode hébergé : le débit direct n'est pas disponible pour cet
-        // opérateur, on bascule sur la page FedaPay. On prévient avant d'ouvrir
-        // le navigateur pour que la sortie de l'app ne surprenne pas
-        // l'utilisateur (cf. opérateurs sans push : Orange, Wave, Moov…).
-        const proceed = await new Promise<boolean>((resolve) => {
-          Alert.alert(
-            'Page de paiement sécurisée',
-            "Ce moyen de paiement va ouvrir une page sécurisée FedaPay dans ton navigateur. Choisis ton opérateur, valide le paiement, puis reviens sur cet écran : la confirmation est automatique.",
-            [
-              { text: 'Annuler', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Continuer', onPress: () => resolve(true) },
-            ],
-            { cancelable: true, onDismiss: () => resolve(false) },
-          );
-        });
-        if (!proceed) {
-          // Abandon avant redirection : on stoppe le polling et on revient au
-          // formulaire en conservant l'opérateur/numéro déjà saisis.
-          finishedRef.current = true;
-          setStep('select');
-          return;
-        }
-        // La promesse se résout à la fermeture du navigateur ; le polling
-        // prend alors le relais.
-        await WebBrowser.openBrowserAsync(payment_url);
-      }
-      // Mode débit direct (payment_url null) : le push USSD a déjà été envoyé
-      // côté backend, le polling détecte la confirmation.
-    } catch (e) {
-      setStep('select');
-      const validationErrors = getValidationErrors(e);
-      if (validationErrors.phone_number) {
-        // Seul champ saisi par l'utilisateur : on remonte un message actionnable.
-        Alert.alert('Numéro invalide', validationErrors.phone_number);
-      } else if (Object.keys(validationErrors).length > 0) {
-        // Offre / operateur invalides : non corrigeables cote utilisateur
-        // (champs pilotes par l'app). On logue le detail technique pour le
-        // diagnostic et on affiche un message generique, jamais le message
-        // brut du backend ("subscription plan id est invalide", etc.).
-        console.warn('[payment-checkout] validation backend:', validationErrors);
-        Alert.alert(
-          'Paiement indisponible',
-          'Impossible de démarrer le paiement pour le moment. Réessaie dans un instant ou contacte le support.',
-        );
-      } else {
-        // Erreur passerelle (502) ou reseau : message backend deja lisible.
-        Alert.alert('Paiement', getApiErrorMessage(e, 'Impossible de démarrer le paiement.'));
-      }
-    }
   };
 
   if (planId === null) {
@@ -282,129 +255,153 @@ export default function PaymentCheckoutScreen() {
     );
   }
 
+  const hasOperators = operators.length > 0;
+  const canPay = !hasOperators || selectedOperator !== null;
+  const isPreparing = profileQuery.isLoading || operatorsQuery.isLoading;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <View style={{ height: insets.top, backgroundColor: C.green }} />
       <Header onBack={handleBack} />
 
-      {step === 'processing' ? (
+      {/* Étape de sélection : opérateur + numéro à débiter */}
+      {step === 'select' && (
+        <>
+          <ScrollView
+            contentContainerStyle={styles.selectScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            {plan_label && (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>{plan_label}</Text>
+                {plan_amount && (
+                  <Text style={styles.summaryAmount}>
+                    {new Intl.NumberFormat('fr-FR').format(Number(plan_amount))}{' '}
+                    {displayCurrency(plan_currency ?? 'XOF')}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {isPreparing ? (
+              <View style={styles.stateBox}>
+                <ActivityIndicator color={C.green} />
+              </View>
+            ) : (
+              <>
+                {hasOperators && (
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Opérateur mobile money</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setOperatorSheetOpen(true)}
+                      style={styles.selector}
+                    >
+                      <Text
+                        style={[
+                          styles.selectorText,
+                          !selectedOperator && styles.selectorPlaceholder,
+                        ]}
+                      >
+                        {selectedOperator ? selectedOperator.name : 'Choisis ton opérateur'}
+                      </Text>
+                      <ChevronDown size={20} color={C.ink3} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Numéro à débiter</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    placeholder="+229 66 00 00 01"
+                    placeholderTextColor={C.ink3}
+                    autoCapitalize="none"
+                  />
+                  <Text style={styles.fieldHint}>
+                    Le numéro de ton compte mobile money, au format international.
+                  </Text>
+                </View>
+              </>
+            )}
+          </ScrollView>
+
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <TouchableOpacity
+              onPress={startPayment}
+              activeOpacity={0.85}
+              disabled={isPreparing || !canPay}
+              style={[styles.cta, (isPreparing || !canPay) && styles.ctaDisabled]}
+            >
+              <Text style={styles.ctaText}>
+                {hasOperators ? 'Payer' : 'Continuer vers le paiement'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.footerLegal}>Paiement sécurisé</Text>
+          </View>
+        </>
+      )}
+
+      {/* Écran de chargement / polling */}
+      {(step === 'initiating' || step === 'polling') && (
         <View style={styles.processingBox}>
           <ActivityIndicator size="large" color={C.green} />
           <Text style={styles.processingTitle}>
-            {hostedCheckout ? 'Finalise ton paiement' : 'Confirme sur ton téléphone'}
+            {step === 'initiating' ? 'Préparation du paiement…' : 'Vérification en cours…'}
           </Text>
-          <Text style={styles.processingDesc}>
-            {hostedCheckout
-              ? "Termine le paiement dans la page qui s'est ouverte. Une fois validé, reviens sur cet écran : la confirmation est automatique. Ne ferme pas cet écran."
-              : 'Une demande de paiement a été envoyée à ton numéro. Valide-la avec ton code mobile money pour activer ton abonnement. Ne ferme pas cet écran.'}
-          </Text>
+          {step === 'polling' && (
+            <Text style={styles.processingDesc}>
+              Le paiement est en cours de validation. La confirmation est automatique dès que le
+              paiement est reçu.
+            </Text>
+          )}
           {status !== 'pending' && status !== 'confirmed' && (
             <Text style={styles.statusText}>
               Statut : {status === 'expired' ? 'Expiré' : 'Échoué'}
             </Text>
           )}
         </View>
-      ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={insets.top + 64}
-        >
-        <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Récap plan */}
-          <View style={styles.planCard}>
-            <View>
-              <Text style={styles.planCardLabel}>Plan {plan_label ?? ''}</Text>
-              <Text style={styles.planCardPrice}>
-                {formatPrice(planAmount)}{' '}
-                <Text style={styles.planCardCurrency}>{displayCurrency(planCurrency)}</Text>
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Text style={styles.modifyLink}>Modifier</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.sectionTitle}>Choisis ton mode de paiement</Text>
-
-          {operatorsQuery.isLoading ? (
-            <View style={styles.stateBox}>
-              <ActivityIndicator color={C.green} />
-            </View>
-          ) : operators.length === 0 ? (
-            <EmptyState
-              icon={Smartphone}
-              title="Aucun opérateur disponible"
-              description="Le paiement mobile money n'est pas encore disponible dans ton pays. Réessaie plus tard."
-            />
-          ) : (
-            <View style={styles.operatorsList}>
-              {operators.map((op) => (
-                <OperatorRow
-                  key={op.id}
-                  operator={op}
-                  active={op.id === selectedOperatorId}
-                  onPress={() => setSelectedOperatorId(op.id)}
-                />
-              ))}
-            </View>
-          )}
-
-          {selectedOperatorId !== null && (
-            <View style={styles.phoneBlock}>
-              <Text style={styles.fieldLabel}>Numéro à débiter</Text>
-              <View style={styles.phoneRow}>
-                <View style={styles.prefixBox}>
-                  <Text style={styles.prefixFlag}>{userCountry?.flag_emoji ?? '🌍'}</Text>
-                  <Text style={styles.prefixText}>{phonePrefix || '…'}</Text>
-                </View>
-                <TextInput
-                  style={[
-                    styles.phoneInput,
-                    styles.phoneInputFlex,
-                    localPhone.length > 0 && !phoneValid && styles.phoneInputError,
-                  ]}
-                  value={localPhone}
-                  onChangeText={setLocalPhone}
-                  placeholder="07 00 00 00 00"
-                  placeholderTextColor={C.ink3}
-                  keyboardType="phone-pad"
-                  autoCapitalize="none"
-                />
-              </View>
-              {localPhone.length > 0 && !phoneValid && (
-                <Text style={styles.fieldError}>Numéro invalide pour {userCountry?.name ?? 'ce pays'}.</Text>
-              )}
-              <View style={styles.infoBox}>
-                <Text style={styles.infoText}>
-                  Tu vas recevoir une demande sur ton téléphone pour confirmer le paiement.
-                </Text>
-              </View>
-            </View>
-          )}
-        </ScrollView>
-        </KeyboardAvoidingView>
       )}
 
-      {step === 'select' && operators.length > 0 && (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <TouchableOpacity
-            onPress={handlePay}
-            disabled={!canPay}
-            activeOpacity={0.85}
-            style={[styles.cta, !canPay && styles.ctaDisabled]}
-          >
-            <Text style={styles.ctaText}>
-              Payer {formatPrice(planAmount)} {displayCurrency(planCurrency)}
-            </Text>
-          </TouchableOpacity>
+      {/* WebView checkout hébergé — visible uniquement pendant step === 'checkout' */}
+      {checkoutUrl !== null && (
+        <View style={styles.webViewContainer}>
+          {!webViewReady && (
+            <View style={styles.webViewLoader}>
+              <ActivityIndicator size="large" color={C.green} />
+              <Text style={styles.webViewLoaderText}>Chargement de la page de paiement…</Text>
+            </View>
+          )}
+          <WebView
+            style={webViewReady ? styles.webView : styles.webViewHidden}
+            source={{ uri: checkoutUrl }}
+            onLoad={() => setWebViewReady(true)}
+            onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState={false}
+            // Empêche les liens target="_blank" / window.open d'ouvrir
+            // le navigateur système — toute navigation reste dans la WebView.
+            setSupportMultipleWindows={false}
+            onOpenWindow={(e) => {
+              // iOS : intercepte window.open() et charge l'URL dans la WebView.
+              setCheckoutUrl(e.nativeEvent.targetUrl);
+            }}
+          />
         </View>
       )}
+
+      <OperatorPickerSheet
+        isOpen={operatorSheetOpen}
+        onClose={() => setOperatorSheetOpen(false)}
+        operators={operators}
+        selectedId={selectedOperator?.id ?? null}
+        onSelect={setSelectedOperator}
+      />
 
       <PremiumSuccessSheet
         isOpen={showSuccessSheet}
@@ -427,37 +424,6 @@ const Header: React.FC<{ onBack: () => void }> = ({ onBack }) => (
   </View>
 );
 
-interface OperatorRowProps {
-  operator: Operator;
-  active: boolean;
-  onPress: () => void;
-}
-
-const OperatorRow: React.FC<OperatorRowProps> = ({ operator, active, onPress }) => {
-  const initials = operator.name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.operatorRow, active && styles.operatorRowActive]}
-    >
-      <View style={[styles.operatorBadge, { backgroundColor: operator.color ?? C.green }]}>
-        <Text style={styles.operatorBadgeText}>{initials}</Text>
-      </View>
-      <Text style={styles.operatorName}>{operator.name}</Text>
-      <View style={[styles.radio, active && styles.radioActive]}>
-        {active && <View style={styles.radioDot} />}
-      </View>
-    </TouchableOpacity>
-  );
-};
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   header: {
@@ -471,121 +437,97 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontFamily: 'Poppins_700Bold', fontSize: 17, color: '#fff' },
 
-  scroll: { paddingHorizontal: 20, paddingTop: 20 },
-
-  planCard: {
-    backgroundColor: '#fff',
+  selectScroll: { padding: 20, gap: 20 },
+  summaryCard: {
+    backgroundColor: C.greenSoft,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 4,
   },
-  planCardLabel: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.ink3 },
-  planCardPrice: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 22,
-    color: C.ink,
-    letterSpacing: -0.5,
-    marginTop: 2,
-  },
-  planCardCurrency: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.ink3 },
-  modifyLink: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.green },
-
-  sectionTitle: {
-    fontFamily: 'Poppins_700Bold',
+  summaryLabel: {
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 14,
     color: C.ink,
-    marginBottom: 10,
   },
-
-  operatorsList: { gap: 8 },
-  operatorRow: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.line,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+  summaryAmount: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 22,
+    color: C.green,
+    marginTop: 2,
   },
-  operatorRowActive: { borderColor: C.green },
-  operatorBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  operatorBadgeText: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: '#fff' },
-  operatorName: { flex: 1, fontFamily: 'Poppins_600SemiBold', fontSize: 14, color: C.ink },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: C.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioActive: { borderColor: C.green, backgroundColor: C.green },
-  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
-
-  phoneBlock: { marginTop: 22 },
+  field: { marginTop: 16 },
   fieldLabel: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 12,
     color: C.ink2,
-    marginBottom: 6,
+    letterSpacing: 0.3,
+    marginBottom: 8,
   },
-  phoneRow: { flexDirection: 'row', gap: 8 },
-  prefixBox: {
+  fieldHint: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 11.5,
+    color: C.ink3,
+    marginTop: 6,
+  },
+  selector: {
     height: 54,
-    paddingHorizontal: 14,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: C.line,
     borderRadius: 14,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  prefixFlag: { fontSize: 18 },
-  prefixText: { fontFamily: 'Poppins_600SemiBold', fontSize: 15, color: C.ink },
-  phoneInput: {
-    height: 54,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: C.line,
-    borderRadius: 14,
+  selectorText: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 15,
     color: C.ink,
   },
-  phoneInputFlex: { flex: 1 },
-  phoneInputError: { borderColor: C.danger },
-  fieldError: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 11.5,
-    color: C.danger,
-    marginTop: 6,
+  selectorPlaceholder: { color: C.ink3 },
+  input: {
+    height: 54,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: C.line,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 15,
+    color: C.ink,
   },
-  infoBox: {
-    backgroundColor: C.greenSoft,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginTop: 12,
+
+  footer: {
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    backgroundColor: C.bg,
   },
-  infoText: {
+  cta: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  ctaDisabled: { opacity: 0.6 },
+  ctaText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 15,
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
+  footerLegal: {
+    marginTop: 10,
+    textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
-    fontSize: 12,
-    color: C.ink2,
-    lineHeight: 18,
+    fontSize: 11,
+    color: C.ink3,
   },
 
   processingBox: {
@@ -616,35 +558,26 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
+  webViewContainer: { flex: 1 },
+  webView: { flex: 1 },
+  webViewHidden: { flex: 0, height: 0 },
+  webViewLoader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  webViewLoaderText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    color: C.ink2,
+  },
+
   stateBox: { paddingVertical: 40, alignItems: 'center', justifyContent: 'center' },
   errorText: {
     fontFamily: 'Poppins_500Medium',
     fontSize: 14,
     color: C.ink2,
     textAlign: 'center',
-  },
-
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: 12,
-    paddingHorizontal: 20,
-    backgroundColor: C.bg,
-  },
-  cta: {
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: C.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaDisabled: { opacity: 0.5 },
-  ctaText: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 15,
-    color: '#fff',
-    letterSpacing: 0.2,
   },
 });

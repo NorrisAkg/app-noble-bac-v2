@@ -7,6 +7,7 @@ export { Card } from './Card';
 export { CountryFlag } from './CountryFlag';
 export { CountryMap } from './CountryMap';
 export { CountryPickerSheet } from './CountryPickerSheet';
+export { OperatorPickerSheet } from './OperatorPickerSheet';
 export { ComingSoonOverlay } from './ComingSoonOverlay';
 export { CustomTabBar } from './CustomTabBar';
 export { DiamondIcon } from './DiamondIcon';

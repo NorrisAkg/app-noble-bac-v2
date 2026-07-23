@@ -37,7 +37,7 @@ describe('courseService', () => {
       data: {
         success: true,
         message: 'OK',
-        data: { id: 1, title: 'Dérivation', order: 1, duration_minutes: 30, is_free: true, status: 'published', content: '<p>x</p>' },
+        data: { id: 1, title: 'Dérivation', order: 1, duration_minutes: 30, is_free: true, status: 'published', html_url: 'https://r2.example.com/lessons/1.html' },
       },
     });
 
@@ -45,7 +45,7 @@ describe('courseService', () => {
 
     expect(mockedApiClient.get).toHaveBeenCalledWith('/courses/lessons/1');
     expect(lesson.title).toBe('Dérivation');
-    expect(lesson.content).toBe('<p>x</p>');
+    expect(lesson.html_url).toBe('https://r2.example.com/lessons/1.html');
   });
 
   it('getRevisionSheetsByChapter hits the new listing endpoint', async () => {

@@ -106,7 +106,8 @@ export interface Lesson {
   duration_minutes: number;
   is_free: boolean;
   status: 'published' | 'draft';
-  content?: string;
+  /** Signed R2 URL (15 min TTL) for the standalone HTML file. Null when no HTML uploaded yet. */
+  html_url: string | null;
   chapter?: {
     id: number;
     title: string;

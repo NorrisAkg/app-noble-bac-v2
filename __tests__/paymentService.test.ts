@@ -32,7 +32,8 @@ describe('paymentService', () => {
     it('POST /payments/initiate avec le bon body (plan + operateur + numero) et deballe data', async () => {
       const response: InitiatePaymentResponse = {
         transaction: transactionFixture,
-        payment_url: 'https://sandbox-process.fedapay.com/test-token',
+        // payment_url peut être une URL Moneroo ou FedaPay selon PAYMENT_GATEWAY
+        payment_url: 'https://checkout.moneroo.io/pay/test-token',
       };
       mockedApiClient.post.mockResolvedValueOnce({
         data: { success: true, message: 'Ouvre la page de paiement pour finaliser ton abonnement.', data: response },
@@ -51,7 +52,7 @@ describe('paymentService', () => {
       });
       expect(result.transaction.id).toBe(101);
       expect(result.transaction.status).toBe('pending');
-      expect(result.payment_url).toBe('https://sandbox-process.fedapay.com/test-token');
+      expect(result.payment_url).toBe('https://checkout.moneroo.io/pay/test-token');
     });
 
     it('omet phone_number quand il n\'est pas fourni (numero du profil utilise cote backend)', async () => {
