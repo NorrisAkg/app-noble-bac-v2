@@ -33,10 +33,9 @@ type AnswerResult = {
 export default function QuizSessionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { chapterId, subjectLabel = 'Quiz', chapterTitle } = useLocalSearchParams<{
+  const { chapterId, subjectLabel = 'Quiz' } = useLocalSearchParams<{
     chapterId: string;
     subjectLabel?: string;
-    chapterTitle?: string;
   }>();
 
   const [session, setSession] = useState<QuizSession | null>(null);
