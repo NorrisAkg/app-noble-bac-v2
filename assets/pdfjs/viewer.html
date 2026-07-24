@@ -188,8 +188,6 @@
     pageIndicator.textContent = currentPage + ' / ' + totalPages;
     prevBtn.disabled = currentPage <= 1;
     nextBtn.disabled = currentPage >= totalPages;
-    // Remonte la position de lecture au RN (suivi « Reprendre » de l'accueil).
-    postRn({ type: 'page', current: currentPage, total: totalPages });
   }
 
   function renderPage(pageNum) {
@@ -277,7 +275,16 @@
 
   statusText.textContent = 'Téléchargement du document…';
 
-  pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise
+  var loadingTask = pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false });
+  loadingTask.onProgress = function(data) {
+    if (data && data.total) {
+      var pct = Math.min(100, Math.round((data.loaded / data.total) * 100));
+      statusText.textContent = 'Chargement… ' + pct + '%';
+      postRn({ type: 'progress', loaded: data.loaded, total: data.total });
+    }
+  };
+
+  loadingTask.promise
     .then(function(pdf) {
       pdfDoc = pdf;
       totalPages = pdf.numPages;

@@ -47,6 +47,7 @@ export default function PdfViewerScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const [loadProgress, setLoadProgress] = useState<number | null>(null);
 
   // Resolution one-shot du viewer PDF.js bundle dans assets/pdfjs/viewer.html.
   // Asset.downloadAsync() le copie dans le cache local et nous donne un
@@ -146,9 +147,15 @@ export default function PdfViewerScreen() {
     );
   }, [showPremium, router]);
 
+  // Note : loading n'est PAS remis à false ici en cas de succès — getCachedPdfUri
+  // peut désormais résoudre quasi instantanément avec une URL réseau (streaming
+  // progressif côté PDF.js) plutôt qu'un fichier local déjà téléchargé. Le spinner/
+  // barre de progression doit donc rester affiché jusqu'à ce que la WebView
+  // signale 'rendered' (ou 'error'), pas dès que l'URL est connue.
   const loadFromBook = useCallback(async (id: number) => {
     try {
       setLoading(true);
+      setLoadProgress(null);
       const uri = await getCachedPdfUri(
         `book_${id}`,
         async () => {
@@ -164,7 +171,6 @@ export default function PdfViewerScreen() {
       } else {
         handleLoadError(err, 'ce livre');
       }
-    } finally {
       setLoading(false);
     }
   }, [handleLoadError, isOnline]);
@@ -172,6 +178,7 @@ export default function PdfViewerScreen() {
   const loadFromRevisionSheet = useCallback(async (id: number) => {
     try {
       setLoading(true);
+      setLoadProgress(null);
       const uri = await getCachedPdfUri(
         `sheet_${id}`,
         async () => {
@@ -188,7 +195,6 @@ export default function PdfViewerScreen() {
       } else {
         handleLoadError(err, 'cette fiche');
       }
-    } finally {
       setLoading(false);
     }
   }, [handleLoadError, isOnline]);
@@ -198,6 +204,7 @@ export default function PdfViewerScreen() {
       if (cacheKeyParam) {
         // Exam corrigé/épreuve : mise en cache transparente au premier accès
         setLoading(true);
+        setLoadProgress(null);
         getCachedPdfUri(cacheKeyParam, async () => initialUrl, isOnline)
           .then((uri) => setPdfUrl(uri))
           .catch((err) => {
@@ -206,8 +213,8 @@ export default function PdfViewerScreen() {
             } else {
               setError('Impossible de charger le document.');
             }
-          })
-          .finally(() => setLoading(false));
+            setLoading(false);
+          });
       } else {
         setPdfUrl(initialUrl);
         setLoading(false);
@@ -356,8 +363,19 @@ export default function PdfViewerScreen() {
       <View style={styles.content}>
         {loading && (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#3DBE45" />
-            <Text style={styles.loaderText}>Chargement du document...</Text>
+            {loadProgress !== null ? (
+              <>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${loadProgress}%` as any }]} />
+                </View>
+                <Text style={styles.loaderText}>Chargement… {loadProgress}%</Text>
+              </>
+            ) : (
+              <>
+                <ActivityIndicator size="large" color="#3DBE45" />
+                <Text style={styles.loaderText}>Chargement du document...</Text>
+              </>
+            )}
           </View>
         )}
 
@@ -383,6 +401,10 @@ export default function PdfViewerScreen() {
               } else if (msg.type === 'page') {
                 if (typeof msg.current === 'number') pageCurrentRef.current = msg.current;
                 if (typeof msg.total === 'number') pageTotalRef.current = msg.total;
+              } else if (msg.type === 'progress') {
+                if (typeof msg.loaded === 'number' && typeof msg.total === 'number' && msg.total > 0) {
+                  setLoadProgress(Math.min(100, Math.round((msg.loaded / msg.total) * 100)));
+                }
               } else if (msg.type === 'error') {
                 console.warn('[PdfViewer] PDF.js error:', msg.message);
                 // On NE BASCULE PLUS vers l'ecran d'erreur RN — on laisse la
@@ -478,6 +500,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_500Medium',
     fontSize: 13,
     color: '#5A6470',
+  },
+  progressTrack: {
+    width: 180,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EEF1F4',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#3DBE45',
+    borderRadius: 4,
   },
   webview: {
     flex: 1,
