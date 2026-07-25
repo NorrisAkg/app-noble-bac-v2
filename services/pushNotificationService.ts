@@ -50,3 +50,22 @@ export async function syncPushTokenWithBackend(token: string): Promise<void> {
 export async function unregisterPushToken(token: string): Promise<void> {
   await apiClient.delete('/me/device-tokens', { data: { token } });
 }
+
+/**
+ * Resolves the device's current Expo push token (if permission was
+ * previously granted) and unregisters it from the backend. No-op if
+ * permission was never granted, since no token was ever registered.
+ */
+export async function unregisterCurrentPushToken(): Promise<void> {
+  if (Platform.OS === 'web') {
+    return;
+  }
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    return;
+  }
+
+  const tokenData = await Notifications.getExpoPushTokenAsync();
+  await unregisterPushToken(tokenData.data);
+}

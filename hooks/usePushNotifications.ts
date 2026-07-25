@@ -57,13 +57,19 @@ export function usePushNotifications() {
     let mounted = true;
 
     (async () => {
-      const token = await registerForPushNotifications();
-      if (token && mounted) {
-        try {
-          await syncPushTokenWithBackend(token);
-        } catch {
-          // Non-fatal — the user can still use the app
+      try {
+        const token = await registerForPushNotifications();
+        if (!token) {
+          console.warn('[push] No Expo push token obtained (permission denied or web platform).');
+        } else if (mounted) {
+          try {
+            await syncPushTokenWithBackend(token);
+          } catch (error) {
+            console.warn('[push] Failed to sync push token with backend:', error);
+          }
         }
+      } catch (error) {
+        console.warn('[push] Failed to register for push notifications:', error);
       }
 
       // Cold start: the app was launched by tapping a push.

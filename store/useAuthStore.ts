@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { User } from '@/types/api';
 import { logout as apiLogout } from '@/services/authService';
+import { unregisterCurrentPushToken } from '@/services/pushNotificationService';
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'access_token',
@@ -41,7 +42,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    // Best-effort server revocation
+    // Best-effort push token cleanup, then server revocation — both must run
+    // before clearLocal() drops the access token they rely on.
+    try {
+      await unregisterCurrentPushToken();
+    } catch {
+      // silent
+    }
     try {
       await apiLogout();
     } catch {
