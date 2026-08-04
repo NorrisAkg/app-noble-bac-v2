@@ -90,9 +90,9 @@ export default function CoursesScreen() {
   // les vidéos. Le backend MVP ne fournit pas de "fiche principale" — on prend
   // simplement la première publiée.
   //
-  // Les fiches et vidéos sont 100% Premium par défaut (RM-ACC-07). On gate
-  // donc avant le fetch ; en cas d'override admin `is_free=true` sur l'item
-  // récupéré, le filet 403 du pdf-viewer/chapter-video reste en place.
+  // Le gate se fait après le fetch, sur l'item réel récupéré, pour respecter
+  // son propre flag `is_free` (même pattern que les leçons ci-dessous et les
+  // vidéos d'épreuve dans library.tsx).
   const openFirstRevisionSheet = async (chapter: Chapter) => {
     if (openingChapterId) return;
     setOpeningChapterId(chapter.id);
@@ -106,19 +106,17 @@ export default function CoursesScreen() {
         Alert.alert('Pas de fiche', 'Aucune fiche disponible pour ce chapitre.');
         return;
       }
-      router.push({
-        pathname: '/pdf-viewer',
-        params: { revisionSheetId: String(first.id), title: first.title, subject: subjectLabel },
+      guard(first, () => {
+        router.push({
+          pathname: '/pdf-viewer',
+          params: { revisionSheetId: String(first.id), title: first.title, subject: subjectLabel },
+        });
       });
     } catch {
       Alert.alert('Erreur', 'Impossible de charger les fiches de ce chapitre.');
     } finally {
       setOpeningChapterId(null);
     }
-  };
-
-  const handleOpenChapterSheet = (chapter: Chapter) => {
-    guard({ is_free: false, title: 'cette fiche' }, () => openFirstRevisionSheet(chapter));
   };
 
   const openFirstChapterVideo = async (chapter: Chapter) => {
@@ -134,19 +132,17 @@ export default function CoursesScreen() {
         Alert.alert('Pas de vidéo', 'Aucune vidéo disponible pour ce chapitre.');
         return;
       }
-      router.push({
-        pathname: '/chapter-video',
-        params: { videoId: String(first.id), title: first.title, subject: subjectLabel },
+      guard(first, () => {
+        router.push({
+          pathname: '/chapter-video',
+          params: { videoId: String(first.id), title: first.title, subject: subjectLabel },
+        });
       });
     } catch {
       Alert.alert('Erreur', 'Impossible de charger les vidéos de ce chapitre.');
     } finally {
       setOpeningChapterId(null);
     }
-  };
-
-  const handleOpenChapterVideo = (chapter: Chapter) => {
-    guard({ is_free: false, title: 'cette vidéo' }, () => openFirstChapterVideo(chapter));
   };
 
   return (
@@ -249,7 +245,7 @@ export default function CoursesScreen() {
               subtitle={`Chapitre ${chapter.order} · fiche PDF`}
               mode="pdf"
               loading={openingChapterId === chapter.id}
-              onClick={() => handleOpenChapterSheet(chapter)}
+              onClick={() => openFirstRevisionSheet(chapter)}
             />
           ))}
 
@@ -260,7 +256,7 @@ export default function CoursesScreen() {
               subtitle={`Chapitre ${chapter.order} · vidéo du chapitre`}
               mode="video"
               loading={openingChapterId === chapter.id}
-              onClick={() => handleOpenChapterVideo(chapter)}
+              onClick={() => openFirstChapterVideo(chapter)}
             />
           ))}
         </ScrollView>
