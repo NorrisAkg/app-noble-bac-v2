@@ -10,10 +10,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, BookOpen, Lock } from 'lucide-react-native';
 
 import { courseService } from '@/services/courseService';
-import type { Chapter, Lesson, Subject } from '@/types/api';
+import type { Chapter, ChapterVideoListItem, Lesson, Subject } from '@/types/api';
 import { SubjectChips } from '@/components/courses/SubjectChips';
 import { TabChips } from '@/components/courses/TabChips';
 import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
+import { ChapterVideoAccordion } from '@/components/courses/ChapterVideoAccordion';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { usePremiumGate, isResourceFree } from '@/hooks/usePremiumGate';
@@ -81,6 +82,10 @@ export default function CoursesScreen() {
     setOpenChapterId(chapters && chapters.length > 0 ? chapters[0].id : null);
   }, [chapters]);
 
+  // Onglet Vidéos : accordéon indépendant de celui du tab `cours`, aucune
+  // section ouverte par défaut.
+  const [openVideoChapterId, setOpenVideoChapterId] = useState<number | null>(null);
+
   const subjectLabel = selectedSubject?.label ?? '';
 
   const { guard } = usePremiumGate();
@@ -120,31 +125,16 @@ export default function CoursesScreen() {
     }
   };
 
-  const openFirstChapterVideo = async (chapter: Chapter) => {
-    if (openingChapterId) return;
-    setOpeningChapterId(chapter.id);
-    try {
-      const videos = await queryClient.fetchQuery({
-        queryKey: ['courses', 'chapter-videos', chapter.id],
-        queryFn: () => courseService.getChapterVideosByChapter(chapter.id),
+  // Clic isolé par vidéo : chaque vidéo du chapitre déplié a son propre
+  // handler, gaté individuellement sur son propre flag `is_free` (pas de
+  // fetch-then-guess sur une vidéo devinée).
+  const handleOpenVideo = (video: ChapterVideoListItem) => {
+    guard(video, () => {
+      router.push({
+        pathname: '/chapter-video',
+        params: { videoId: String(video.id), title: video.title, subject: subjectLabel },
       });
-      const freeVideo = videos.find((v) => isResourceFree(v));
-      const targetVideo = freeVideo ?? videos[0];
-      if (!targetVideo) {
-        Alert.alert('Pas de vidéo', 'Aucune vidéo disponible pour ce chapitre.');
-        return;
-      }
-      guard(targetVideo, () => {
-        router.push({
-          pathname: '/chapter-video',
-          params: { videoId: String(targetVideo.id), title: targetVideo.title, subject: subjectLabel },
-        });
-      });
-    } catch {
-      Alert.alert('Erreur', 'Impossible de charger les vidéos de ce chapitre.');
-    } finally {
-      setOpeningChapterId(null);
-    }
+    });
   };
 
   return (
@@ -237,9 +227,9 @@ export default function CoursesScreen() {
             />
           ))}
 
-          {/* Fiches / Vidéos : liste plate de chapitres (aligné maquette
-              `screens-courses.jsx:362-385`). Le tap charge la 1re fiche /
-              1re vidéo et navigue directement vers le viewer. */}
+          {/* Fiches : liste plate de chapitres (aligné maquette
+              `screens-courses.jsx:362-385`). Le tap charge la 1re fiche et
+              navigue directement vers le viewer. */}
           {!chaptersLoading && chapters && tab === 'fiches' && sheetChapters.map((chapter) => (
             <ChapterRowCard
               key={chapter.id}
@@ -251,14 +241,15 @@ export default function CoursesScreen() {
             />
           ))}
 
+          {/* Vidéos : accordéon par chapitre, chaque vidéo est cliquée
+              individuellement (guard() par vidéo, pas de fetch-then-guess). */}
           {!chaptersLoading && chapters && tab === 'videos' && videoChapters.map((chapter) => (
-            <ChapterRowCard
+            <ChapterVideoAccordion
               key={chapter.id}
-              title={chapter.title}
-              subtitle={`Chapitre ${chapter.order} · vidéo du chapitre`}
-              mode="video"
-              loading={openingChapterId === chapter.id}
-              onClick={() => openFirstChapterVideo(chapter)}
+              chapter={chapter}
+              open={openVideoChapterId === chapter.id}
+              onToggle={() => setOpenVideoChapterId(openVideoChapterId === chapter.id ? null : chapter.id)}
+              onOpenVideo={handleOpenVideo}
             />
           ))}
         </ScrollView>
