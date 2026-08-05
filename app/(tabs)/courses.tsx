@@ -69,6 +69,20 @@ export default function CoursesScreen() {
   const chapters = chaptersQuery.data;
   const chaptersLoading = chaptersQuery.isLoading;
 
+  // Les flags `has_revision_sheet` / `has_video` peuvent changer côté admin
+  // après le premier chargement des chapitres (écran monté une seule fois
+  // par session, cache React Query non revalidé automatiquement). On force
+  // un refetch à chaque bascule vers ces sous-onglets pour éviter un "Aucune
+  // fiche/vidéo" obsolète tant que l'utilisateur n'a pas fait de pull.
+  // Ne doit se redéclencher qu'au changement d'onglet ; chaptersQuery est un
+  // nouvel objet à chaque rendu (l'inclure boucherait l'effet en continu).
+  useEffect(() => {
+    if (selectedSubject && (tab === 'fiches' || tab === 'videos')) {
+      chaptersQuery.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   // Onglets Fiches / Vidéos : on n'affiche que les chapitres ayant au moins
   // une fiche / vidéo publiée (flags `has_revision_sheet` / `has_video`).
   const sheetChapters = (chapters ?? []).filter((c) => c.has_revision_sheet);
