@@ -16,7 +16,7 @@ import { TabChips } from '@/components/courses/TabChips';
 import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
-import { usePremiumGate } from '@/hooks/usePremiumGate';
+import { usePremiumGate, isResourceFree } from '@/hooks/usePremiumGate';
 
 type CourseTabKey = 'cours' | 'fiches' | 'videos';
 
@@ -354,7 +354,7 @@ function LessonList({
               <Text style={accordionStyles.rowSubtitle}>{lesson.duration_minutes} min</Text>
             ) : null}
           </View>
-          {!lesson.is_free && !hideLockIcon && <Lock size={14} color="#9AA3AC" />}
+          {!isResourceFree(lesson) && !hideLockIcon && <Lock size={14} color="#9AA3AC" />}
         </TouchableOpacity>
       ))}
     </View>
