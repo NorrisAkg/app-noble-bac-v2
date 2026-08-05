@@ -365,6 +365,7 @@ export interface ExamListItem {
   country: { id: number; name: string; iso_code: string };
   series: { id: number; code: string };
   subject: { id: number; name: string; icon_slug: string | null };
+  is_free?: boolean;
 }
 
 /**

@@ -145,8 +145,8 @@ export default function LibraryScreen() {
   });
 
   const openCorrige = (examId: number) => {
-    // Le corrigé est toujours Premium (RM-ACC-02). On gate avant le fetch.
-    guard({ is_free: false, title: 'ce corrigé' }, () => {
+    // Si l'épreuve/corrigé est marqué is_free = true, il est accessible gratuitement.
+    guard({ is_free: examForYear?.is_free, title: 'ce corrigé' }, () => {
       openPdfMutation.mutate({ examId, kind: 'corrige' });
     });
   };
