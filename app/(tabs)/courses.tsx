@@ -101,15 +101,16 @@ export default function CoursesScreen() {
         queryKey: ['courses', 'revision-sheets', chapter.id],
         queryFn: () => courseService.getRevisionSheetsByChapter(chapter.id),
       });
-      const first = sheets[0];
-      if (!first) {
+      const freeSheet = sheets.find((s) => isResourceFree(s));
+      const targetSheet = freeSheet ?? sheets[0];
+      if (!targetSheet) {
         Alert.alert('Pas de fiche', 'Aucune fiche disponible pour ce chapitre.');
         return;
       }
-      guard(first, () => {
+      guard(targetSheet, () => {
         router.push({
           pathname: '/pdf-viewer',
-          params: { revisionSheetId: String(first.id), title: first.title, subject: subjectLabel },
+          params: { revisionSheetId: String(targetSheet.id), title: targetSheet.title, subject: subjectLabel },
         });
       });
     } catch {
@@ -127,15 +128,16 @@ export default function CoursesScreen() {
         queryKey: ['courses', 'chapter-videos', chapter.id],
         queryFn: () => courseService.getChapterVideosByChapter(chapter.id),
       });
-      const first = videos[0];
-      if (!first) {
+      const freeVideo = videos.find((v) => isResourceFree(v));
+      const targetVideo = freeVideo ?? videos[0];
+      if (!targetVideo) {
         Alert.alert('Pas de vidéo', 'Aucune vidéo disponible pour ce chapitre.');
         return;
       }
-      guard(first, () => {
+      guard(targetVideo, () => {
         router.push({
           pathname: '/chapter-video',
-          params: { videoId: String(first.id), title: first.title, subject: subjectLabel },
+          params: { videoId: String(targetVideo.id), title: targetVideo.title, subject: subjectLabel },
         });
       });
     } catch {
