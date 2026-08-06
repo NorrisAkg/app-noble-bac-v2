@@ -50,6 +50,7 @@ import {
 import 'react-native-reanimated';
 import '@/global.css';
 
+import { ForceUpdateGate } from '@/components/ForceUpdateGate';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
 import { QueryProvider, queryClient } from '@/providers/QueryProvider';
@@ -57,6 +58,7 @@ import { registerAuthCleanup } from '@/services/apiClient';
 import { prefetchAllData } from '@/services/prefetchService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useForceUpdate } from '@/hooks/useForceUpdate';
 
 function PushNotificationInitializer() {
   usePushNotifications();
@@ -74,6 +76,7 @@ export default function RootLayout() {
   const { initialize, isAuthenticated, isHydrated } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
+  const { isChecking: isCheckingVersion, mustUpdate, storeUrl } = useForceUpdate();
 
   const [loaded, error] = useFonts({
     Poppins_400Regular,
@@ -92,10 +95,10 @@ export default function RootLayout() {
   // Pré-charge toutes les données texte/JSON dès que l'utilisateur est authentifié.
   // prefetchQuery est silencieux (pas de throw) et no-op si les données sont encore fraîches.
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !mustUpdate) {
       prefetchAllData(queryClient);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, mustUpdate]);
 
   const wasOnlineRef = useRef<boolean | null>(null);
 
@@ -112,11 +115,15 @@ export default function RootLayout() {
     return unsub;
   }, []);
 
+  // On attend aussi la vérification de compatibilité : sans ça, un binaire
+  // obsolète afficherait brièvement l'app avant d'être remplacé par l'écran
+  // bloquant. `fetchAppVersion` a un timeout de 5 s et échoue en fail-open,
+  // donc cette attente est bornée.
   useEffect(() => {
-    if ((loaded || error) && isHydrated) {
+    if ((loaded || error) && isHydrated && !isCheckingVersion) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error, isHydrated]);
+  }, [loaded, error, isHydrated, isCheckingVersion]);
 
   // Filet de securite RUNTIME uniquement (post-login / post-logout). La
   // decision du cold-start appartient a app/index.tsx (<Redirect> declaratif,
@@ -125,6 +132,10 @@ export default function RootLayout() {
   // d'onboarding pour un utilisateur connecte.
   useEffect(() => {
     if (!loaded || !isHydrated) return;
+
+    // Le Stack n'est pas monté quand l'écran de mise à jour est affiché :
+    // toute navigation ici viserait un arbre inexistant.
+    if (mustUpdate) return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // DEV BYPASS — set EXPO_PUBLIC_BYPASS_AUTH=true in .env.local to skip the
@@ -154,11 +165,22 @@ export default function RootLayout() {
       // bascule vers (tabs) une fois setAuth() appele.
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isHydrated, segments, loaded, router]);
+  }, [isAuthenticated, isHydrated, segments, loaded, router, mustUpdate]);
 
 
   if (!loaded && !error) {
     return null;
+  }
+
+  // Court-circuite tout le reste de l'arbre : ni Stack, ni providers, ni push.
+  // Un binaire incompatible ne doit émettre aucun appel API métier.
+  if (mustUpdate) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ForceUpdateGate storeUrl={storeUrl} />
+        <StatusBar style="dark" />
+      </GestureHandlerRootView>
+    );
   }
 
   return (

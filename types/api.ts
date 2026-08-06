@@ -190,6 +190,21 @@ export interface ApiError {
   errors: Record<string, string[]> | null;
 }
 
+// ─── Compatibilité du client ──────────────────────────────────────────────────
+
+/** Réponse de GET /api/v1/app-version. */
+export interface AppVersionInfo {
+  platform: string;
+  /** Version du binaire telle qu'envoyée par le client, ou null si omise. */
+  current: string | null;
+  min_supported: string;
+  latest: string;
+  store_url: string;
+  /** true ⇒ l'app doit bloquer l'utilisateur sur l'écran de mise à jour. */
+  force_update: boolean;
+  update_available: boolean;
+}
+
 // ─── Auth payloads ────────────────────────────────────────────────────────────
 
 export interface RegisterPayload {
