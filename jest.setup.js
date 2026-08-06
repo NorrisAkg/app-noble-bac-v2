@@ -8,6 +8,7 @@ jest.mock('expo-secure-store', () => ({
 
 jest.mock('expo-constants', () => ({
   expoConfig: {
+    version: '1.0.0',
     extra: {
       apiUrl: 'https://api.test.com',
     },
