@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator,
-  TouchableOpacity, RefreshControl, Alert,
+  TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, BookOpen, Lock } from 'lucide-react-native';
 
 import { courseService } from '@/services/courseService';
-import type { Chapter, ChapterVideoListItem, Lesson, Subject } from '@/types/api';
+import type { Chapter, ChapterVideoListItem, Lesson, RevisionSheetListItem, Subject } from '@/types/api';
 import { SubjectChips } from '@/components/courses/SubjectChips';
 import { TabChips } from '@/components/courses/TabChips';
-import { ChapterRowCard } from '@/components/courses/ChapterRowCard';
+import { ChapterSheetAccordion } from '@/components/courses/ChapterSheetAccordion';
 import { ChapterVideoAccordion } from '@/components/courses/ChapterVideoAccordion';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
@@ -36,7 +36,6 @@ interface SubjectChip {
 export default function CoursesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   const subjectsQuery = useQuery({
     queryKey: ['courses', 'subjects'],
@@ -53,7 +52,6 @@ export default function CoursesScreen() {
 
   const [selectedSubject, setSelectedSubject] = useState<SubjectChip | null>(null);
   const [tab, setTab] = useState<CourseTabKey>('cours');
-  const [openingChapterId, setOpeningChapterId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!selectedSubject && subjects.length > 0) {
@@ -69,60 +67,52 @@ export default function CoursesScreen() {
   const chapters = chaptersQuery.data;
   const chaptersLoading = chaptersQuery.isLoading;
 
+  // Les flags `has_revision_sheet` / `has_video` peuvent changer côté admin
+  // après le premier chargement des chapitres (écran monté une seule fois
+  // par session, cache React Query non revalidé automatiquement). On force
+  // un refetch à chaque bascule vers ces sous-onglets pour éviter un "Aucune
+  // fiche/vidéo" obsolète tant que l'utilisateur n'a pas fait de pull.
+  // Ne doit se redéclencher qu'au changement d'onglet ; chaptersQuery est un
+  // nouvel objet à chaque rendu (l'inclure boucherait l'effet en continu).
+  useEffect(() => {
+    if (selectedSubject && (tab === 'fiches' || tab === 'videos')) {
+      chaptersQuery.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   // Onglets Fiches / Vidéos : on n'affiche que les chapitres ayant au moins
   // une fiche / vidéo publiée (flags `has_revision_sheet` / `has_video`).
   const sheetChapters = (chapters ?? []).filter((c) => c.has_revision_sheet);
   const videoChapters = (chapters ?? []).filter((c) => c.has_video);
 
   // Pour le tab `cours`, on garde la 1re section ouverte par défaut quand la
-  // liste change (changement de matière). Pour les autres tabs (flat list),
-  // pas d'état d'ouverture nécessaire.
+  // liste change (changement de matière). Les tabs `fiches` / `videos` ont
+  // leur propre état d'ouverture (voir ci-dessous).
   const [openChapterId, setOpenChapterId] = useState<number | null>(null);
   useEffect(() => {
     setOpenChapterId(chapters && chapters.length > 0 ? chapters[0].id : null);
   }, [chapters]);
 
-  // Onglet Vidéos : accordéon indépendant de celui du tab `cours`, aucune
-  // section ouverte par défaut.
+  // Onglets Fiches / Vidéos : accordéons indépendants de celui du tab `cours`,
+  // aucune section ouverte par défaut.
+  const [openSheetChapterId, setOpenSheetChapterId] = useState<number | null>(null);
   const [openVideoChapterId, setOpenVideoChapterId] = useState<number | null>(null);
 
   const subjectLabel = selectedSubject?.label ?? '';
 
   const { guard } = usePremiumGate();
 
-  // Tap d'une carte chapitre côté Fiches : on charge la liste des fiches du
-  // chapitre et on ouvre la première dans le pdf-viewer. Mêmes principes pour
-  // les vidéos. Le backend MVP ne fournit pas de "fiche principale" — on prend
-  // simplement la première publiée.
-  //
-  // Le gate se fait après le fetch, sur l'item réel récupéré, pour respecter
-  // son propre flag `is_free` (même pattern que les leçons ci-dessous et les
-  // vidéos d'épreuve dans library.tsx).
-  const openFirstRevisionSheet = async (chapter: Chapter) => {
-    if (openingChapterId) return;
-    setOpeningChapterId(chapter.id);
-    try {
-      const sheets = await queryClient.fetchQuery({
-        queryKey: ['courses', 'revision-sheets', chapter.id],
-        queryFn: () => courseService.getRevisionSheetsByChapter(chapter.id),
+  // Clic isolé par fiche : chaque fiche du chapitre déplié a son propre
+  // handler, gaté individuellement sur son propre flag `is_free` (pas de
+  // fetch-then-guess sur une fiche devinée).
+  const handleOpenSheet = (sheet: RevisionSheetListItem) => {
+    guard(sheet, () => {
+      router.push({
+        pathname: '/pdf-viewer',
+        params: { revisionSheetId: String(sheet.id), title: sheet.title, subject: subjectLabel },
       });
-      const freeSheet = sheets.find((s) => isResourceFree(s));
-      const targetSheet = freeSheet ?? sheets[0];
-      if (!targetSheet) {
-        Alert.alert('Pas de fiche', 'Aucune fiche disponible pour ce chapitre.');
-        return;
-      }
-      guard(targetSheet, () => {
-        router.push({
-          pathname: '/pdf-viewer',
-          params: { revisionSheetId: String(targetSheet.id), title: targetSheet.title, subject: subjectLabel },
-        });
-      });
-    } catch {
-      Alert.alert('Erreur', 'Impossible de charger les fiches de ce chapitre.');
-    } finally {
-      setOpeningChapterId(null);
-    }
+    });
   };
 
   // Clic isolé par vidéo : chaque vidéo du chapitre déplié a son propre
@@ -227,17 +217,15 @@ export default function CoursesScreen() {
             />
           ))}
 
-          {/* Fiches : liste plate de chapitres (aligné maquette
-              `screens-courses.jsx:362-385`). Le tap charge la 1re fiche et
-              navigue directement vers le viewer. */}
+          {/* Fiches : accordéon par chapitre, chaque fiche PDF est cliquée
+              individuellement (guard() par fiche, pas de fetch-then-guess). */}
           {!chaptersLoading && chapters && tab === 'fiches' && sheetChapters.map((chapter) => (
-            <ChapterRowCard
+            <ChapterSheetAccordion
               key={chapter.id}
-              title={chapter.title}
-              subtitle={`Chapitre ${chapter.order} · fiche PDF`}
-              mode="pdf"
-              loading={openingChapterId === chapter.id}
-              onClick={() => openFirstRevisionSheet(chapter)}
+              chapter={chapter}
+              open={openSheetChapterId === chapter.id}
+              onToggle={() => setOpenSheetChapterId(openSheetChapterId === chapter.id ? null : chapter.id)}
+              onOpenSheet={handleOpenSheet}
             />
           ))}
 
