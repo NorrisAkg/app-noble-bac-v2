@@ -52,6 +52,7 @@ import '@/global.css';
 
 import { ForceUpdateGate } from '@/components/ForceUpdateGate';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
+import { ADMIN_MANAGED_QUERY_PREFIXES, queryKeys } from '@/lib/queryKeys';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
 import { QueryProvider, queryClient } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
@@ -106,9 +107,17 @@ export default function RootLayout() {
     const unsub = NetInfo.addEventListener((state) => {
       const online = !!state.isConnected && state.isInternetReachable !== false;
       if (online && wasOnlineRef.current === false) {
-        queryClient.invalidateQueries({ queryKey: ['subscription'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.subscription.all() });
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['my-downloads'] });
+
+        // Au retour du réseau, seuls le profil, l'abonnement et les
+        // téléchargements étaient rafraîchis : le contenu édité en admin
+        // (référentiel, cours, catalogue, quiz) restait sur la copie mise en
+        // cache avant la coupure.
+        for (const prefix of ADMIN_MANAGED_QUERY_PREFIXES) {
+          queryClient.invalidateQueries({ queryKey: prefix });
+        }
       }
       wasOnlineRef.current = online;
     });
