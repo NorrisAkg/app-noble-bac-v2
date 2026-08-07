@@ -1,12 +1,11 @@
 import { QueryClient } from '@tanstack/react-query';
 
+import { queryKeys } from '@/lib/queryKeys';
 import { catalogService } from './catalogService';
 import { courseService } from './courseService';
 import { getProfile } from './profileService';
 import { quizService } from './quizService';
 import { getCountries } from './referentialService';
-
-const DAY_MS = 1000 * 60 * 60 * 24;
 
 /**
  * Pre-fetches all text/JSON data needed for offline use right after
@@ -27,23 +26,22 @@ export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
   const subjects = Array.isArray(snapshot) ? snapshot : [];
 
   if (subjects.length > 0) {
-    // subjects list — matches ['courses', 'subjects'] query key
-    queryClient.setQueryData(['courses', 'subjects'], subjects.map(({ chapters: _c, ...s }) => s));
+    queryClient.setQueryData(
+      queryKeys.courses.subjects(),
+      subjects.map(({ chapters: _c, ...s }) => s),
+    );
 
     for (const subject of subjects) {
-      // chapters per subject — matches ['courses', 'chapters', subjectId]
       queryClient.setQueryData(
-        ['courses', 'chapters', subject.id],
+        queryKeys.courses.chapters(subject.id),
         subject.chapters.map(({ lessons: _l, ...c }) => c),
       );
 
       for (const chapter of subject.chapters) {
-        // lessons per chapter — matches ['courses', 'lessons', chapterId]
-        queryClient.setQueryData(['courses', 'lessons', chapter.id], chapter.lessons);
+        queryClient.setQueryData(queryKeys.courses.lessons(chapter.id), chapter.lessons);
 
-        // lesson detail per lesson — matches ['courses', 'lesson', lessonId] (course-reader.tsx)
         for (const lesson of chapter.lessons) {
-          queryClient.setQueryData(['courses', 'lesson', lesson.id], lesson);
+          queryClient.setQueryData(queryKeys.courses.lesson(lesson.id), lesson);
         }
       }
     }
@@ -55,21 +53,23 @@ export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
       queryKey: ['profile'],
       queryFn: getProfile,
     }),
+    // Pas de staleTime ici : un `staleTime` de 24h faisait no-op ce prefetch
+    // pendant une journée entière, alors que l'API invalide désormais son cache
+    // référentiel dès qu'un admin édite un pays ou une série.
     queryClient.prefetchQuery({
-      queryKey: ['referential', 'countries'],
+      queryKey: queryKeys.referential.countries(),
       queryFn: getCountries,
-      staleTime: DAY_MS,
     }),
     queryClient.prefetchQuery({
-      queryKey: ['catalog', 'exams'],
+      queryKey: queryKeys.catalog.exams(),
       queryFn: () => catalogService.getExams(),
     }),
     queryClient.prefetchQuery({
-      queryKey: ['catalog', 'books'],
+      queryKey: queryKeys.catalog.books(),
       queryFn: () => catalogService.getBooks(),
     }),
     queryClient.prefetchQuery({
-      queryKey: ['quiz', 'history', 'first-page'],
+      queryKey: queryKeys.quiz.historyFirstPage(),
       queryFn: () => quizService.getHistory(1, 20),
     }),
   ]);

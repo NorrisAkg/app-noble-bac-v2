@@ -18,6 +18,7 @@ import { ChapterVideoAccordion } from '@/components/courses/ChapterVideoAccordio
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { usePremiumGate, isResourceFree } from '@/hooks/usePremiumGate';
+import { queryKeys } from '@/lib/queryKeys';
 
 type CourseTabKey = 'cours' | 'fiches' | 'videos';
 
@@ -38,7 +39,7 @@ export default function CoursesScreen() {
   const router = useRouter();
 
   const subjectsQuery = useQuery({
-    queryKey: ['courses', 'subjects'],
+    queryKey: queryKeys.courses.subjects(),
     queryFn: courseService.getSubjects,
   });
   const apiSubjects = subjectsQuery.data;
@@ -60,7 +61,7 @@ export default function CoursesScreen() {
   }, [subjects, selectedSubject]);
 
   const chaptersQuery = useQuery({
-    queryKey: ['courses', 'chapters', selectedSubject?.id],
+    queryKey: queryKeys.courses.chapters(selectedSubject?.id),
     queryFn: () => courseService.getChapters(selectedSubject!.id),
     enabled: !!selectedSubject,
   });
@@ -256,7 +257,7 @@ interface ChapterAccordionProps {
 
 function ChapterAccordion({ chapter, open, onToggle, subjectLabel, router }: ChapterAccordionProps) {
   const { data: lessons, isLoading: lessonsLoading } = useQuery({
-    queryKey: ['courses', 'lessons', chapter.id],
+    queryKey: queryKeys.courses.lessons(chapter.id),
     queryFn: () => courseService.getLessons(chapter.id),
     enabled: open,
   });

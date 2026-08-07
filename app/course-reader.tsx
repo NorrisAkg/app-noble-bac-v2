@@ -12,6 +12,7 @@ import { upsertLastRead } from '@/services/meService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { C } from '@/constants/theme';
+import { queryKeys } from '@/lib/queryKeys';
 
 export default function CourseReaderScreen() {
   const insets = useSafeAreaInsets();
@@ -22,7 +23,7 @@ export default function CourseReaderScreen() {
   }>();
 
   const { data: lesson, isLoading, error } = useQuery({
-    queryKey: ['courses', 'lesson', lessonId],
+    queryKey: queryKeys.courses.lesson(lessonId),
     queryFn: () => courseService.getLesson(Number(lessonId)),
     enabled: !!lessonId,
   });

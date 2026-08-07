@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { courseService } from '@/services/courseService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { queryKeys } from '@/lib/queryKeys';
 
 function buildEmbedUri(provider: string, videoId: string): string {
   const id = encodeURIComponent(videoId);
@@ -32,7 +33,7 @@ export default function ChapterVideoScreen() {
   const [webviewError, setWebviewError] = useState(false);
 
   const { data: video, isLoading, error } = useQuery({
-    queryKey: ['courses', 'chapter-video', videoId],
+    queryKey: queryKeys.courses.chapterVideo(videoId),
     queryFn: () => courseService.getChapterVideo(Number(videoId)),
     enabled: !!videoId,
   });

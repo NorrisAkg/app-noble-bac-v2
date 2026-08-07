@@ -27,6 +27,7 @@ import { catalogService } from '@/services/catalogService';
 import { getProfile } from '@/services/profileService';
 import { getApiErrorMessage } from '@/utils/apiError';
 import type { ExamListItem, ExamVideoItem, Subject, UserProfile } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 const TABS = [
   { id: 'epreuve', label: 'Épreuve' },
@@ -53,9 +54,8 @@ export default function LibraryScreen() {
   const profile = profileQuery.data;
 
   const subjectsQuery = useQuery<Subject[]>({
-    queryKey: ['subjects'],
+    queryKey: queryKeys.courses.subjects(),
     queryFn: courseService.getSubjects,
-    staleTime: 24 * 60 * 60 * 1000,
   });
   const subjects = useMemo<Subject[]>(() => subjectsQuery.data ?? [], [subjectsQuery.data]);
 
@@ -73,11 +73,11 @@ export default function LibraryScreen() {
 
   // Liste des exams filtres par sujet + scope (pays/série ACTIFS, pas l'origine).
   const examsQuery = useQuery({
-    queryKey: [
-      'catalog',
-      'exams',
-      { subjectId, countryId: profile?.active_country.id, seriesId: profile?.active_series.id },
-    ],
+    queryKey: queryKeys.catalog.exams({
+      subjectId,
+      countryId: profile?.active_country.id,
+      seriesId: profile?.active_series.id,
+    }),
     queryFn: () =>
       catalogService.getExams({
         subject_id: subjectId ?? undefined,
@@ -152,7 +152,7 @@ export default function LibraryScreen() {
   };
 
   const videosQuery = useQuery({
-    queryKey: ['catalog', 'videos', examForYear?.id],
+    queryKey: queryKeys.catalog.videos(examForYear?.id),
     queryFn: () =>
       examForYear ? catalogService.getExamVideos(examForYear.id) : Promise.resolve([]),
     enabled: examForYear != null && tab === 'video',

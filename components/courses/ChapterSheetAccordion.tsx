@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { courseService } from '@/services/courseService';
 import type { Chapter, RevisionSheetListItem } from '@/types/api';
 import { isResourceFree } from '@/hooks/usePremiumGate';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface ChapterSheetAccordionProps {
   chapter: Chapter;
@@ -23,7 +24,7 @@ export function ChapterSheetAccordion({
   onOpenSheet,
 }: ChapterSheetAccordionProps) {
   const { data: sheets, isLoading: sheetsLoading } = useQuery({
-    queryKey: ['courses', 'revision-sheets', chapter.id],
+    queryKey: queryKeys.courses.revisionSheets(chapter.id),
     queryFn: () => courseService.getRevisionSheetsByChapter(chapter.id),
     enabled: open,
   });

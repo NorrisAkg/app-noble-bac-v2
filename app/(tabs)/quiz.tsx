@@ -20,15 +20,15 @@ import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import type { Subject } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 export default function QuizSubjectsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const subjectsQuery = useQuery({
-    queryKey: ['quiz', 'subjects'],
+    queryKey: queryKeys.quiz.subjects(),
     queryFn: quizService.getSubjects,
-    staleTime: 24 * 60 * 60 * 1000,
   });
   const subjects: Subject[] = subjectsQuery.data ?? [];
   const loading = subjectsQuery.isLoading;

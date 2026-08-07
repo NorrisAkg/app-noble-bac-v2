@@ -16,6 +16,7 @@ import { register } from '@/services/authService';
 import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
 import { buildE164Phone } from '@/utils/phone';
 import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
+import { queryKeys } from '@/lib/queryKeys';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -32,8 +33,9 @@ export default function SignupScreen() {
   // ── Selection state ───────────────────────────────────────────────────────
   // Même UX que sur /login : on s'appuie sur la liste statique des pays UEMOA
   // (`constants/countries`) avec Niger pré-sélectionné. Le `country.id` backend
-  // est résolu au moment du submit via le référentiel API (cache
-  // `staleTime: Infinity`). La filière n'est PAS demandée ici — le backend
+  // est résolu au moment du submit via le référentiel API (cache au
+  // `staleTime` par défaut de 5 min, l'API invalidant le sien à l'édition
+  // admin). La filière n'est PAS demandée ici — le backend
   // auto-affecte la 1re série active du pays, l'utilisateur la choisit/corrige
   // sur `/setup` après vérification OTP (CDC US-AUTH-04).
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
@@ -46,7 +48,7 @@ export default function SignupScreen() {
     isError: referentialError,
     error: referentialErrorObj,
   } = useQuery({
-    queryKey: ['referential', 'countries'],
+    queryKey: queryKeys.referential.countries(),
     queryFn: getCountries,
   });
 

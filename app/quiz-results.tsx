@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { C } from '@/constants/theme';
 import { useQuizStore } from '@/store/useQuizStore';
 import { quizService } from '@/services/quizService';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface Tier {
   label: string;
@@ -71,7 +72,7 @@ export default function QuizResultsScreen() {
   // déjà cached par la tab Quiz. On filtre sur subject.id (la session qu'on
   // vient de finir y est déjà incluse côté backend).
   const historyQuery = useQuery({
-    queryKey: ['quiz', 'history', 'first-page'],
+    queryKey: queryKeys.quiz.historyFirstPage(),
     queryFn: () => quizService.getHistory(1, 50),
     staleTime: 30 * 1000,
   });

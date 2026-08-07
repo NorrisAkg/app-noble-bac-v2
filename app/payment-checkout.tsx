@@ -27,6 +27,7 @@ import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
 import { OperatorPickerSheet } from '@/components/ui/OperatorPickerSheet';
 import { C } from '@/constants/theme';
 import type { Operator, TransactionStatus } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * Chemins de retour des gateways — interceptés dans la WebView pour détecter
@@ -77,7 +78,7 @@ export default function PaymentCheckoutScreen() {
   const countryId = profileQuery.data?.country.id ?? null;
 
   const operatorsQuery = useQuery({
-    queryKey: ['operators', countryId],
+    queryKey: queryKeys.referential.operators(countryId),
     queryFn: () => getOperators(countryId as number),
     enabled: countryId !== null,
     staleTime: 10 * 60 * 1000,
@@ -154,10 +155,12 @@ export default function PaymentCheckoutScreen() {
         const tx = await getPaymentStatus(transactionId);
         if (tx.status === 'confirmed') {
           finishedRef.current = true;
-          await queryClient.invalidateQueries({ queryKey: ['subscription', 'active'] });
-          await queryClient.invalidateQueries({ queryKey: ['active-subscription'] });
+          // Un seul préfixe couvre désormais abonnement actif, plans et
+          // transactions : avant l'unification des clés, deux des quatre
+          // invalidations visaient des clés que plus aucun écran n'utilisait
+          // (`['my-subscription-transactions']` notamment).
+          await queryClient.invalidateQueries({ queryKey: queryKeys.subscription.all() });
           await queryClient.invalidateQueries({ queryKey: ['profile'] });
-          await queryClient.invalidateQueries({ queryKey: ['my-subscription-transactions'] });
           setStatus('confirmed');
           setShowSuccessSheet(true);
           return;
