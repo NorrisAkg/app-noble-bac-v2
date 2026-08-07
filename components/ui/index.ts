@@ -18,6 +18,7 @@ export type { HeadingLevel } from './Heading';
 export { IllustrationStack, IllustrationQuiz, IllustrationAI } from './Illustrations';
 export { Input } from './Input';
 export { Loader } from './Loader';
+export { PasswordInput } from './PasswordInput';
 export { Logo, LogoMini } from './Logo';
 export { PremiumLock } from './PremiumLock';
 export { OfflineBanner } from './OfflineBanner';
