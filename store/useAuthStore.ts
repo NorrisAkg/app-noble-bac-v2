@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { User } from '@/types/api';
 import { logout as apiLogout } from '@/services/authService';
+import { signOutFromGoogle } from '@/services/googleService';
 import { unregisterCurrentPushToken } from '@/services/pushNotificationService';
 
 const STORAGE_KEYS = {
@@ -54,6 +55,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // silent
     }
+    // Sans ça, le SDK Google resélectionne silencieusement le dernier compte :
+    // un utilisateur qui se déconnecte pour en changer serait reconnecté sur
+    // le même, sans jamais voir le sélecteur de compte.
+    await signOutFromGoogle();
     await get().clearLocal();
   },
 

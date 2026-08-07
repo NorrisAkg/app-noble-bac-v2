@@ -4,46 +4,43 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
-import { Eye, EyeOff } from 'lucide-react-native';
 import { resetPassword } from '@/services/authService';
-import { otpService, OtpError } from '@/services/otpService';
-import { getApiErrorMessage } from '@/utils/apiError';
+import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
+
+const CODE_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 8;
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { identifier: rawIdentifier } = useLocalSearchParams<{ identifier?: string }>();
+  const identifier = typeof rawIdentifier === 'string' ? rawIdentifier : '';
 
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // The OTP was dispatched by /auth/password/request-reset in forgot.tsx.
-  // On mount we just log the bypass hint (no-op in production).
   useEffect(() => {
-    if (!phone) {
-      Alert.alert('Erreur', 'Numéro de téléphone manquant.');
+    if (!identifier) {
+      Alert.alert('Erreur', 'Identifiant manquant.');
       router.back();
-      return;
     }
-    otpService.acknowledgeOtpSent(String(phone));
-  }, [phone, router]);
+  }, [identifier, router]);
 
-  const codeValid = code.length === 6;
-  const passwordValid = password.length === 4 && password === passwordConfirm;
-  const isValid = codeValid && passwordValid;
+  const passwordsMatch = password.length > 0 && password === passwordConfirm;
+  const isValid =
+    code.length === CODE_LENGTH && password.length >= MIN_PASSWORD_LENGTH && passwordsMatch;
 
   const { mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      const validatedCode = otpService.validateCode(code);
-      return resetPassword({
-        phone: String(phone),
-        code: validatedCode,
+    mutationFn: () =>
+      resetPassword({
+        identifier,
+        code,
         password,
         password_confirmation: passwordConfirm,
-      });
-    },
+      }),
     onSuccess: () => {
       Alert.alert(
         'Mot de passe mis à jour',
@@ -52,10 +49,14 @@ export default function ResetPasswordScreen() {
       );
     },
     onError: (error) => {
-      const message = error instanceof OtpError
-        ? error.message
-        : getApiErrorMessage(error);
-      Alert.alert('Échec', message);
+      const validationErrors = getValidationErrors(error);
+      if (Object.keys(validationErrors).length > 0) {
+        setFieldErrors(validationErrors);
+      } else {
+        // Un code invalide remonte en 401, pas en 422 : il n'a donc pas de
+        // champ associé et doit passer par une alerte.
+        Alert.alert('Échec', getApiErrorMessage(error));
+      }
     },
   });
 
@@ -69,51 +70,49 @@ export default function ResetPasswordScreen() {
       >
         <ScrollView className="flex-1 px-6 pt-7" keyboardShouldPersistTaps="handled">
           <Text className="font-poppins-bold text-2xl text-brand-ink tracking-tighter">
-            Vérification + nouveau mot de passe
+            Vérification et nouveau mot de passe
           </Text>
           <Text className="font-poppins text-sm text-brand-ink-medium mt-1.5 mb-6 leading-5">
-            Saisis le code à 6 chiffres reçu sur WhatsApp au {phone || ''}, puis choisis un nouveau code PIN à 4 chiffres.
+            Saisis le code à 6 chiffres envoyé à{' '}
+            <Text className="font-poppins-medium">{identifier}</Text>, puis choisis un nouveau mot
+            de passe.
           </Text>
 
           <Input
-            label="Code WhatsApp"
+            label="Code de vérification"
             placeholder="• • • • • •"
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={CODE_LENGTH}
             value={code}
-            onChangeText={setCode}
+            onChangeText={(v) => {
+              setCode(v);
+              setFieldErrors((e) => ({ ...e, code: '' }));
+            }}
+            error={fieldErrors.code || undefined}
           />
 
-          <Input
+          <PasswordInput
             label="Nouveau mot de passe"
-            placeholder="• • • •"
-            keyboardType="number-pad"
-            maxLength={4}
-            secureTextEntry={!showPwd}
+            placeholder="8 caractères minimum"
             value={password}
-            onChangeText={setPassword}
-            icon={
-              <TouchableOpacity onPress={() => setShowPwd((v) => !v)}>
-                {showPwd ? <EyeOff size={20} color="#5A6470" /> : <Eye size={20} color="#5A6470" />}
-              </TouchableOpacity>
-            }
+            onChangeText={(v) => {
+              setPassword(v);
+              setFieldErrors((e) => ({ ...e, password: '' }));
+            }}
+            error={fieldErrors.password || undefined}
           />
 
-          <Input
-            label="Confirmer le mot de passe"
-            placeholder="• • • •"
-            keyboardType="number-pad"
-            maxLength={4}
-            secureTextEntry={!showPwd}
+          <PasswordInput
+            label="Confirme le mot de passe"
+            placeholder="Retape ton mot de passe"
             value={passwordConfirm}
             onChangeText={setPasswordConfirm}
+            error={
+              passwordConfirm.length > 0 && !passwordsMatch
+                ? 'Les deux mots de passe ne correspondent pas.'
+                : undefined
+            }
           />
-
-          {password.length > 0 && password !== passwordConfirm && passwordConfirm.length > 0 && (
-            <Text className="font-poppins text-xs text-[#A93122] mb-2">
-              Les mots de passe ne correspondent pas.
-            </Text>
-          )}
 
           <View className="mt-4">
             <Button onPress={() => mutate()} disabled={!isValid} loading={isPending}>

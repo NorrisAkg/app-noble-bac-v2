@@ -19,10 +19,14 @@ export interface User {
   id: string;
   first_name: string;
   last_name: string;
-  phone: string;
+  /** Identifiant principal depuis la refonte : toujours présent sur un compte récent. */
+  email: string | null;
+  /** Optionnel : un compte créé par email ou par Google n'en a pas. */
+  phone: string | null;
   country_id: string;
   series_id: string;
   phone_verified_at: string | null;
+  email_verified_at: string | null;
   is_active: boolean;
 }
 
@@ -210,21 +214,50 @@ export interface AppVersionInfo {
 export interface RegisterPayload {
   first_name: string;
   last_name: string;
-  /** E.164 format e.g. +22990123456 */
-  phone: string;
+  email: string;
+  /** Au moins 8 caractères. Le backend borne aussi à 72 octets (limite bcrypt). */
   password: string;
+  password_confirmation: string;
+  /** Optionnel depuis la refonte — E.164, ex. +22790123456. */
+  phone?: string;
   country_id: string;
   /**
    * Optionnel : le backend auto-affecte la 1re série active du pays
-   * si non fourni. L'utilisateur la choisit/corrige via /setup post-OTP.
+   * si non fourni. L'utilisateur la choisit/corrige via /setup.
    */
   series_id?: string;
 }
 
 export interface LoginPayload {
-  /** E.164 format */
-  phone: string;
+  /**
+   * Email ou numéro E.164 — le backend discrimine sur la présence d'un `@`.
+   * Aucune validation de format côté client : un identifiant inconnu doit
+   * produire un 401 générique, pas une erreur de saisie qui révélerait
+   * quel format est attendu.
+   */
+  identifier: string;
   password: string;
+}
+
+export interface VerifyEmailPayload {
+  email: string;
+  /** Code à 6 chiffres reçu par email. */
+  code: string;
+}
+
+export interface ResendEmailCodePayload {
+  email: string;
+}
+
+export interface GoogleSignInPayload {
+  /** id_token obtenu du SDK natif Google, vérifié côté backend. */
+  id_token: string;
+  /**
+   * Requis uniquement à la création du compte. Un utilisateur déjà inscrit
+   * n'a aucun pays à fournir ; le backend renvoie une erreur de validation
+   * sur ce champ s'il doit créer et ne l'a pas reçu.
+   */
+  country_id?: string;
 }
 
 export interface VerifyOtpPayload {
@@ -240,16 +273,20 @@ export interface SendOtpPayload {
 }
 
 export interface RequestPasswordResetPayload {
-  /** E.164 format */
-  phone: string;
+  /**
+   * Email ou numéro E.164. Le canal d'envoi suit l'identifiant saisi, pas les
+   * données du compte : qui tape son numéro reçoit un SMS, même si son compte
+   * porte une adresse email.
+   */
+  identifier: string;
 }
 
 export interface ResetPasswordPayload {
-  /** E.164 format */
-  phone: string;
-  /** 6-digit OTP code received on WhatsApp via Twilio Verify */
+  /** Le même identifiant qu'à la demande — il détermine le canal de vérification. */
+  identifier: string;
+  /** Code à 6 chiffres reçu par email ou par WhatsApp/SMS. */
   code: string;
-  /** New 4-digit PIN (backend enforces "confirmed" rule) */
+  /** Au moins 8 caractères — le reset applique la règle moderne, contrairement au login. */
   password: string;
   password_confirmation: string;
 }

@@ -7,6 +7,12 @@ jest.mock('../services/authService', () => ({
   logout: jest.fn(),
 }));
 
+// Le module natif Google n'existe pas sous Jest : sans ce mock, l'import de
+// googleService par le store fait echouer la suite entiere au chargement.
+jest.mock('../services/googleService', () => ({
+  signOutFromGoogle: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockedSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockedApiLogout = apiLogout as jest.MockedFunction<typeof apiLogout>;
 
@@ -14,10 +20,12 @@ const userFixture: User = {
   id: 'u-1',
   first_name: 'Awa',
   last_name: 'Diallo',
+  email: 'awa@noble-bac.com',
   phone: '+221701234567',
   country_id: 'c-1',
   series_id: 's-1',
   phone_verified_at: '2026-04-01T10:00:00Z',
+  email_verified_at: '2026-04-01T10:00:00Z',
   is_active: true,
 };
 

@@ -3,6 +3,9 @@ import type {
   RegisterPayload,
   LoginPayload,
   VerifyOtpPayload,
+  VerifyEmailPayload,
+  ResendEmailCodePayload,
+  GoogleSignInPayload,
   RequestPasswordResetPayload,
   ResetPasswordPayload,
   SendOtpPayload,
@@ -13,8 +16,8 @@ import type {
 
 /**
  * POST /api/v1/auth/register
- * Creates a new account and triggers a WhatsApp OTP via Twilio Verify.
- * The user must then verify their phone via /auth/verify-otp.
+ * Crée un compte non vérifié et envoie un code à 6 chiffres par email.
+ * L'utilisateur le soumet ensuite à /auth/email/verify.
  */
 export async function register(payload: RegisterPayload): Promise<AuthUserResponse> {
   const { data } = await apiClient.post<AuthUserResponse>('/auth/register', payload);
@@ -22,9 +25,31 @@ export async function register(payload: RegisterPayload): Promise<AuthUserRespon
 }
 
 /**
+ * POST /api/v1/auth/email/verify
+ * Valide le code reçu par email. En cas de succès, marque email_verified_at et
+ * émet les tokens : la vérification vaut connexion.
+ */
+export async function verifyEmail(payload: VerifyEmailPayload): Promise<LoginResponse> {
+  const { data } = await apiClient.post<LoginResponse>('/auth/email/verify', payload);
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/email/resend
+ * Renvoie un code de vérification. Répond 200 que l'adresse existe ou non,
+ * pour ne pas transformer l'endpoint en oracle d'énumération des comptes.
+ */
+export async function resendEmailCode(
+  payload: ResendEmailCodePayload,
+): Promise<ApiResponse<null>> {
+  const { data } = await apiClient.post<ApiResponse<null>>('/auth/email/resend', payload);
+  return data;
+}
+
+/**
  * POST /api/v1/auth/verify-otp
- * Submits the 6-digit OTP code to the backend. Twilio Verify validates it.
- * On success, marks phone_verified_at and issues access + refresh tokens (auto-login).
+ * Vérification par OTP téléphone. Conservé pour les comptes créés avant la
+ * refonte, qui n'ont pas d'email.
  */
 export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginResponse> {
   const { data } = await apiClient.post<LoginResponse>('/auth/verify-otp', payload);
@@ -33,7 +58,7 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginRespons
 
 /**
  * POST /api/v1/auth/login
- * Authenticates with phone + password and returns a Sanctum token.
+ * Authentifie un identifiant (email ou téléphone) + mot de passe.
  */
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const { data } = await apiClient.post<LoginResponse>('/auth/login', payload);
@@ -41,26 +66,27 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 }
 
 /**
- * POST /api/v1/auth/logout  (requires Bearer token)
- * Revokes the current Sanctum token.
+ * POST /api/v1/auth/google
+ * Connexion ET inscription : le backend crée le compte s'il n'existe pas,
+ * ou rattache le compte existant portant la même adresse.
+ */
+export async function googleSignIn(payload: GoogleSignInPayload): Promise<LoginResponse> {
+  const { data } = await apiClient.post<LoginResponse>('/auth/google', payload);
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/logout  (requiert un Bearer token)
+ * Révoque le token Sanctum courant.
  */
 export async function logout(): Promise<void> {
   await apiClient.post('/auth/logout');
 }
 
 /**
- * POST /api/v1/auth/refresh  (requires Bearer token)
- * Issues a new Sanctum token (rotates the old one).
- */
-export async function refreshToken(): Promise<LoginResponse> {
-  const { data } = await apiClient.post<LoginResponse>('/auth/refresh');
-  return data;
-}
-
-/**
  * POST /api/v1/auth/password/request-reset
- * Confirms the phone is registered and dispatches a WhatsApp OTP via Twilio Verify.
- * Always responds 200 to avoid phone-number enumeration.
+ * Envoie un code sur le canal correspondant à l'identifiant saisi.
+ * Répond toujours 200 pour éviter l'énumération des comptes.
  */
 export async function requestPasswordReset(
   payload: RequestPasswordResetPayload,
@@ -71,8 +97,8 @@ export async function requestPasswordReset(
 
 /**
  * POST /api/v1/auth/password/reset
- * Resets the password after Twilio Verify validates the 6-digit OTP code.
- * Backend revokes all existing Sanctum tokens on success.
+ * Réinitialise le mot de passe après validation du code. Le backend révoque
+ * tous les tokens existants en cas de succès.
  */
 export async function resetPassword(payload: ResetPasswordPayload): Promise<ApiResponse<null>> {
   const { data } = await apiClient.post<ApiResponse<null>>('/auth/password/reset', payload);
@@ -81,8 +107,7 @@ export async function resetPassword(payload: ResetPasswordPayload): Promise<ApiR
 
 /**
  * POST /api/v1/auth/send-otp
- * Requests a new WhatsApp OTP dispatch for the given phone.
- * Used by the resend button on the verify screen.
+ * Renvoie un OTP téléphone. Utilisé par les comptes historiques uniquement.
  */
 export async function sendOtp(payload: SendOtpPayload): Promise<ApiResponse<null>> {
   const { data } = await apiClient.post<ApiResponse<null>>('/auth/send-otp', payload);

@@ -5,29 +5,21 @@ import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { CountryMap } from '@/components/ui/CountryMap';
-import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
-import { ChevronDown } from 'lucide-react-native';
 import { requestPasswordReset } from '@/services/authService';
 import { getApiErrorMessage } from '@/utils/apiError';
-import { buildE164Phone } from '@/utils/phone';
-import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
 
-  const e164Phone = buildE164Phone(country.dial, phone);
-  const isValid = phone.length >= 6;
+  const isValid = identifier.trim().length > 0;
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => requestPasswordReset({ phone: e164Phone }),
+    mutationFn: () => requestPasswordReset({ identifier: identifier.trim() }),
     onSuccess: () => {
-      // Backend always returns 200 to avoid enumeration; we navigate
-      // unconditionally to the OTP step.
-      router.push({ pathname: '/(auth)/reset', params: { phone: e164Phone } });
+      // Le backend répond 200 quel que soit le résultat, pour ne pas permettre
+      // d'énumérer les comptes : on navigue donc inconditionnellement.
+      router.push({ pathname: '/(auth)/reset', params: { identifier: identifier.trim() } });
     },
     onError: (error) => {
       Alert.alert('Erreur', getApiErrorMessage(error));
@@ -47,26 +39,21 @@ export default function ForgotPasswordScreen() {
             Réinitialiser
           </Text>
           <Text className="font-poppins text-sm text-brand-ink-medium mt-1.5 mb-6 leading-5">
-            Saisis le numéro de téléphone associé à ton compte. Tu recevras un code par SMS pour confirmer ton identité.
+            Saisis l&apos;email ou le numéro associé à ton compte. Tu recevras un code à 6 chiffres
+            pour confirmer ton identité.
           </Text>
 
           <Input
-            label="Numéro de téléphone"
-            placeholder="90 12 34 56"
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
-            icon={
-              <TouchableOpacity
-                key={country.code}
-                onPress={() => setPickerOpen(true)}
-                className="flex-row items-center gap-1.5 pr-2 border-r border-line"
-              >
-                <CountryMap code={country.code} size={22} />
-                <Text className="font-poppins-semibold text-sm text-brand-ink ml-1">{country.dial}</Text>
-                <ChevronDown size={14} color="#5A6470" />
-              </TouchableOpacity>
-            }
+            label="Email ou téléphone"
+            placeholder="toi@exemple.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={identifier}
+            onChangeText={setIdentifier}
+            // Le canal suit l'identifiant saisi, pas les données du compte :
+            // il faut que l'utilisateur sache où regarder.
+            helperText="Le code arrive par email, ou par SMS si tu saisis un numéro."
           />
 
           <View className="mt-2 mb-6">
@@ -87,17 +74,6 @@ export default function ForgotPasswordScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <CountryPickerSheet
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        options={COUNTRIES.map((c) => ({ key: c.code, code: c.code, name: c.name, dial: c.dial }))}
-        selectedKey={country.code}
-        onSelect={(opt) => {
-          const next = COUNTRIES.find((c) => c.code === opt.key);
-          if (next) setCountry(next);
-        }}
-      />
     </View>
   );
 }

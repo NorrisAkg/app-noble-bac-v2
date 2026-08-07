@@ -5,18 +5,23 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Check, ChevronDown } from 'lucide-react-native';
 import { AppBar } from '@/components/ui/AppBar';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
+import { GoogleButton } from '@/components/ui/GoogleButton';
 import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
-import { Check, ChevronDown, Eye, EyeOff } from 'lucide-react-native';
 import { CountryMap } from '@/components/ui/CountryMap';
 import { getCountries } from '@/services/referentialService';
 import { register } from '@/services/authService';
+import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
 import { buildE164Phone } from '@/utils/phone';
 import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
 import { queryKeys } from '@/lib/queryKeys';
+
+const MIN_PASSWORD_LENGTH = 8;
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -24,24 +29,20 @@ export default function SignupScreen() {
   // ── Form state ────────────────────────────────────────────────────────────
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [agree, setAgree] = useState(false);
-  const [showPwd, setShowPwd] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ── Selection state ───────────────────────────────────────────────────────
-  // Même UX que sur /login : on s'appuie sur la liste statique des pays UEMOA
-  // (`constants/countries`) avec Niger pré-sélectionné. Le `country.id` backend
-  // est résolu au moment du submit via le référentiel API (cache au
-  // `staleTime` par défaut de 5 min, l'API invalidant le sien à l'édition
-  // admin). La filière n'est PAS demandée ici — le backend
-  // auto-affecte la 1re série active du pays, l'utilisateur la choisit/corrige
-  // sur `/setup` après vérification OTP (CDC US-AUTH-04).
+  // Le `country.id` backend est résolu au submit via le référentiel API. La
+  // filière n'est PAS demandée ici — le backend auto-affecte la 1re série
+  // active du pays, l'utilisateur la choisit/corrige sur `/setup`.
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
 
-  // Référentiel API préchargé (résolution du country_id backend au submit).
   const {
     data: apiCountries = [],
     isLoading: loadingApiCountries,
@@ -52,22 +53,35 @@ export default function SignupScreen() {
     queryFn: getCountries,
   });
 
-  const e164Phone = buildE164Phone(country.dial, phone);
+  const apiCountry = apiCountries.find((c) => c.code === country.code) ?? null;
 
-  // isValid ne dépend QUE des champs utilisateur. Le référentiel API est
-  // une exigence technique vérifiée au submit (l'utilisateur n'a pas
-  // conscience qu'il « doit » avoir une série).
+  // Le téléphone est désormais facultatif : un compte peut vivre sans, et le
+  // numéro sera demandé au moment du paiement s'il manque.
+  const trimmedPhone = phone.trim();
+  const e164Phone = trimmedPhone ? buildE164Phone(country.dial, trimmedPhone) : undefined;
+
+  const passwordsMatch = password.length > 0 && password === passwordConfirm;
+
   const isValid =
     !!firstName.trim() &&
     !!lastName.trim() &&
-    phone.length >= 6 &&
-    password.length === 4 &&
+    !!email.trim() &&
+    password.length >= MIN_PASSWORD_LENGTH &&
+    passwordsMatch &&
     agree;
+
+  const clearError = (field: string) =>
+    setFieldErrors((errors) => {
+      if (!errors[field]) return errors;
+      const { [field]: _removed, ...rest } = errors;
+      return rest;
+    });
+
+  const google = useGoogleAuth({ countryId: apiCountry?.id ?? null });
 
   // ── Register mutation ─────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      const apiCountry = apiCountries.find((c) => c.code === country.code) ?? null;
       if (!apiCountry) {
         throw new Error(
           loadingApiCountries
@@ -78,15 +92,15 @@ export default function SignupScreen() {
       return register({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        phone: e164Phone,
+        email: email.trim(),
         password,
+        password_confirmation: passwordConfirm,
+        ...(e164Phone ? { phone: e164Phone } : {}),
         country_id: apiCountry.id,
-        // series_id volontairement omis : le backend auto-affecte
-        // (le user choisira / corrigera via /setup).
       });
     },
     onSuccess: () => {
-      router.push({ pathname: '/(auth)/verify', params: { phone: e164Phone } });
+      router.push({ pathname: '/(auth)/verify-email', params: { email: email.trim() } });
     },
     onError: (error) => {
       const validationErrors = getValidationErrors(error);
@@ -114,29 +128,49 @@ export default function SignupScreen() {
             Quelques infos pour personnaliser ton parcours.
           </Text>
 
-          {/* ── Name ── */}
+          {/* ── Nom ── */}
           <View className="flex-row gap-3">
             <Input
               containerClassName="flex-1"
               placeholder="Prénom"
+              autoCapitalize="words"
               value={firstName}
-              onChangeText={(v) => { setFirstName(v); setFieldErrors((e) => ({ ...e, first_name: '' })); }}
+              onChangeText={(v) => { setFirstName(v); clearError('first_name'); }}
+              error={fieldErrors.first_name}
             />
             <Input
               containerClassName="flex-1"
               placeholder="Nom"
+              autoCapitalize="words"
               value={lastName}
-              onChangeText={(v) => { setLastName(v); setFieldErrors((e) => ({ ...e, last_name: '' })); }}
+              onChangeText={(v) => { setLastName(v); clearError('last_name'); }}
+              error={fieldErrors.last_name}
             />
           </View>
 
-          {/* ── Phone ── */}
+          {/* ── Email ── */}
           <Input
-            label="Numéro de téléphone"
+            label="Adresse email"
+            placeholder="toi@exemple.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            value={email}
+            onChangeText={(v) => { setEmail(v); clearError('email'); }}
+            error={fieldErrors.email}
+            helperText="On t'y enverra ton code de vérification."
+          />
+
+          {/* ── Téléphone (facultatif) ── */}
+          <Input
+            label="Numéro de téléphone (facultatif)"
             placeholder="90 12 34 56"
             keyboardType="phone-pad"
             value={phone}
-            onChangeText={(v) => { setPhone(v); setFieldErrors((e) => ({ ...e, phone: '' })); }}
+            onChangeText={(v) => { setPhone(v); clearError('phone'); }}
+            error={fieldErrors.phone}
+            helperText="Nécessaire seulement pour payer par mobile money."
             icon={
               <TouchableOpacity
                 key={country.code}
@@ -149,28 +183,35 @@ export default function SignupScreen() {
               </TouchableOpacity>
             }
           />
-          {fieldErrors.phone ? (
-            <Text className="text-red-500 font-poppins text-xs -mt-3 mb-3">{fieldErrors.phone}</Text>
-          ) : null}
 
-          {/* ── Password ── */}
-          <Input
-            placeholder="Code PIN à 4 chiffres"
-            keyboardType="number-pad"
-            maxLength={4}
-            secureTextEntry={!showPwd}
+          {/* ── Mot de passe ── */}
+          <PasswordInput
+            label="Mot de passe"
+            placeholder="8 caractères minimum"
             value={password}
-            onChangeText={setPassword}
-            icon={
-              <TouchableOpacity onPress={() => setShowPwd((v) => !v)}>
-                {showPwd ? <EyeOff size={20} color="#5A6470" /> : <Eye size={20} color="#5A6470" />}
-              </TouchableOpacity>
+            onChangeText={(v) => { setPassword(v); clearError('password'); }}
+            error={fieldErrors.password}
+          />
+
+          <PasswordInput
+            label="Confirme le mot de passe"
+            placeholder="Retape ton mot de passe"
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+            // Erreur affichée seulement une fois la confirmation entamée, pour
+            // ne pas signaler une divergence avant que l'utilisateur ait tapé.
+            error={
+              passwordConfirm.length > 0 && !passwordsMatch
+                ? 'Les deux mots de passe ne correspondent pas.'
+                : undefined
             }
           />
 
-          {/* ── Terms ── */}
+          {/* ── CGU ── */}
           <TouchableOpacity
             onPress={() => setAgree((v) => !v)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agree }}
             className="flex-row items-start gap-2.5 mt-2 mb-6"
           >
             <View className={`w-[22px] h-[22px] rounded-md border-[1.5px] items-center justify-center ${
@@ -190,18 +231,32 @@ export default function SignupScreen() {
             Créer mon compte
           </Button>
 
-          {/* Feedback statut référentiel — préventif. Si l'API ne répond
-              plus ou que la liste est vide, l'utilisateur sait pourquoi
-              le submit échouera au lieu d'un bouton silencieusement bloqué. */}
+          {/* Statut du référentiel — préventif : si l'API ne répond pas,
+              l'utilisateur sait pourquoi le submit échouera. */}
           {loadingApiCountries ? (
             <Text className="font-poppins text-xs text-brand-ink-medium text-center mt-3">
               Chargement du référentiel…
             </Text>
           ) : referentialError ? (
-            <Text className="font-poppins-medium text-xs text-red-500 text-center mt-3">
+            <Text className="font-poppins-medium text-xs text-brand-danger text-center mt-3">
               {getApiErrorMessage(referentialErrorObj)}
             </Text>
           ) : null}
+
+          {/* ── Séparateur ── */}
+          <View className="flex-row items-center my-5">
+            <View className="flex-1 h-[1px] bg-line" />
+            <Text className="font-poppins text-xs text-brand-ink-medium mx-3">ou</Text>
+            <View className="flex-1 h-[1px] bg-line" />
+          </View>
+
+          <GoogleButton
+            onPress={google.start}
+            loading={google.isPending}
+            // Sans pays résolu, le backend refuserait la création : mieux vaut
+            // un bouton inerte qu'une erreur après la fenêtre Google.
+            disabled={isPending || !apiCountry}
+          />
 
           <View className="mt-6 mb-10 flex-row justify-center gap-1">
             <Text className="font-poppins text-[13.5px] text-brand-ink-medium">Déjà inscrit ?</Text>
@@ -212,7 +267,6 @@ export default function SignupScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ── Country picker (identique à /login) ── */}
       <CountryPickerSheet
         isOpen={countryPickerOpen}
         onClose={() => setCountryPickerOpen(false)}
