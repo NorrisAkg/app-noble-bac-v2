@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/Input';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
 import { GoogleButton } from '@/components/ui/GoogleButton';
-import { login } from '@/services/authService';
+import { login, resendEmailCode, sendOtp } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
-import { getApiErrorMessage } from '@/utils/apiError';
+import { getApiErrorMessage, getVerificationChannel } from '@/utils/apiError';
+import { resolveVerificationTarget } from '@/utils/verification';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,13 +40,49 @@ export default function LoginScreen() {
     },
   });
 
+  /**
+   * Envoie un code sur le bon canal puis ouvre l'écran de vérification
+   * correspondant. L'envoi précède la navigation : contrairement au parcours
+   * d'inscription, aucun code n'a été émis ici, et l'écran s'ouvrirait sur un
+   * compte à rebours de renvoi de 45 secondes sans rien à saisir.
+   */
+  const redirectToVerification = async (channel: 'email' | 'phone') => {
+    const target = resolveVerificationTarget(channel, identifier);
+
+    if (target.kind === 'unavailable') {
+      setFormError(target.reason);
+      return;
+    }
+
+    try {
+      if (target.kind === 'email') {
+        await resendEmailCode({ email: target.email });
+        router.push({ pathname: '/(auth)/verify-email', params: { email: target.email } });
+      } else {
+        await sendOtp({ phone: target.phone });
+        router.push({ pathname: '/(auth)/verify', params: { phone: target.phone } });
+      }
+    } catch (error) {
+      setFormError(getApiErrorMessage(error));
+    }
+  };
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => login({ identifier: identifier.trim(), password }),
     onSuccess: async (res) => {
       await setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
       // Navigation prise en charge par le garde d'auth de _layout.tsx
     },
-    onError: (error) => {
+    onError: async (error) => {
+      // Compte existant mais jamais vérifié : sans cette branche, l'utilisateur
+      // recevait un 403 sans aucune issue — le mot de passe est bon, mais rien
+      // ne le menait vers l'écran de vérification.
+      const channel = getVerificationChannel(error);
+      if (channel) {
+        await redirectToVerification(channel);
+        return;
+      }
+
       // Affiché sous le champ plutôt qu'en Alert : l'erreur porte sur la
       // saisie, l'utilisateur doit la voir en même temps que ce qu'il a tapé.
       setFormError(getApiErrorMessage(error));
