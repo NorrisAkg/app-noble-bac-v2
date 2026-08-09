@@ -18,6 +18,7 @@ import { getActiveSubscription, getSubscriptionPlans } from '@/services/subscrip
 import { displayCurrency } from '@/utils/currency';
 import { C } from '@/constants/theme';
 import type { SubscriptionPlan } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface Perk {
   icon: string;
@@ -73,13 +74,13 @@ export default function SubscriptionPlansScreen() {
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
 
   const plansQuery = useQuery({
-    queryKey: ['subscription-plans'],
+    queryKey: queryKeys.subscription.plans(),
     queryFn: getSubscriptionPlans,
     staleTime: 10 * 60 * 1000,
   });
 
   const activeQuery = useQuery({
-    queryKey: ['active-subscription'],
+    queryKey: queryKeys.subscription.active(),
     queryFn: getActiveSubscription,
     staleTime: 60 * 1000,
   });

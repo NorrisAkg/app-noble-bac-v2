@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { courseService } from '@/services/courseService';
 import type { Chapter, ChapterVideoListItem } from '@/types/api';
 import { isResourceFree } from '@/hooks/usePremiumGate';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface ChapterVideoAccordionProps {
   chapter: Chapter;
@@ -23,7 +24,7 @@ export function ChapterVideoAccordion({
   onOpenVideo,
 }: ChapterVideoAccordionProps) {
   const { data: videos, isLoading: videosLoading } = useQuery({
-    queryKey: ['courses', 'chapter-videos', chapter.id],
+    queryKey: queryKeys.courses.chapterVideos(chapter.id),
     queryFn: () => courseService.getChapterVideosByChapter(chapter.id),
     enabled: open,
   });

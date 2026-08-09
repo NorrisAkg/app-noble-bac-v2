@@ -19,6 +19,7 @@ import { getActiveSubscription, getTransactions } from '@/services/subscriptionS
 import { displayCurrency } from '@/utils/currency';
 import { C } from '@/constants/theme';
 import type { PaymentTransaction, SubscriptionStatus, TransactionStatus } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
@@ -78,13 +79,13 @@ export default function MySubscriptionScreen() {
   const router = useRouter();
 
   const activeQuery = useQuery({
-    queryKey: ['active-subscription'],
+    queryKey: queryKeys.subscription.active(),
     queryFn: getActiveSubscription,
     staleTime: 60 * 1000,
   });
 
   const txQuery = useQuery({
-    queryKey: ['subscription-transactions'],
+    queryKey: queryKeys.subscription.transactions(),
     queryFn: () => getTransactions({ page: 1, per_page: 20 }),
     staleTime: 60 * 1000,
   });

@@ -33,6 +33,27 @@ export function getApiErrorMessage(error: unknown, fallback = 'Une erreur est su
 }
 
 /**
+ * Lit le canal de vérification renvoyé avec un 403 « compte non vérifié ».
+ *
+ * Le backend le transporte dans `errors` faute d'une clé de premier niveau
+ * dans l'enveloppe. Lecture distincte de getValidationErrors, qui ne
+ * s'intéresse qu'aux 422 : confondre les deux ferait passer un refus de
+ * connexion pour une erreur de saisie.
+ *
+ * Renvoie null si l'erreur n'est pas un 403 de ce type, ou si le compte n'a
+ * aucun canal exploitable.
+ */
+export function getVerificationChannel(error: unknown): 'email' | 'phone' | null {
+  if (!isAxiosError<ApiError>(error) || error.response?.status !== 403) {
+    return null;
+  }
+
+  const channel = error.response.data?.errors?.verification_channel?.[0];
+
+  return channel === 'email' || channel === 'phone' ? channel : null;
+}
+
+/**
  * Extracts field-level validation errors from a 422 response.
  * Returns a flat map of { fieldName: firstErrorMessage }.
  */

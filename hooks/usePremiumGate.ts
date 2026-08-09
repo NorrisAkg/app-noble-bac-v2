@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { getActiveSubscription } from '@/services/subscriptionService';
 import { usePremiumGateContext } from '@/providers/PremiumGateProvider';
+import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * Helper de calcul "is free" pour les ressources backend ayant un flag
@@ -61,7 +62,7 @@ export function usePremiumGate(): PremiumGate {
   const { show } = usePremiumGateContext();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['subscription', 'active'],
+    queryKey: queryKeys.subscription.active(),
     queryFn: getActiveSubscription,
     staleTime: 5 * 60 * 1000,
   });

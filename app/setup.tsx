@@ -21,6 +21,7 @@ import { getApiErrorMessage } from '@/utils/apiError';
 import { withCountryPreposition } from '@/utils/countryLocative';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Country, Series } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 export default function SetupScreen() {
   const router = useRouter();
@@ -31,9 +32,8 @@ export default function SetupScreen() {
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
 
   const { data: countries = [], isLoading: loadingCountries } = useQuery({
-    queryKey: ['countries'],
+    queryKey: queryKeys.referential.countries(),
     queryFn: getCountries,
-    staleTime: Infinity,
   });
 
   const { data: profile, isLoading: loadingProfile } = useQuery({

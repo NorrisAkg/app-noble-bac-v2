@@ -1,41 +1,103 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { AppBar } from '@/components/ui/AppBar';
-import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Button } from '@/components/ui/Button';
-import { CountryMap } from '@/components/ui/CountryMap';
-import { CountryPickerSheet } from '@/components/ui/CountryPickerSheet';
-import { Eye, EyeOff, ChevronDown } from 'lucide-react-native';
-import { login } from '@/services/authService';
+import { GoogleButton } from '@/components/ui/GoogleButton';
+import { KeyboardAwareScreen } from '@/components/ui/KeyboardAwareScreen';
+import { IdentifierField, IdentifierCountrySheet } from '@/components/auth/IdentifierField';
+import { login, resendEmailCode, sendOtp } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getApiErrorMessage } from '@/utils/apiError';
-import { buildE164Phone } from '@/utils/phone';
-import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
+import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { useIdentifierInput } from '@/hooks/useIdentifierInput';
+import { getApiErrorMessage, getVerificationChannel } from '@/utils/apiError';
+import { resolveVerificationTarget } from '@/utils/verification';
 
 export default function LoginScreen() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [phone, setPhone] = useState('');
+  // L'onglet email est celui par défaut : l'email est obligatoire à
+  // l'inscription et le téléphone facultatif, la connexion par numéro ne sert
+  // donc plus qu'aux comptes créés avant la refonte.
+  const identity = useIdentifierInput('email');
+  const identifier = identity.identifier;
   const [password, setPassword] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  // Build the E.164 number — preserve leading zeros (UEMOA convention).
-  const e164Phone = buildE164Phone(country.dial, phone);
-  const isValid = phone.length >= 6 && password.length === 4;
+  // Aucune validation de format au-delà de « non vide » : le backend répond
+  // 401 sur tout identifiant inconnu, et refuser une saisie ici reviendrait à
+  // révéler quel format il attend.
+  const isValid = identity.isFilled && password.length > 0;
+
+  const google = useGoogleAuth({
+    onCountryRequired: () => {
+      Alert.alert(
+        'Compte introuvable',
+        'Aucun compte n\'est associé à ce compte Google. Crée ton compte pour choisir ton pays.',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Créer un compte', onPress: () => router.push('/(auth)/signup') },
+        ],
+      );
+    },
+  });
+
+  /**
+   * Envoie un code sur le bon canal puis ouvre l'écran de vérification
+   * correspondant. L'envoi précède la navigation : contrairement au parcours
+   * d'inscription, aucun code n'a été émis ici, et l'écran s'ouvrirait sur un
+   * compte à rebours de renvoi de 45 secondes sans rien à saisir.
+   */
+  const redirectToVerification = async (channel: 'email' | 'phone') => {
+    const target = resolveVerificationTarget(channel, identifier);
+
+    if (target.kind === 'unavailable') {
+      setFormError(target.reason);
+      return;
+    }
+
+    try {
+      if (target.kind === 'email') {
+        await resendEmailCode({ email: target.email });
+        router.push({ pathname: '/(auth)/verify-email', params: { email: target.email } });
+      } else {
+        await sendOtp({ phone: target.phone });
+        router.push({ pathname: '/(auth)/verify', params: { phone: target.phone } });
+      }
+    } catch (error) {
+      setFormError(getApiErrorMessage(error));
+    }
+  };
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => login({ phone: e164Phone, password }),
+    mutationFn: () => login({ identifier, password }),
     onSuccess: async (res) => {
-      await setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
-      // Navigation handled by the auth guard in _layout.tsx
+      // Le drapeau vient du backend : seul /auth/login voit le mot de passe en
+      // clair et peut donc repérer un PIN historique.
+      await setAuth(
+        res.data.user,
+        res.data.access_token,
+        res.data.refresh_token,
+        res.data.password_upgrade_required,
+      );
+      // Navigation prise en charge par le garde d'auth de _layout.tsx
     },
-    onError: (error) => {
-      Alert.alert('Connexion échouée', getApiErrorMessage(error));
+    onError: async (error) => {
+      // Compte existant mais jamais vérifié : sans cette branche, l'utilisateur
+      // recevait un 403 sans aucune issue — le mot de passe est bon, mais rien
+      // ne le menait vers l'écran de vérification.
+      const channel = getVerificationChannel(error);
+      if (channel) {
+        await redirectToVerification(channel);
+        return;
+      }
+
+      // Affiché sous le champ plutôt qu'en Alert : l'erreur porte sur la
+      // saisie, l'utilisateur doit la voir en même temps que ce qu'il a tapé.
+      setFormError(getApiErrorMessage(error));
     },
   });
 
@@ -43,86 +105,65 @@ export default function LoginScreen() {
     <View className="flex-1 bg-background">
       <AppBar title="Connexion" onBack={() => router.back()} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-      >
-        <ScrollView className="flex-1 px-6 pt-7" keyboardShouldPersistTaps="handled">
-          <Text className="font-poppins-bold text-2xl text-brand-ink tracking-tighter">
-            Bon retour 👋
+      <KeyboardAwareScreen className="flex-1 px-6 pt-7">
+        <Text className="font-poppins-bold text-2xl text-brand-ink tracking-tighter">
+          Bon retour 👋
+        </Text>
+        <Text className="font-poppins text-sm text-brand-ink-medium mt-1.5 mb-6 leading-5">
+          Connecte-toi pour reprendre tes révisions là où tu les as laissées.
+        </Text>
+
+        <IdentifierField
+          state={identity}
+          onEdit={() => setFormError('')}
+          phoneHelperText="Choisis ton pays, puis saisis ton numéro sans l'indicatif."
+        />
+
+        <PasswordInput
+          label="Mot de passe"
+          placeholder="Ton mot de passe"
+          value={password}
+          onChangeText={(v) => {
+            setPassword(v);
+            setFormError('');
+          }}
+          error={formError || undefined}
+        />
+
+        <TouchableOpacity
+          className="self-end mb-6"
+          onPress={() => router.push('/(auth)/forgot')}
+        >
+          <Text className="font-poppins-semibold text-xs text-brand-green">
+            Mot de passe oublié ?
           </Text>
-          <Text className="font-poppins text-sm text-brand-ink-medium mt-1.5 mb-6 leading-5">
-            Connecte-toi pour reprendre tes révisions là où tu les as laissées.
-          </Text>
+        </TouchableOpacity>
 
-          <Input
-            label="Numéro de téléphone"
-            placeholder="90 12 34 56"
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
-            icon={
-              <TouchableOpacity
-                key={country.code}
-                onPress={() => setPickerOpen(true)}
-                className="flex-row items-center gap-1.5 pr-2 border-r border-line"
-              >
-                <CountryMap code={country.code} size={22} />
-                <Text className="font-poppins-semibold text-sm text-brand-ink ml-1">{country.dial}</Text>
-                <ChevronDown size={14} color="#5A6470" />
-              </TouchableOpacity>
-            }
-          />
+        <Button onPress={() => mutate()} disabled={!isValid} loading={isPending}>
+          Se connecter
+        </Button>
 
-          <Input
-            label="Mot de passe"
-            placeholder="• • • •"
-            keyboardType="number-pad"
-            maxLength={4}
-            secureTextEntry={!showPwd}
-            value={password}
-            onChangeText={setPassword}
-            icon={
-              <TouchableOpacity onPress={() => setShowPwd((v) => !v)}>
-                {showPwd ? <EyeOff size={20} color="#5A6470" /> : <Eye size={20} color="#5A6470" />}
-              </TouchableOpacity>
-            }
-          />
+        {/* ── Séparateur ── */}
+        <View className="flex-row items-center my-5">
+          <View className="flex-1 h-[1px] bg-line" />
+          <Text className="font-poppins text-xs text-brand-ink-medium mx-3">ou</Text>
+          <View className="flex-1 h-[1px] bg-line" />
+        </View>
 
-          <TouchableOpacity
-            className="self-end mb-6"
-            onPress={() => router.push('/(auth)/forgot')}
-          >
-            <Text className="font-poppins-semibold text-xs text-brand-green">
-              Mot de passe oublié ?
+        <GoogleButton onPress={google.start} loading={google.isPending} disabled={isPending} />
+
+        <View className="mt-6 mb-10 flex-row justify-center gap-1">
+          <Text className="font-poppins text-[13.5px] text-brand-ink-medium">Nouveau ici ?</Text>
+          <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+            <Text className="font-poppins-semibold text-[13.5px] text-brand-green">
+              Créer un compte
             </Text>
           </TouchableOpacity>
+        </View>
+      </KeyboardAwareScreen>
 
-          <Button onPress={() => mutate()} disabled={!isValid} loading={isPending}>
-            Se connecter
-          </Button>
-
-          <View className="mt-6 mb-10 flex-row justify-center gap-1">
-            <Text className="font-poppins text-[13.5px] text-brand-ink-medium">Nouveau ici ?</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-              <Text className="font-poppins-semibold text-[13.5px] text-brand-green">
-                Créer un compte
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      <CountryPickerSheet
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        options={COUNTRIES.map((c) => ({ key: c.code, code: c.code, name: c.name, dial: c.dial }))}
-        selectedKey={country.code}
-        onSelect={(opt) => {
-          const next = COUNTRIES.find((c) => c.code === opt.key);
-          if (next) setCountry(next);
-        }}
-      />
+      {/* Hors du conteneur scrollable : la sheet couvre l'écran. */}
+      <IdentifierCountrySheet state={identity} onEdit={() => setFormError('')} />
     </View>
   );
 }

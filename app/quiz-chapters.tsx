@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyCourses } from '@/components/ui/EmptyIllustrations';
 import { C } from '@/constants/theme';
 import type { Chapter } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 export default function QuizChaptersScreen() {
   const insets = useSafeAreaInsets();
@@ -30,13 +31,13 @@ export default function QuizChaptersScreen() {
   }>();
 
   const chaptersQuery = useQuery({
-    queryKey: ['quiz', 'chapters', Number(subjectId)],
+    queryKey: queryKeys.quiz.chapters(Number(subjectId)),
     queryFn: () => courseService.getQuizChapters(Number(subjectId)),
     enabled: !!subjectId,
   });
 
   const historyQuery = useQuery({
-    queryKey: ['quiz', 'history', 'subject', Number(subjectId)],
+    queryKey: queryKeys.quiz.historyForSubject(Number(subjectId)),
     queryFn: () => quizService.getHistory(1, 100, Number(subjectId)),
     enabled: !!subjectId,
   });

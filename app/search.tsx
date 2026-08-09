@@ -20,6 +20,7 @@ import { C } from '@/constants/theme';
 import { courseService } from '@/services/courseService';
 import { catalogService } from '@/services/catalogService';
 import type { Book } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * Recherche globale — aligné `templates/screens-plan-search.jsx:178-308`.
@@ -73,9 +74,8 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
 
   const { data: subjects = [] } = useQuery({
-    queryKey: ['subjects'],
+    queryKey: queryKeys.courses.subjects(),
     queryFn: () => courseService.getSubjects(),
-    staleTime: 10 * 60 * 1000,
   });
 
   const { data: booksList } = useQuery({
