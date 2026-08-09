@@ -91,7 +91,7 @@ describe('useAuthStore', () => {
     await useAuthStore.getState().logout();
 
     expect(mockedApiLogout).toHaveBeenCalledTimes(1);
-    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledTimes(3);
+    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledTimes(4);
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 
@@ -107,7 +107,7 @@ describe('useAuthStore', () => {
     await useAuthStore.getState().logout();
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
-    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledTimes(3);
+    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledTimes(4);
   });
 
   it('initialize rehydrate le state quand tokens et user sont presents', async () => {
@@ -157,5 +157,82 @@ describe('useAuthStore', () => {
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('access_token');
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('refresh_token');
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('auth_user');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migration du mot de passe des comptes historiques
+// ---------------------------------------------------------------------------
+
+describe('passwordUpgradeRequired', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuthStore.setState({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      isHydrated: false,
+      passwordUpgradeRequired: false,
+    });
+  });
+
+  it('vaut false par défaut au setAuth', async () => {
+    await useAuthStore.getState().setAuth(userFixture, 'access', 'refresh');
+
+    expect(useAuthStore.getState().passwordUpgradeRequired).toBe(false);
+  });
+
+  it('persiste le drapeau quand la migration est requise', async () => {
+    await useAuthStore.getState().setAuth(userFixture, 'access', 'refresh', true);
+
+    expect(useAuthStore.getState().passwordUpgradeRequired).toBe(true);
+    expect(mockedSecureStore.setItemAsync).toHaveBeenCalledWith('password_upgrade_required', '1');
+  });
+
+  it('réhydrate le drapeau au démarrage', async () => {
+    // Sans persistance, tuer l'app suffirait à contourner la migration
+    // jusqu'à la prochaine connexion.
+    mockedSecureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'access_token') return 'access';
+      if (key === 'refresh_token') return 'refresh';
+      if (key === 'auth_user') return JSON.stringify(userFixture);
+      if (key === 'password_upgrade_required') return '1';
+      return null;
+    });
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().passwordUpgradeRequired).toBe(true);
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
+
+  it('ne réhydrate pas le drapeau quand il est absent', async () => {
+    mockedSecureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'access_token') return 'access';
+      if (key === 'refresh_token') return 'refresh';
+      if (key === 'auth_user') return JSON.stringify(userFixture);
+      return null;
+    });
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().passwordUpgradeRequired).toBe(false);
+  });
+
+  it('lève le drapeau après une migration réussie', async () => {
+    await useAuthStore.getState().setAuth(userFixture, 'access', 'refresh', true);
+    await useAuthStore.getState().clearPasswordUpgrade();
+
+    expect(useAuthStore.getState().passwordUpgradeRequired).toBe(false);
+    expect(mockedSecureStore.setItemAsync).toHaveBeenCalledWith('password_upgrade_required', '0');
+  });
+
+  it('purge le drapeau au clearLocal', async () => {
+    await useAuthStore.getState().setAuth(userFixture, 'access', 'refresh', true);
+    await useAuthStore.getState().clearLocal();
+
+    expect(useAuthStore.getState().passwordUpgradeRequired).toBe(false);
+    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('password_upgrade_required');
   });
 });

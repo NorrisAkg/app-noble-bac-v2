@@ -6,6 +6,7 @@ import type {
   VerifyEmailPayload,
   ResendEmailCodePayload,
   GoogleSignInPayload,
+  ChangePasswordPayload,
   RequestPasswordResetPayload,
   ResetPasswordPayload,
   SendOtpPayload,
@@ -72,6 +73,16 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
  */
 export async function googleSignIn(payload: GoogleSignInPayload): Promise<LoginResponse> {
   const { data } = await apiClient.post<LoginResponse>('/auth/google', payload);
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/password/change  (requiert un Bearer token)
+ * Change le mot de passe et renvoie un nouveau couple de tokens : le backend
+ * révoque tous les credentials existants, y compris celui de l'appelant.
+ */
+export async function changePassword(payload: ChangePasswordPayload): Promise<LoginResponse> {
+  const { data } = await apiClient.post<LoginResponse>('/auth/password/change', payload);
   return data;
 }
 

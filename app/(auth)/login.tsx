@@ -70,7 +70,14 @@ export default function LoginScreen() {
   const { mutate, isPending } = useMutation({
     mutationFn: () => login({ identifier: identifier.trim(), password }),
     onSuccess: async (res) => {
-      await setAuth(res.data.user, res.data.access_token, res.data.refresh_token);
+      // Le drapeau vient du backend : seul /auth/login voit le mot de passe en
+      // clair et peut donc repérer un PIN historique.
+      await setAuth(
+        res.data.user,
+        res.data.access_token,
+        res.data.refresh_token,
+        res.data.password_upgrade_required,
+      );
       // Navigation prise en charge par le garde d'auth de _layout.tsx
     },
     onError: async (error) => {

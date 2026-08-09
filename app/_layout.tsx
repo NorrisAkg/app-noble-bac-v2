@@ -51,6 +51,7 @@ import 'react-native-reanimated';
 import '@/global.css';
 
 import { ForceUpdateGate } from '@/components/ForceUpdateGate';
+import { PasswordUpgradeGate } from '@/components/PasswordUpgradeGate';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { ADMIN_MANAGED_QUERY_PREFIXES, queryKeys } from '@/lib/queryKeys';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
@@ -74,7 +75,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { initialize, isAuthenticated, isHydrated } = useAuthStore();
+  const { initialize, isAuthenticated, isHydrated, passwordUpgradeRequired } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   const { isChecking: isCheckingVersion, mustUpdate, storeUrl } = useForceUpdate();
@@ -96,10 +97,10 @@ export default function RootLayout() {
   // Pré-charge toutes les données texte/JSON dès que l'utilisateur est authentifié.
   // prefetchQuery est silencieux (pas de throw) et no-op si les données sont encore fraîches.
   useEffect(() => {
-    if (isAuthenticated && !mustUpdate) {
+    if (isAuthenticated && !mustUpdate && !passwordUpgradeRequired) {
       prefetchAllData(queryClient);
     }
-  }, [isAuthenticated, mustUpdate]);
+  }, [isAuthenticated, mustUpdate, passwordUpgradeRequired]);
 
   const wasOnlineRef = useRef<boolean | null>(null);
 
@@ -144,7 +145,7 @@ export default function RootLayout() {
 
     // Le Stack n'est pas monté quand l'écran de mise à jour est affiché :
     // toute navigation ici viserait un arbre inexistant.
-    if (mustUpdate) return;
+    if (mustUpdate || passwordUpgradeRequired) return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // DEV BYPASS — set EXPO_PUBLIC_BYPASS_AUTH=true in .env.local to skip the
@@ -174,7 +175,7 @@ export default function RootLayout() {
       // bascule vers (tabs) une fois setAuth() appele.
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isHydrated, segments, loaded, router, mustUpdate]);
+  }, [isAuthenticated, isHydrated, segments, loaded, router, mustUpdate, passwordUpgradeRequired]);
 
 
   if (!loaded && !error) {
@@ -187,6 +188,21 @@ export default function RootLayout() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ForceUpdateGate storeUrl={storeUrl} />
+        <StatusBar style="dark" />
+      </GestureHandlerRootView>
+    );
+  }
+
+  // Même principe que la passerelle de mise à jour : on court-circuite le
+  // Stack plutôt que d'ouvrir une route, qui resterait franchissable par le
+  // bouton retour. QueryProvider est conservé, l'écran ayant besoin de
+  // react-query et de SafeAreaProvider.
+  if (isAuthenticated && passwordUpgradeRequired) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryProvider>
+          <PasswordUpgradeGate />
+        </QueryProvider>
         <StatusBar style="dark" />
       </GestureHandlerRootView>
     );

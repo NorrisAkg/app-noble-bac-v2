@@ -239,6 +239,13 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ChangePasswordPayload {
+  /** Peut être un PIN à 4 chiffres : c'est l'ancien mot de passe. */
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}
+
 export interface VerifyEmailPayload {
   email: string;
   /** Code à 6 chiffres reçu par email. */
@@ -302,6 +309,12 @@ export interface TokenData {
   access_token: string;
   refresh_token: string;
   expires_at: string;
+  /**
+   * Compte historique dont le mot de passe fait moins de 8 caractères.
+   * Renseigné par /auth/login uniquement — c'est le seul endpoint où le
+   * backend voit le mot de passe en clair. Vaut false partout ailleurs.
+   */
+  password_upgrade_required: boolean;
 }
 export type LoginResponse = ApiResponse<TokenData>;
 

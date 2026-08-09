@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
   USER: 'auth_user',
+  PASSWORD_UPGRADE: 'password_upgrade_required',
 } as const;
 
 interface AuthState {
@@ -18,8 +19,21 @@ interface AuthState {
   isAuthenticated: boolean;
   /** True once initialize() has finished reading SecureStore on app boot */
   isHydrated: boolean;
+  /**
+   * Compte historique dont le mot de passe est encore un PIN à 4 chiffres.
+   * Persisté : sans ça, tuer l'app suffirait à contourner la migration
+   * jusqu'à la prochaine connexion.
+   */
+  passwordUpgradeRequired: boolean;
   /** Call after a successful login or OTP verification */
-  setAuth: (user: User, accessToken: string, refreshToken: string) => Promise<void>;
+  setAuth: (
+    user: User,
+    accessToken: string,
+    refreshToken: string,
+    passwordUpgradeRequired?: boolean,
+  ) => Promise<void>;
+  /** Appelé après une migration réussie du mot de passe. */
+  clearPasswordUpgrade: () => Promise<void>;
   /** Revokes the token on the server then clears local storage */
   logout: () => Promise<void>;
   /** Local-only cleanup. Called by apiClient when refresh fails (no server roundtrip). */
@@ -34,12 +48,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: null,
   isAuthenticated: false,
   isHydrated: false,
+  passwordUpgradeRequired: false,
 
-  setAuth: async (user, accessToken, refreshToken) => {
+  setAuth: async (user, accessToken, refreshToken, passwordUpgradeRequired = false) => {
     await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
     await SecureStore.setItemAsync(STORAGE_KEYS.USER, JSON.stringify(user));
-    set({ user, accessToken, refreshToken, isAuthenticated: true });
+    await SecureStore.setItemAsync(
+      STORAGE_KEYS.PASSWORD_UPGRADE,
+      passwordUpgradeRequired ? '1' : '0',
+    );
+    set({ user, accessToken, refreshToken, isAuthenticated: true, passwordUpgradeRequired });
+  },
+
+  clearPasswordUpgrade: async () => {
+    await SecureStore.setItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE, '0');
+    set({ passwordUpgradeRequired: false });
   },
 
   logout: async () => {
@@ -66,7 +90,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
-    set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE);
+    set({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      passwordUpgradeRequired: false,
+    });
   },
 
   initialize: async () => {
@@ -82,12 +113,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (accessToken && rawUser) {
         try {
           const user: User = JSON.parse(rawUser);
-          next = { user, accessToken, refreshToken, isAuthenticated: true, isHydrated: true };
+          const upgrade = await SecureStore.getItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE);
+          next = {
+            user,
+            accessToken,
+            refreshToken,
+            isAuthenticated: true,
+            isHydrated: true,
+            passwordUpgradeRequired: upgrade === '1',
+          };
         } catch {
           // Corrupted storage — clear it
           await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
           await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
           await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+          await SecureStore.deleteItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE);
         }
       }
     } finally {
