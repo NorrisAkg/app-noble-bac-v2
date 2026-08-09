@@ -54,6 +54,17 @@ export function getVerificationChannel(error: unknown): 'email' | 'phone' | null
 }
 
 /**
+ * Vrai quand le serveur a répondu 404.
+ *
+ * Sert à distinguer une absence légitime (aucune date d'examen saisie pour ce
+ * pays) d'une vraie panne : la première se traite en masquant le bloc, la
+ * seconde ne doit pas être avalée silencieusement.
+ */
+export function isNotFound(error: unknown): boolean {
+  return isAxiosError<ApiError>(error) && error.response?.status === 404;
+}
+
+/**
  * Extracts field-level validation errors from a 422 response.
  * Returns a flat map of { fieldName: firstErrorMessage }.
  */

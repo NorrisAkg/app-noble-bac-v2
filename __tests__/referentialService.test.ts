@@ -1,6 +1,6 @@
-import { getCountries, getOperators } from '../services/referentialService';
+import { getCountries, getExamDate, getOperators } from '../services/referentialService';
 import apiClient from '../services/apiClient';
-import type { Country, Operator } from '../types/api';
+import type { Country, ExamDateInfo, Operator } from '../types/api';
 
 jest.mock('../services/apiClient');
 
@@ -75,5 +75,31 @@ describe('referentialService', () => {
 
     const result = await getOperators(99);
     expect(result).toEqual([]);
+  });
+
+  it('getExamDate GET /countries/{id}/exam-date et deballe data.data', async () => {
+    const examDateFixture: ExamDateInfo = {
+      country_id: 2,
+      year: 2027,
+      exam_date: '2027-06-17',
+      days_remaining: 312,
+    };
+    mockedApiClient.get.mockResolvedValueOnce({
+      data: { success: true, message: 'OK', data: examDateFixture },
+    });
+
+    const result = await getExamDate(2);
+
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/countries/2/exam-date');
+    expect(result).toEqual(examDateFixture);
+  });
+
+  it('getExamDate propage le 404 au lieu de l\'avaler', async () => {
+    // L'absence de date est un cas nominal, mais c'est au hook de la traiter :
+    // un service qui renverrait null ici rendrait le 404 indistinguable d'une
+    // panne réseau.
+    mockedApiClient.get.mockRejectedValueOnce(new Error('Request failed with status code 404'));
+
+    await expect(getExamDate(2)).rejects.toThrow('404');
   });
 });

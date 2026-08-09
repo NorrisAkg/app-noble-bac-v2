@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,8 +14,7 @@ import { AppBar } from '@/components/ui/AppBar';
 import { SubjectIcon, type SubjectKind } from '@/components/ui/SubjectIcon';
 import { Heading } from '@/components/ui/Heading';
 import { C } from '@/constants/theme';
-import { daysUntilBac } from '@/constants/bacDates';
-import { getProfile } from '@/services/profileService';
+import { useExamDate } from '@/hooks/useExamDate';
 
 /**
  * Plan d'étude — aligné `templates/screens-plan-search.jsx:5-120`.
@@ -24,8 +22,8 @@ import { getProfile } from '@/services/profileService';
  * **Limite backend** : pas d'endpoint `/me/study-plan` (cf.
  * `docs/BACKEND_GAPS.md` section 5.2). Les semaines et tâches sont des
  * stubs locaux dans ce fichier. À brancher quand le backend exposera
- * un plan personnalisé. Le countdown jusqu'au BAC, lui, est réel
- * (calculé via `daysUntilBac` à partir du pays du user).
+ * un plan personnalisé. Le countdown jusqu'au BAC, lui, est réel : il vient de
+ * la date saisie dans le back-office pour le pays actif (cf. useExamDate).
  */
 
 interface PlannedWeek {
@@ -73,13 +71,10 @@ function capitalize(s: string): string {
 export default function StudyPlanScreen() {
   const insets = useSafeAreaInsets();
 
-  const { data: profile } = useQuery({
-    queryKey: ['profile'],
-    queryFn: getProfile,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const daysLeft = daysUntilBac(profile?.country.code);
+  // Même source que l'accueil : le hook lit le pays **actif**, là où cet écran
+  // lisait le pays d'inscription — les deux écrans affichaient deux comptes à
+  // rebours différents dès qu'un utilisateur changeait de pays.
+  const { daysRemaining } = useExamDate();
 
   return (
     <View style={styles.container}>
@@ -99,8 +94,14 @@ export default function StudyPlanScreen() {
         >
           <View style={styles.heroRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.heroLabel}>BAC dans</Text>
-              <Text style={styles.heroDays}>{daysLeft} jours</Text>
+              {/* Masqués ensemble : « BAC dans » seul serait une phrase
+                  interrompue. */}
+              {daysRemaining != null && (
+                <>
+                  <Text style={styles.heroLabel}>BAC dans</Text>
+                  <Text style={styles.heroDays}>{daysRemaining} jours</Text>
+                </>
+              )}
               <Text style={styles.heroHelper}>
                 Plan calibré sur 6 semaines · 8h/sem.
               </Text>

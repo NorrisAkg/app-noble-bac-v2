@@ -21,6 +21,8 @@ export const queryKeys = {
     countries: () => ['referential', 'countries'] as const,
     operators: (countryId: number | string | null | undefined) =>
       ['referential', 'operators', countryId] as const,
+    examDate: (countryId: number | string | null | undefined) =>
+      ['referential', 'exam-date', countryId] as const,
   },
 
   /** Contenu pédagogique — GET /courses/*, lu en direct en base côté API. */

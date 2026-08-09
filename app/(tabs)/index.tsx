@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import { HomeSkeleton } from "@/components/home/HomeSkeleton";
 import { QuoteCard } from "@/components/home/QuoteCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IllustrationEmptyBooks } from "@/components/ui/EmptyIllustrations";
-import { getNextBacDate } from "@/constants/bacDates";
+import { useExamDate } from "@/hooks/useExamDate";
 import { adsService } from "@/services/adsService";
 import { catalogService } from "@/services/catalogService";
 import { getLastRead, getMeStats } from "@/services/meService";
@@ -111,25 +111,21 @@ export default function HomeScreen() {
   });
   const profile = profileQuery.data;
 
-  const countryCode = profile?.active_country.code ?? null;
-  const bacDateParts = useMemo(() => {
-    const d = getNextBacDate(countryCode);
-    return {
-      day: d.getDate(),
-      month: d.toLocaleDateString("fr-FR", { month: "short" }),
-    };
-  }, [countryCode]);
-  const bacDateFormatted = useMemo(
-    () =>
-      getNextBacDate(countryCode).toLocaleDateString("fr-FR", {
-        year: "numeric",
-      }),
-    [countryCode],
-  );
-  const daysRemaining = useMemo(() => {
-    const ms = getNextBacDate(countryCode).getTime() - Date.now();
-    return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
-  }, [countryCode]);
+  // Date saisie par l'admin dans le back-office pour le pays actif. Tant
+  // qu'aucune n'est saisie, `year` et `daysRemaining` sont null et le bloc
+  // s'affiche sans compte à rebours plutôt qu'avec une date inventée.
+  const bacDate = useExamDate();
+
+  // « BAC 2027 · Sénégal · Bac S1 », amputé des segments encore inconnus
+  // plutôt qu'affiché avec des trous.
+  const bacTitle =
+    [
+      bacDate.year != null ? `BAC ${bacDate.year}` : null,
+      profile?.active_country.name,
+      profile != null ? `Bac ${profile.active_series.code}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || "BAC";
 
   // Top 6 livres du catalog backend (filtres par scope cote backend via Sanctum user).
   const booksQuery = useQuery({
@@ -309,16 +305,16 @@ export default function HomeScreen() {
           {/* Progress card — countdown localise par pays, « prêt à X % »
             alimenté par /me/stats (moyenne des quiz, masqué sans session). */}
           <View style={styles.progressCard}>
-            <View style={styles.daysBox}>
-              <Text style={styles.daysNum}>{bacDateParts.day}</Text>
-              <Text style={styles.daysMonth}>{bacDateParts.month}</Text>
-            </View>
+            {bacDate.day != null && (
+              <View style={styles.daysBox}>
+                <Text style={styles.daysNum}>{bacDate.day}</Text>
+                <Text style={styles.daysMonth}>{bacDate.month}</Text>
+              </View>
+            )}
 
             <View style={{ flex: 1 }}>
               <Text style={styles.progressTitle} numberOfLines={1}>
-                {profile != null
-                  ? `BAC ${bacDateFormatted} · ${profile.active_country.name} · Bac ${profile.active_series.code}`
-                  : `BAC ${bacDateFormatted}`}
+                {bacTitle}
               </Text>
               <View style={styles.progressTrack}>
                 <View
@@ -328,13 +324,15 @@ export default function HomeScreen() {
                   ]}
                 />
               </View>
-              <Text style={styles.progressPct}>
-                Plus que{" "}
-                <Text style={styles.progressPctBold}>
-                  {daysRemaining} jours
+              {bacDate.daysRemaining != null && (
+                <Text style={styles.progressPct}>
+                  Plus que{" "}
+                  <Text style={styles.progressPctBold}>
+                    {bacDate.daysRemaining} jours
+                  </Text>
+                  {/* {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""} */}
                 </Text>
-                {/* {readinessPct != null ? ` · prêt à ${readinessPct} %` : ""} */}
-              </Text>
+              )}
             </View>
           </View>
         </View>

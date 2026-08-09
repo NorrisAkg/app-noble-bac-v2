@@ -42,6 +42,23 @@ export interface Country {
   series: Series[];
 }
 
+/**
+ * Date du BAC pilotant le compte à rebours (GET /countries/{id}/exam-date).
+ * Saisie par l'admin dans Filament, une par pays et par session.
+ */
+export interface ExamDateInfo {
+  country_id: number;
+  /** Année de la session, ex: 2027. */
+  year: number;
+  /** Format 'YYYY-MM-DD'. */
+  exam_date: string;
+  /**
+   * Calculé par le serveur, jamais côté client : le fuseau de l'appareil ferait
+   * diverger l'affichage d'un jour par rapport au back-office.
+   */
+  days_remaining: number;
+}
+
 export interface Series {
   id: string;
   /** Code interne (ex: 'A', 'C', 'D', 'S1'). */
