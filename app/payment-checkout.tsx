@@ -22,6 +22,7 @@ import { initiatePayment, getPaymentStatus } from '@/services/paymentService';
 import { getProfile } from '@/services/profileService';
 import { getOperators } from '@/services/referentialService';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { buildE164Phone } from '@/utils/phone';
 import { displayCurrency } from '@/utils/currency';
 import { PremiumSuccessSheet } from '@/components/ui/PremiumSuccessSheet';
 import { OperatorPickerSheet } from '@/components/ui/OperatorPickerSheet';
@@ -108,10 +109,18 @@ export default function PaymentCheckoutScreen() {
     setStep('initiating');
 
     try {
+      // Le champ est libre : l'utilisateur tape aussi bien "01 66 00 00 01"
+      // que "+2290166000001". Le backend n'accepte que de l'E.164 strict
+      // (E164PhoneRule), donc on recompose avant d'envoyer plutôt que de le
+      // laisser répondre 422 sur un numéro pourtant correct.
+      const e164 = phone.trim()
+        ? buildE164Phone(profileQuery.data?.country.phone_code ?? '', phone)
+        : undefined;
+
       const { transaction, payment_url } = await initiatePayment({
         subscriptionPlanId: planId,
         operatorId: selectedOperator?.id,
-        phoneNumber: phone.trim() || undefined,
+        phoneNumber: e164,
       });
 
       startedAtRef.current = Date.now();
@@ -321,12 +330,17 @@ export default function PaymentCheckoutScreen() {
                     value={phone}
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
-                    placeholder="+229 66 00 00 01"
+                    // Pas d'exemple de numéro : l'ancien (« +229 66 00 00 01 »)
+                    // était au format béninois à 8 chiffres, abandonné en 2024,
+                    // et n'avait de sens pour aucun autre pays.
+                    placeholder={`${profileQuery.data?.country.phone_code ?? ''} …`.trim()}
                     placeholderTextColor={C.ink3}
                     autoCapitalize="none"
                   />
                   <Text style={styles.fieldHint}>
-                    Le numéro de ton compte mobile money, au format international.
+                    Le numéro de ton compte mobile money. L&apos;indicatif{' '}
+                    {profileQuery.data?.country.phone_code ?? ''} est ajouté automatiquement si tu
+                    ne le mets pas.
                   </Text>
                 </View>
               </>

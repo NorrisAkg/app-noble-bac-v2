@@ -15,7 +15,7 @@ const profileFixture: UserProfile = {
   gender: 'F',
   birth_date: '2005-06-15',
   avatar_url: null,
-  country: { id: 1, name: 'Sénégal', code: 'SN', flag_emoji: '🇸🇳' },
+  country: { id: 1, name: 'Sénégal', code: 'SN', phone_code: '+221', flag_emoji: '🇸🇳' },
   series: { id: 7, label: 'S2', code: 'S2' },
   active_country: { id: 1, name: 'Sénégal', code: 'SN', flag_emoji: '🇸🇳' },
   active_series: { id: 7, label: 'S2', code: 'S2' },

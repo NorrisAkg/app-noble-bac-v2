@@ -26,6 +26,18 @@ describe('buildE164Phone', () => {
     expect(buildE164Phone('+225', '22507000001')).toBe('+22507000001');
   });
 
+  // Le champ « Numéro à débiter » du checkout est libre : l'utilisateur y tape
+  // aussi bien le format local que l'international, et le backend n'accepte
+  // que de l'E.164 strict (E164PhoneRule). Ces cas verrouillent les saisies
+  // réelles du tunnel de paiement mobile money.
+  it('normalises the payment checkout inputs for the Bénin 10-digit plan', () => {
+    expect(buildE164Phone('+229', '0166000001')).toBe('+2290166000001');
+    expect(buildE164Phone('+229', '01 66 00 00 01')).toBe('+2290166000001');
+    expect(buildE164Phone('+229', '+229 01 66 00 00 01')).toBe('+2290166000001');
+    // Numéro prérempli depuis le profil : déjà E.164, doit rester intact.
+    expect(buildE164Phone('+229', '+2290166000001')).toBe('+2290166000001');
+  });
+
   it('does NOT strip a legitimate leading 0 (regression test)', () => {
     // Le bug originel : `phone.replace(/^0+/, '')` transformait 07000001 en
     // 7000001, produisant +2257000001 (11 chars) au lieu de +22507000001 (12).

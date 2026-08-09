@@ -356,6 +356,8 @@ export interface UserProfile {
     id: number;
     name: string;
     code: string;
+    /** Indicatif avec le `+` (ex: "+229") — sert à recomposer un numéro saisi en local. */
+    phone_code: string;
     flag_emoji: string | null;
   };
   /** Série d'origine, liée au pays d'origine. Ne change jamais. */
