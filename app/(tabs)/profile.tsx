@@ -124,7 +124,9 @@ export default function ProfileScreen() {
       icon: Globe2,
       iconColor: C.green,
       iconBg: C.greenSoft,
-      onPress: () => router.push('/setup' as Href),
+      // `step=series` ouvre directement l'étape série du pays actif : changer
+      // de série ne doit pas obliger à re-sélectionner son pays.
+      onPress: () => router.push({ pathname: '/setup', params: { step: 'series' } } as Href),
     },
     {
       id: 'downloads',

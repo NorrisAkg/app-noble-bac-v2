@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react-native';
 import { AppBar } from '@/components/ui/AppBar';
@@ -28,6 +28,12 @@ export default function SetupScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
+  // `?step=series` : on arrive depuis le profil pour ajuster un réglage, pas
+  // pour dérouler l'onboarding. On ouvre alors directement l'étape série du
+  // pays actif ; le pays reste modifiable via le bouton « Modifier ».
+  const { step } = useLocalSearchParams<{ step?: string }>();
+  const fromProfile = step === 'series';
+
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
 
@@ -42,17 +48,34 @@ export default function SetupScreen() {
     staleTime: 60_000,
   });
 
-  const handleCountrySelect = (c: Country) => {
-    setSelectedCountry(c);
-    if (profile && c.code === profile.active_country.code) {
-      const activeSeries = c.series.find((s) => s.id === String(profile.active_series.id));
-      setSelectedSeries(activeSeries ?? null);
-    } else {
-      setSelectedSeries(null);
-    }
-  };
+  const handleCountrySelect = useCallback(
+    (c: Country) => {
+      setSelectedCountry(c);
+      if (profile && c.code === profile.active_country.code) {
+        const activeSeries = c.series.find((s) => s.id === String(profile.active_series.id));
+        setSelectedSeries(activeSeries ?? null);
+      } else {
+        setSelectedSeries(null);
+      }
+    },
+    [profile],
+  );
 
   const activeCountryCode = profile?.active_country.code;
+  const activeCountry = countries.find((c) => c.code === activeCountryCode);
+
+  // Pré-sélection du pays actif quand on vient du profil, une seule fois.
+  // Le garde par `ref` est essentiel : sans lui, un clic sur « Modifier »
+  // (qui remet selectedCountry à null) serait aussitôt annulé par cet effet,
+  // rendant l'étape pays inatteignable.
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (!fromProfile || prefilledRef.current || !profile || countries.length === 0) return;
+    prefilledRef.current = true;
+    // Pays actif désactivé côté back : on laisse l'écran sur l'étape pays.
+    if (activeCountry) handleCountrySelect(activeCountry);
+  }, [fromProfile, profile, countries, activeCountry, handleCountrySelect]);
+
   const isDifferentActiveCountry =
     selectedCountry !== null &&
     activeCountryCode !== undefined &&
@@ -122,6 +145,31 @@ export default function SetupScreen() {
   const isLoading = loadingCountries || loadingProfile;
   const showSeries = selectedCountry !== null;
 
+  // Depuis le profil la flèche est toujours présente : à l'étape série elle
+  // ferme l'écran (on n'est jamais passé par l'étape pays), à l'étape pays elle
+  // revient à la série — sinon l'utilisateur y serait bloqué sans issue.
+  // Dans l'onboarding, comportement d'origine : pas de flèche à l'étape pays.
+  const leaveScreen = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/profile');
+  };
+
+  const handleBack = () => {
+    if (showSeries && !fromProfile) {
+      setSelectedCountry(null);
+      return;
+    }
+    // Étape pays en mode profil : on retourne à la série du pays actif. Si ce
+    // pays n'est plus disponible, il n'y a rien à afficher : on ferme l'écran.
+    if (!showSeries && activeCountry) {
+      handleCountrySelect(activeCountry);
+      return;
+    }
+    leaveScreen();
+  };
+
+  const showBack = showSeries || fromProfile;
+
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
@@ -134,7 +182,7 @@ export default function SetupScreen() {
     <View className="flex-1 bg-background">
       <AppBar
         title={showSeries ? 'Ta série' : 'Ton pays'}
-        onBack={showSeries ? () => setSelectedCountry(null) : undefined}
+        onBack={showBack ? handleBack : undefined}
       />
 
       <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
