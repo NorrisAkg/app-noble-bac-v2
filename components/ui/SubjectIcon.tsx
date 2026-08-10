@@ -6,11 +6,11 @@ export type SubjectKind =
   | 'maths' | 'phys' | 'svt' | 'chem' | 'fr' | 'eng' | 'hg' | 'geo'
   | 'philo' | 'econ' | 'bio' | 'geol' | 'socio' | 'compta' | 'droit'
   | 'ling' | 'grec' | 'latin' | 'arabe' | 'adab' | 'port' | 'ital'
-  | 'all' | 'russe' | 'chinois' | 'cg' | 'science' | 'bonus';
+  | 'all' | 'russe' | 'chinois' | 'cg' | 'science' | 'plume';
 
 /**
  * Mapping `icon_slug` (backend SubjectSeeder) → `SubjectKind` (illustration locale).
- * Slugs non listés tombent en fallback (lettre initiale).
+ * Slugs non listés tombent en fallback (illustration `plume`).
  */
 const BACKEND_SLUG_TO_KIND: Record<string, SubjectKind> = {
   math: 'maths',
@@ -23,7 +23,7 @@ const BACKEND_SLUG_TO_KIND: Record<string, SubjectKind> = {
   geography: 'geo',
   english: 'eng',
   economics: 'econ',
-  star: 'bonus',
+  star: 'plume',
 };
 
 /**
@@ -64,7 +64,7 @@ const SUBJECT_SOURCES: Record<SubjectKind, ImageSourcePropType> = {
   chinois: require('@/assets/images/illustrations/chinois.png'),
   cg:      require('@/assets/images/illustrations/culture-generale.png'),
   science: require('@/assets/images/illustrations/science.png'),
-  bonus:   require('@/assets/images/illustrations/bonus.png'),
+  plume:   require('@/assets/images/illustrations/plume.png'),
 };
 
 const SUBJECT_TILE_BG: Partial<Record<SubjectKind, string>> = {
@@ -77,7 +77,7 @@ const SUBJECT_TILE_BG: Partial<Record<SubjectKind, string>> = {
   arabe: C.salmonSoft, adab: C.salmonSoft, port: C.greenSoft,
   ital: C.salmonSoft,  all: C.greenSoft,   russe: C.salmonSoft,
   chinois: C.salmonSoft, cg: C.greenSoft,  science: C.salmonSoft,
-  bonus: C.salmonSoft,
+  plume: C.greenSoft,
 };
 
 interface SubjectIconProps {
@@ -89,7 +89,7 @@ interface SubjectIconProps {
 
 export const SubjectIcon: React.FC<SubjectIconProps> = ({ kind, size = 36, plain = false, style }) => {
   const typedKind = kind as SubjectKind | undefined;
-  const resolvedKind: SubjectKind = (typedKind && SUBJECT_SOURCES[typedKind]) ? typedKind : 'bonus';
+  const resolvedKind: SubjectKind = (typedKind && SUBJECT_SOURCES[typedKind]) ? typedKind : 'plume';
   const source = SUBJECT_SOURCES[resolvedKind];
   const bg = plain ? 'transparent' : SUBJECT_TILE_BG[resolvedKind] ?? C.greenSoft;
   const radius = plain ? 0 : Math.round(size * 0.28);
@@ -108,7 +108,7 @@ export const SubjectIcon: React.FC<SubjectIconProps> = ({ kind, size = 36, plain
       <Image
         source={source}
         resizeMode="contain"
-        accessibilityLabel={kind ?? 'bonus'}
+        accessibilityLabel={kind ?? 'plume'}
         style={{ width: '74%', height: '74%' }}
       />
     </View>
