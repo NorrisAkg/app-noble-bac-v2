@@ -9,57 +9,108 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppBar } from '@/components/ui/AppBar';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { C } from '@/constants/theme';
+import { deleteAccount } from '@/services/accountService';
+import { getProfile } from '@/services/profileService';
+import { GoogleSignInCancelled, signInWithGoogle } from '@/services/googleService';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getApiErrorMessage } from '@/utils/apiError';
+import type { AccountDeletionReason } from '@/types/api';
 
 /**
  * Écran de suppression de compte RGPD — aligné
  * `templates/screens-mvp-additions.jsx:316-457`. Flow 2 étapes :
  * 1. `reason` : choix de motif + warning définitif.
- * 2. `confirm` : saisie obligatoire du mot « SUPPRIMER » avant
- *    déclenchement de la suppression.
+ * 2. `confirm` : mot de passe + saisie du mot « SUPPRIMER ».
  *
- * **Limite backend** : pas d'endpoint `DELETE /me/account`
- * (cf. `docs/BACKEND_GAPS.md` section 7.3). L'écran affiche une
- * alerte explicite et redirige vers le support tant que l'API
- * n'est pas livrée. Quand l'endpoint sera dispo, brancher
- * `deleteAccount({ reason, confirmation: 'SUPPRIMER' })`.
+ * Le mot de passe est redemandé alors que l'appelant présente déjà un token :
+ * sans lui, un téléphone déverrouillé laissé sans surveillance suffirait à
+ * détruire le compte. Pour un compte créé par Google, dont le mot de passe est
+ * une valeur aléatoire que personne ne connaît, on passe par une
+ * ré-authentification Google (`google_linked` du profil).
+ *
+ * La suppression n'est pas immédiate : le compte est inutilisable sur-le-champ
+ * mais purgé seulement après la fenêtre de grâce, pendant laquelle
+ * l'utilisateur peut annuler depuis l'écran de connexion.
  */
 
-const REASONS = [
-  'Je n’utilise plus l’app',
-  'J’ai trouvé une autre app',
-  'Le contenu Premium ne m’intéresse pas',
-  'Je veux protéger mes données',
-  'Autre raison',
+const REASONS: { value: AccountDeletionReason; label: string }[] = [
+  { value: 'no_longer_using', label: 'Je n’utilise plus l’app' },
+  { value: 'found_alternative', label: 'J’ai trouvé une autre app' },
+  { value: 'premium_not_interesting', label: 'Le contenu Premium ne m’intéresse pas' },
+  { value: 'privacy_concerns', label: 'Je veux protéger mes données' },
+  { value: 'other', label: 'Autre raison' },
 ];
+
+const CONFIRMATION_WORD = 'SUPPRIMER';
 
 type Step = 'reason' | 'confirm';
 
 export default function DeleteAccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const clearLocal = useAuthStore((s) => s.clearLocal);
 
   const [step, setStep] = useState<Step>('reason');
-  const [reason, setReason] = useState<string | null>(null);
+  const [reason, setReason] = useState<AccountDeletionReason | null>(null);
+  const [password, setPassword] = useState('');
   const [confirmText, setConfirmText] = useState('');
 
-  const canConfirm = confirmText === 'SUPPRIMER';
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    staleTime: 60_000,
+  });
 
-  const handleFinalDelete = () => {
-    // Backend endpoint pas encore disponible (cf. BACKEND_GAPS 7.3).
-    // On informe l'utilisateur et on redirige vers le support.
-    Alert.alert(
-      'Demande enregistrée',
-      'Pour le moment, la suppression définitive du compte se fait via notre support. On a noté ta demande — un agent te répondra sous 48h.',
-      [
-        { text: 'OK', onPress: () => router.replace('/settings/support') },
-      ],
-    );
-  };
+  // Compte Google sans mot de passe connu : on ne peut pas lui en demander un.
+  const useGoogleReauth = profile?.google_linked === true;
+
+  const canConfirm =
+    confirmText === CONFIRMATION_WORD && (useGoogleReauth || password.length > 0);
+
+  const { mutate: submitDeletion, isPending } = useMutation({
+    mutationFn: async () => {
+      if (!reason) throw new Error('Choisis un motif avant de continuer.');
+
+      const credentials = useGoogleReauth
+        ? { google_id_token: await signInWithGoogle() }
+        : { password };
+
+      return deleteAccount({
+        reason,
+        confirmation: CONFIRMATION_WORD,
+        ...credentials,
+      });
+    },
+    onSuccess: async (result) => {
+      const purgeDate = new Date(result.purge_at).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      Alert.alert(
+        'Compte supprimé',
+        `Ton compte est désactivé et sera définitivement effacé le ${purgeDate}. Tu peux encore annuler d'ici là en te reconnectant.`,
+      );
+
+      // Pas de router.replace ici : le garde d'auth de `app/_layout.tsx`
+      // bascule vers /landing dès que le store passe à non authentifié.
+      await clearLocal();
+    },
+    onError: (error) => {
+      // Fermeture volontaire de la fenêtre Google : ce n'est pas un échec.
+      if (error instanceof GoogleSignInCancelled) return;
+
+      Alert.alert('Suppression impossible', getApiErrorMessage(error));
+    },
+  });
 
   return (
     <View style={styles.container}>
@@ -84,11 +135,11 @@ export default function DeleteAccountScreen() {
 
             <View style={{ gap: 8, marginBottom: 22 }}>
               {REASONS.map((r) => {
-                const active = r === reason;
+                const active = r.value === reason;
                 return (
                   <TouchableOpacity
-                    key={r}
-                    onPress={() => setReason(r)}
+                    key={r.value}
+                    onPress={() => setReason(r.value)}
                     activeOpacity={0.85}
                     style={[styles.reasonRow, active && styles.reasonRowActive]}
                   >
@@ -96,7 +147,7 @@ export default function DeleteAccountScreen() {
                       {active && <View style={styles.radioDot} />}
                     </View>
                     <Text style={[styles.reasonLabel, active && styles.reasonLabelActive]}>
-                      {r}
+                      {r.label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -127,9 +178,21 @@ export default function DeleteAccountScreen() {
             <Text style={styles.confirmEmoji}>🗑️</Text>
             <Text style={styles.confirmTitle}>Dernière confirmation</Text>
             <Text style={styles.confirmDesc}>
-              Pour confirmer, tape{' '}
-              <Text style={styles.confirmKeyword}>SUPPRIMER</Text>{' '}ci-dessous.
+              {useGoogleReauth
+                ? 'Tape SUPPRIMER ci-dessous, puis confirme avec ton compte Google.'
+                : 'Saisis ton mot de passe et tape SUPPRIMER ci-dessous.'}
             </Text>
+
+            {!useGoogleReauth && (
+              <View style={{ marginBottom: 14 }}>
+                <PasswordInput
+                  label="Mot de passe"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Ton mot de passe"
+                />
+              </View>
+            )}
 
             <TextInput
               value={confirmText}
@@ -150,12 +213,14 @@ export default function DeleteAccountScreen() {
             </Text>
 
             <TouchableOpacity
-              onPress={handleFinalDelete}
-              disabled={!canConfirm}
+              onPress={() => submitDeletion()}
+              disabled={!canConfirm || isPending}
               activeOpacity={0.85}
-              style={[styles.dangerBtn, !canConfirm && styles.dangerBtnDisabled]}
+              style={[styles.dangerBtn, (!canConfirm || isPending) && styles.dangerBtnDisabled]}
             >
-              <Text style={styles.dangerBtnText}>Supprimer définitivement</Text>
+              <Text style={styles.dangerBtnText}>
+                {isPending ? 'Suppression…' : 'Supprimer définitivement'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity

@@ -22,6 +22,7 @@ const profileFixture: UserProfile = {
   phone_verified_at: '2026-04-01T10:00:00Z',
   is_active: true,
   is_admin: false,
+  google_linked: false,
   is_premium: true,
 };
 

@@ -380,6 +380,12 @@ export interface UserProfile {
     code: string;
   };
   phone_verified_at: string | null;
+  /**
+   * Le compte est rattaché à Google. Un compte créé par Google porte un mot de
+   * passe aléatoire que son titulaire ne connaît pas : l'écran de suppression
+   * doit alors proposer la ré-authentification Google, pas un champ password.
+   */
+  google_linked: boolean;
   is_active: boolean;
   is_admin: boolean;
   is_premium: boolean;
@@ -409,6 +415,45 @@ export interface SwitchActiveCountryPayload {
 }
 
 export type ProfileResponse = ApiResponse<UserProfile>;
+
+// ─── Suppression de compte ────────────────────────────────────────────────────
+
+/**
+ * Motifs proposés avant la suppression. Contrat figé avec l'enum backend
+ * `App\Domain\Profile\Enums\AccountDeletionReason` : toute valeur ajoutée
+ * ici doit l'être des deux côtés dans le même commit.
+ */
+export type AccountDeletionReason =
+  | 'no_longer_using'
+  | 'found_alternative'
+  | 'premium_not_interesting'
+  | 'privacy_concerns'
+  | 'other';
+
+export interface DeleteAccountPayload {
+  reason: AccountDeletionReason;
+  /** Doit valoir exactement « SUPPRIMER ». */
+  confirmation: string;
+  /** L'un des deux est requis : mot de passe, ou id_token pour un compte Google. */
+  password?: string;
+  google_id_token?: string;
+  feedback?: string;
+}
+
+export interface AccountDeletionData {
+  deletion_requested_at: string;
+  /** Date de la purge définitive — à afficher à l'utilisateur. */
+  purge_at: string;
+  grace_days: number;
+}
+
+export type DeleteAccountResponse = ApiResponse<AccountDeletionData>;
+
+export interface CancelAccountDeletionPayload {
+  identifier?: string;
+  password?: string;
+  google_id_token?: string;
+}
 
 /**
  * Shape renvoyée par GET /api/v1/me/stats (MeStatsResource côté backend).

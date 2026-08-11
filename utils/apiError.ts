@@ -54,6 +54,24 @@ export function getVerificationChannel(error: unknown): 'email' | 'phone' | null
 }
 
 /**
+ * Lit la date de purge renvoyée avec un 403 « compte en cours de suppression ».
+ *
+ * Même convention que getVerificationChannel : le backend transporte la donnée
+ * dans `errors`, l'enveloppe {success, message, errors} étant figée. Sa
+ * présence est le signal qui distingue ce refus d'un compte simplement
+ * désactivé, et permet de proposer l'annulation.
+ *
+ * Renvoie null si l'erreur n'est pas un 403 de ce type.
+ */
+export function getPendingDeletionPurgeAt(error: unknown): string | null {
+  if (!isAxiosError<ApiError>(error) || error.response?.status !== 403) {
+    return null;
+  }
+
+  return error.response.data?.errors?.purge_at?.[0] ?? null;
+}
+
+/**
  * Vrai quand le serveur a répondu 404.
  *
  * Sert à distinguer une absence légitime (aucune date d'examen saisie pour ce

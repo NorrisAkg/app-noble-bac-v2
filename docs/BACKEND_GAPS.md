@@ -301,16 +301,24 @@ manquants** qui empêchent une conformité 100 % aux maquettes
 - **Endpoint cible** : `GET /me/preferences` + `PATCH /me/preferences
   { download_wifi_only?, auto_download_enabled?, ... }`.
 
-### 7.3 — Suppression de compte (`DELETE /me/account`)
-- **Constat** : pas d'endpoint RGPD pour supprimer un compte.
-- **Impact** : flow `DeleteAccountScreen` (raison + confirmation
-  typant `SUPPRIMER`) prescrit par `screens-mvp-additions.jsx:316-457`
-  ne peut pas fonctionner.
-- **Endpoint cible** :
-  - `DELETE /me/account { reason: 'no_longer_needed'|...,
-    confirmation: 'SUPPRIMER' }` → effacement sous 30j (sauf logs
-    de paiement, cf. politique de confidentialité).
-  - `POST /me/account/cancel-deletion` (fenêtre de récupération).
+### 7.3 — Suppression de compte (`DELETE /me/account`) — ✅ LIVRÉ (2026-08-11)
+- **Livré** :
+  - `DELETE /v1/me/account { reason, confirmation: 'SUPPRIMER',
+    password | google_id_token, feedback? }` (auth:sanctum + throttle:auth,
+    hors `verified`). Réponse `{ deletion_requested_at, purge_at, grace_days }`.
+  - `POST /v1/me/account/cancel-deletion { identifier, password }` —
+    **route publique** : la demande révoque tous les credentials, `auth:sanctum`
+    rendrait l'annulation inatteignable. Renvoie un couple de tokens complet.
+- **Sémantique** : la demande marque `deletion_requested_at` + `is_active=false`
+  et supprime tokens/sessions/téléchargements. `deleted_at` n'est posé qu'à la
+  purge, par `PurgeDeletedAccountsJob` (cron 03:00, fenêtre 30 j), qui anonymise
+  la ligne `users` sur place. `transactions` et `subscriptions` sont
+  **conservées** (obligation comptable — à refléter dans la politique de
+  confidentialité) ; un `forceDelete()` sur `User` est bloqué par un garde.
+- **Effet de bord voulu** : pendant les 30 jours, l'email reste occupé.
+  `RegisterRequest` renvoie « ce compte est en cours de suppression » plutôt
+  qu'un « email déjà utilisé » sans issue, et `/auth/login` répond 403 avec
+  `errors.purge_at` pour permettre l'annulation depuis l'écran de connexion.
 
 ---
 
@@ -495,7 +503,7 @@ Liste des endpoints réellement absents du backend v1.4.1-hardened au
 | `PATCH /v1/profile` accepte `country_id` | 2.2 ⚠️ | S | **Bloqué Q4 CDC** — décision client requise (recommandation : autoriser + warning subscription) |
 | `GET /v1/me/stats` | 4.1 | M | Agrégat `quiz_sessions`, `user_downloads`. **Retirer `study_time_minutes`** (pas tracké au CDC, US-PROG-01 simplifié) |
 | `GET /v1/me/last-read` + `PATCH` | 4.2 | L | Nouvelle table `user_reading_progress` polymorphe (lesson / chapter / exam) |
-| `DELETE /v1/me/account` + `POST cancel-deletion` + job purge | 7.3 | L | Mandat CDC CL-DATA-06 ; `users.deleted_at` ✅ déjà indexé, ajouter `deletion_reason` + job 30j |
+| ~~`DELETE /v1/me/account` + `POST cancel-deletion` + job purge~~ ✅ livré 2026-08-11 | 7.3 | L | Colonnes `deletion_requested_at` / `deletion_reason` / `anonymized_at` + `PurgeDeletedAccountsJob` |
 | `GET /v1/me/bootstrap` agrégé | 9.6 | M | Profile + stats + last_read + recommended_books + days_to_bac, ETag + cache Redis 60s |
 | Param `?inline=1` sur `POST /v1/catalog/{exam}/signed-url` | 8.1 | XS | `ResponseContentDisposition` propagé dans `R2StorageService` |
 | Enrichir `ExamDetailResource` + ALTER `exams` | 8.2 | M | Ajouter `duration_minutes`, `coefficient` (file_size_kb + page_count déjà migrés) |

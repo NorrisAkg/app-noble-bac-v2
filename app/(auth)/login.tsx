@@ -9,10 +9,15 @@ import { GoogleButton } from '@/components/ui/GoogleButton';
 import { KeyboardAwareScreen } from '@/components/ui/KeyboardAwareScreen';
 import { IdentifierField, IdentifierCountrySheet } from '@/components/auth/IdentifierField';
 import { login, resendEmailCode, sendOtp } from '@/services/authService';
+import { cancelAccountDeletion } from '@/services/accountService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useIdentifierInput } from '@/hooks/useIdentifierInput';
-import { getApiErrorMessage, getVerificationChannel } from '@/utils/apiError';
+import {
+  getApiErrorMessage,
+  getPendingDeletionPurgeAt,
+  getVerificationChannel,
+} from '@/utils/apiError';
 import { resolveVerificationTarget } from '@/utils/verification';
 
 export default function LoginScreen() {
@@ -72,6 +77,36 @@ export default function LoginScreen() {
     }
   };
 
+  /**
+   * Compte en cours de suppression : le backend refuse la connexion en 403 et
+   * transporte la date de purge. Sans cette branche, l'utilisateur verrait un
+   * refus sans issue alors qu'il lui reste 30 jours pour se raviser.
+   */
+  const { mutate: cancelDeletion, isPending: isCancelling } = useMutation({
+    mutationFn: () => cancelAccountDeletion({ identifier, password }),
+    onSuccess: async (data) => {
+      await setAuth(data.user, data.access_token, data.refresh_token);
+    },
+    onError: (error) => setFormError(getApiErrorMessage(error)),
+  });
+
+  const promptCancelDeletion = (purgeAt: string) => {
+    const purgeDate = new Date(purgeAt).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    Alert.alert(
+      'Compte en cours de suppression',
+      `Ton compte sera définitivement supprimé le ${purgeDate}. Tu peux encore annuler et le récupérer intact.`,
+      [
+        { text: 'Laisser supprimer', style: 'cancel' },
+        { text: 'Annuler la suppression', onPress: () => cancelDeletion() },
+      ],
+    );
+  };
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => login({ identifier, password }),
     onSuccess: async (res) => {
@@ -86,6 +121,12 @@ export default function LoginScreen() {
       // Navigation prise en charge par le garde d'auth de _layout.tsx
     },
     onError: async (error) => {
+      const purgeAt = getPendingDeletionPurgeAt(error);
+      if (purgeAt) {
+        promptCancelDeletion(purgeAt);
+        return;
+      }
+
       // Compte existant mais jamais vérifié : sans cette branche, l'utilisateur
       // recevait un 403 sans aucune issue — le mot de passe est bon, mais rien
       // ne le menait vers l'écran de vérification.
@@ -139,7 +180,11 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
 
-        <Button onPress={() => mutate()} disabled={!isValid} loading={isPending}>
+        <Button
+          onPress={() => mutate()}
+          disabled={!isValid}
+          loading={isPending || isCancelling}
+        >
           Se connecter
         </Button>
 
