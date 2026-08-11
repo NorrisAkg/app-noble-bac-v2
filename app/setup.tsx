@@ -69,19 +69,24 @@ export default function SetupScreen() {
     [profile],
   );
 
-  const activeCountryCode = profile?.active_country.code;
-  const activeCountry = countries.find((c) => c.code === activeCountryCode);
+  const activeCountryCode = profile?.active_country?.code ?? profile?.country?.code;
+  const activeCountry = countries.find(
+    (c) =>
+      (activeCountryCode && c.code.toUpperCase() === activeCountryCode.toUpperCase()) ||
+      String(c.id) === String(profile?.active_country?.id ?? profile?.country?.id),
+  );
 
-  // Pré-sélection du pays actif quand on vient du profil, une seule fois.
+  // Pré-sélection du pays actif quand on vient du profil ou de l'onboarding, une seule fois.
   // Le garde par `ref` est essentiel : sans lui, un clic sur « Modifier »
   // (qui remet selectedCountry à null) serait aussitôt annulé par cet effet,
   // rendant l'étape pays inatteignable.
   const prefilledRef = useRef(false);
   useEffect(() => {
     if (!openOnSeries || prefilledRef.current || !profile || countries.length === 0) return;
-    prefilledRef.current = true;
-    // Pays actif désactivé côté back : on laisse l'écran sur l'étape pays.
-    if (activeCountry) handleCountrySelect(activeCountry);
+    if (activeCountry) {
+      prefilledRef.current = true;
+      handleCountrySelect(activeCountry);
+    }
   }, [openOnSeries, profile, countries, activeCountry, handleCountrySelect]);
 
   const isDifferentActiveCountry =
