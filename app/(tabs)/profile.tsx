@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -179,6 +180,17 @@ export default function ProfileScreen() {
     },
   ];
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Déconnexion',
+      'Es-tu sûr de vouloir te déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Se déconnecter', style: 'destructive', onPress: () => logout() },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -282,7 +294,7 @@ export default function ProfileScreen() {
         {/* Bouton logout — pleine largeur, border salmonSoft, fond blanc */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={() => logout()}
+          onPress={handleLogout}
           activeOpacity={0.85}
         >
           <LogOut size={18} color={C.danger} strokeWidth={2.2} />
