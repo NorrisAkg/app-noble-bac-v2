@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
@@ -106,7 +106,7 @@ export default function LandingScreen() {
           <TouchableOpacity
             style={styles.btnPrimary}
             activeOpacity={0.85}
-            onPress={() => router.push("/(auth)/signup")}
+            onPress={() => router.push("/(auth)/country" as Href)}
           >
             <Text style={styles.btnPrimaryText}>Commencer</Text>
           </TouchableOpacity>

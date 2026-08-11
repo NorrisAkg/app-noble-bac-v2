@@ -4,7 +4,7 @@ import {
   useIdentifierInput,
   IDENTIFIER_COUNTRY_OPTIONS,
 } from '@/hooks/useIdentifierInput';
-import { COUNTRIES, DEFAULT_COUNTRY } from '@/constants/countries';
+import { COUNTRIES, DEFAULT_DIAL_COUNTRY } from '@/constants/countries';
 
 // RNTL 14 : `renderHook` et `act` sont asynchrones — sans `await`, `result`
 // reste indéfini (cf. le même avertissement dans Input.test.tsx).
@@ -14,7 +14,7 @@ describe('useIdentifierInput', () => {
     const { result } = await renderHook(() => useIdentifierInput('email'));
 
     expect(result.current.mode).toBe('email');
-    expect(result.current.country).toEqual(DEFAULT_COUNTRY);
+    expect(result.current.country).toEqual(DEFAULT_DIAL_COUNTRY);
     expect(result.current.identifier).toBe('');
     expect(result.current.isFilled).toBe(false);
   });

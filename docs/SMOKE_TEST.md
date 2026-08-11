@@ -126,8 +126,19 @@
 - [ ] Profile → `Supprimer mon compte` → `/settings/delete-account`
 - [ ] Delete account step 1 : warning rouge + 5 motifs radio
 - [ ] Tap motif puis `Continuer` → step 2
-- [ ] Step 2 : input centré, taper `SUPPRIMER` → bouton danger s'active
-- [ ] Tap `Supprimer définitivement` → Alert « Demande enregistrée » → route vers support
+- [ ] Step 2 : champ mot de passe (masqué si compte Google) + input centré ; taper `SUPPRIMER` → bouton danger s'active
+- [ ] Tap `Supprimer définitivement` → Alert avec la date de purge → retour sur `/landing`
+- [ ] Se reconnecter avec les mêmes identifiants → Alert « Compte en cours de suppression » → `Annuler la suppression` → retour sur l'accueil, compte intact
+- [ ] Tenter de se ré-inscrire avec le même email pendant la fenêtre → message « ce compte est en cours de suppression »
+
+## Parcours pays → inscription → série
+
+- [ ] Landing → `Commencer` → **écran `Ton pays`** (cartes géographiques, pas de drapeaux)
+- [ ] Choisir un pays ≠ Niger → écran d'inscription avec le pays en récapitulatif + lien `Modifier`
+- [ ] `Modifier` → retour à l'écran pays, la sélection est reprise
+- [ ] Créer le compte → code email → félicitations → **écran `Ta série` directement** (pas d'étape pays, pas de flèche retour)
+- [ ] Vérifier en base que `users.country_id` correspond au pays choisi
+- [ ] Profil → `Pays et série` → comportement inchangé (flèche retour, bouton `Modifier`, sortie vers le profil)
 
 ## Phase 8 — Polish
 

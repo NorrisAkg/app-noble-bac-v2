@@ -13,6 +13,7 @@ import { Check } from 'lucide-react-native';
 import { AppBar } from '@/components/ui/AppBar';
 import { Button } from '@/components/ui/Button';
 import { CountryMap } from '@/components/ui/CountryMap';
+import { CountryStep } from '@/components/onboarding/CountryStep';
 import { Heading } from '@/components/ui/Heading';
 import { C } from '@/constants/theme';
 import { getCountries } from '@/services/referentialService';
@@ -28,11 +29,18 @@ export default function SetupScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
-  // `?step=series` : on arrive depuis le profil pour ajuster un réglage, pas
-  // pour dérouler l'onboarding. On ouvre alors directement l'étape série du
-  // pays actif ; le pays reste modifiable via le bouton « Modifier ».
-  const { step } = useLocalSearchParams<{ step?: string }>();
-  const fromProfile = step === 'series';
+  // Deux paramètres, deux sens distincts — les confondre en un seul booléen
+  // rendait l'onboarding impossible à distinguer d'un réglage depuis le profil.
+  //
+  // `step=series` : ouvrir directement l'étape série, le pays étant déjà connu.
+  // `origin` : d'où l'on vient. En `onboarding` (retour des félicitations), le
+  //   pays vient d'être choisi à l'inscription et `users.country_id` est de
+  //   toute façon immuable : ni flèche retour ni bouton « Modifier ». En
+  //   `profile`, l'utilisateur ajuste son pays ACTIF et doit pouvoir revenir.
+  const { step, origin } = useLocalSearchParams<{ step?: string; origin?: string }>();
+  const openOnSeries = step === 'series';
+  const fromOnboarding = origin === 'onboarding';
+  const fromProfile = openOnSeries && !fromOnboarding;
 
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
@@ -70,11 +78,11 @@ export default function SetupScreen() {
   // rendant l'étape pays inatteignable.
   const prefilledRef = useRef(false);
   useEffect(() => {
-    if (!fromProfile || prefilledRef.current || !profile || countries.length === 0) return;
+    if (!openOnSeries || prefilledRef.current || !profile || countries.length === 0) return;
     prefilledRef.current = true;
     // Pays actif désactivé côté back : on laisse l'écran sur l'étape pays.
     if (activeCountry) handleCountrySelect(activeCountry);
-  }, [fromProfile, profile, countries, activeCountry, handleCountrySelect]);
+  }, [openOnSeries, profile, countries, activeCountry, handleCountrySelect]);
 
   const isDifferentActiveCountry =
     selectedCountry !== null &&
@@ -155,7 +163,7 @@ export default function SetupScreen() {
   };
 
   const handleBack = () => {
-    if (showSeries && !fromProfile) {
+    if (showSeries && !openOnSeries) {
       setSelectedCountry(null);
       return;
     }
@@ -168,7 +176,9 @@ export default function SetupScreen() {
     leaveScreen();
   };
 
-  const showBack = showSeries || fromProfile;
+  // En onboarding l'écran est terminal : le pays vient d'être choisi et il n'y
+  // a rien derrière — la flèche renverrait vers les écrans d'auth déjà passés.
+  const showBack = !fromOnboarding && (showSeries || fromProfile);
 
   if (isLoading) {
     return (
@@ -191,7 +201,10 @@ export default function SetupScreen() {
         {showSeries && selectedCountry && (
           <SeriesStep
             country={selectedCountry}
-            onModify={() => setSelectedCountry(null)}
+            // Pas de changement de pays juste après l'inscription : il vient
+            // d'être choisi, et le modifier ici ne toucherait que le pays ACTIF
+            // sans corriger le pays d'origine du compte.
+            onModify={fromOnboarding ? undefined : () => setSelectedCountry(null)}
             selected={selectedSeries}
             onSelect={setSelectedSeries}
           />
@@ -209,49 +222,10 @@ export default function SetupScreen() {
   );
 }
 
-interface CountryStepProps {
-  countries: Country[];
-  onSelect: (c: Country) => void;
-}
-
-const CountryStep: React.FC<CountryStepProps> = ({ countries, onSelect }) => (
-  <>
-    <Heading level="h2">Dans quel pays passes-tu le BAC ?</Heading>
-    <Text className="font-poppins text-[13.5px] text-brand-ink-medium mt-1.5 mb-6 leading-5">
-      On adapte les épreuves, les corrigés et les quiz à ton pays.
-    </Text>
-
-    <View className="flex-row flex-wrap -mx-1.5">
-      {countries.map((c) => (
-        <View key={c.id} className="w-1/2 px-1.5 mb-3">
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => onSelect(c)}
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: 16,
-              paddingVertical: 18,
-              paddingHorizontal: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#1A2027',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.08,
-              shadowRadius: 10,
-              elevation: 2,
-            }}
-          >
-            <CountryMap code={c.code} size={84} />
-          </TouchableOpacity>
-        </View>
-      ))}
-    </View>
-  </>
-);
-
 interface SeriesStepProps {
   country: Country;
-  onModify: () => void;
+  /** Absent en onboarding : le pays vient d'être choisi à l'inscription. */
+  onModify?: () => void;
   selected: Series | null;
   onSelect: (s: Series) => void;
 }
@@ -289,11 +263,13 @@ const SeriesStep: React.FC<SeriesStepProps> = ({ country, onModify, selected, on
           {country.name}
         </Text>
       </View>
-      <TouchableOpacity onPress={onModify}>
-        <Text style={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.green }}>
-          Modifier
-        </Text>
-      </TouchableOpacity>
+      {onModify && (
+        <TouchableOpacity onPress={onModify}>
+          <Text style={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.green }}>
+            Modifier
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
 
     <Heading level="h2">Choisis ta série</Heading>

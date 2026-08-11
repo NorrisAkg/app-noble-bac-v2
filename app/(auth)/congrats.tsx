@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -139,7 +139,7 @@ export default function CongratsScreen() {
         className="px-5 pt-4 bg-white border-t border-line"
         style={{ paddingBottom: Math.max(insets.bottom, 16) }}
       >
-        <Button onPress={() => router.replace('/setup')}>
+        <Button onPress={() => router.replace('/setup?step=series&origin=onboarding' as Href)}>
           Commencer maintenant
         </Button>
       </View>

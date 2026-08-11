@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { buildE164Phone } from '@/utils/phone';
-import { COUNTRIES, DEFAULT_COUNTRY, type Country } from '@/constants/countries';
+import { COUNTRIES, DEFAULT_DIAL_COUNTRY, type Country } from '@/constants/countries';
 
 export type IdentifierMode = 'email' | 'phone';
 
@@ -37,7 +37,7 @@ export interface IdentifierInputState {
  *
  * Les deux saisies sont conservées séparément : basculer d'un onglet à l'autre
  * ne doit pas effacer ce qui a déjà été tapé, et surtout l'indicatif pays ne
- * peut pas être déduit d'un champ unique — `DEFAULT_COUNTRY` vaut le Niger, si
+ * peut pas être déduit d'un champ unique — `DEFAULT_DIAL_COUNTRY` vaut le Niger, si
  * bien qu'un numéro sénégalais préfixé en silence produirait le même 401 que
  * celui qu'on cherche à supprimer, en pire : invisible.
  */
@@ -45,7 +45,7 @@ export function useIdentifierInput(initialMode: IdentifierMode = 'email'): Ident
   const [mode, setMode] = useState<IdentifierMode>(initialMode);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [country, setCountry] = useState<Country>(DEFAULT_DIAL_COUNTRY);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
 
   const trimmedEmail = email.trim();

@@ -1,27 +1,21 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
-import { useRouter } from "expo-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Check, ChevronDown } from "lucide-react-native";
+import { Redirect, useLocalSearchParams, useRouter, type Href } from "expo-router";
+import { useMutation } from "@tanstack/react-query";
+import { Check } from "lucide-react-native";
 import { AppBar } from "@/components/ui/AppBar";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { KeyboardAwareScreen } from "@/components/ui/KeyboardAwareScreen";
 import { GoogleButton } from "@/components/ui/GoogleButton";
-import { CountryPickerSheet } from "@/components/ui/CountryPickerSheet";
 import { CountryMap } from "@/components/ui/CountryMap";
-import { getCountries } from "@/services/referentialService";
 import { register } from "@/services/authService";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { getApiErrorMessage, getValidationErrors } from "@/utils/apiError";
 import { buildE164Phone } from "@/utils/phone";
-import {
-  COUNTRIES,
-  DEFAULT_COUNTRY,
-  type Country,
-} from "@/constants/countries";
-import { queryKeys } from "@/lib/queryKeys";
+import { COUNTRIES } from "@/constants/countries";
+import { C } from "@/constants/theme";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -38,31 +32,27 @@ export default function SignupScreen() {
   const [agree, setAgree] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // ── Selection state ───────────────────────────────────────────────────────
-  // Le `country.id` backend est résolu au submit via le référentiel API. La
-  // filière n'est PAS demandée ici — le backend auto-affecte la 1re série
-  // active du pays, l'utilisateur la choisit/corrige sur `/setup`.
-  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
-  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  // ── Pays ──────────────────────────────────────────────────────────────────
+  // Choisi à l'écran précédent (`/(auth)/country`) et transporté en paramètre
+  // de route : `users.country_id` est le scope d'origine du compte, figé à la
+  // création. Il n'y a plus de valeur par défaut — un pays non choisi ne doit
+  // jamais être deviné.
+  //
+  // La filière n'est PAS demandée ici : le backend auto-affecte la 1re série
+  // active du pays et l'utilisateur la choisit juste après les félicitations.
+  const { countryId, countryCode } = useLocalSearchParams<{
+    countryId?: string;
+    countryCode?: string;
+  }>();
 
-  const {
-    data: apiCountries = [],
-    isLoading: loadingApiCountries,
-    isError: referentialError,
-    error: referentialErrorObj,
-  } = useQuery({
-    queryKey: queryKeys.referential.countries(),
-    queryFn: getCountries,
-  });
-
-  const apiCountry = apiCountries.find((c) => c.code === country.code) ?? null;
+  // Le libellé et l'indicatif viennent du référentiel local, indexés par code.
+  const country = COUNTRIES.find((c) => c.code === countryCode) ?? null;
 
   // Le téléphone est désormais facultatif : un compte peut vivre sans, et le
   // numéro sera demandé au moment du paiement s'il manque.
   const trimmedPhone = phone.trim();
-  const e164Phone = trimmedPhone
-    ? buildE164Phone(country.dial, trimmedPhone)
-    : undefined;
+  const e164Phone =
+    trimmedPhone && country ? buildE164Phone(country.dial, trimmedPhone) : undefined;
 
   const passwordsMatch = password.length > 0 && password === passwordConfirm;
 
@@ -81,28 +71,20 @@ export default function SignupScreen() {
       return rest;
     });
 
-  const google = useGoogleAuth({ countryId: apiCountry?.id ?? null });
+  const google = useGoogleAuth({ countryId: countryId ?? null });
 
   // ── Register mutation ─────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      if (!apiCountry) {
-        throw new Error(
-          loadingApiCountries
-            ? "Le référentiel des pays charge encore, réessaie dans un instant."
-            : `Pays ${country.code} introuvable côté API. Vérifie le serveur.`,
-        );
-      }
-      return register({
+    mutationFn: async () =>
+      register({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         email: email.trim(),
         password,
         password_confirmation: passwordConfirm,
         ...(e164Phone ? { phone: e164Phone } : {}),
-        country_id: apiCountry.id,
-      });
-    },
+        country_id: countryId as string,
+      }),
     onSuccess: () => {
       router.push({
         pathname: "/(auth)/verify-email",
@@ -119,6 +101,12 @@ export default function SignupScreen() {
     },
   });
 
+  // Filet de sécurité : deep link, retour arrière atypique ou reload à chaud
+  // peuvent amener ici sans pays. On renvoie choisir plutôt que d'en inventer un.
+  if (!countryId || !country) {
+    return <Redirect href={"/(auth)/country" as Href} />;
+  }
+
   return (
     <View className="flex-1 bg-background">
       <AppBar title="Créer un compte" onBack={() => router.back()} />
@@ -130,6 +118,57 @@ export default function SignupScreen() {
         <Text className="font-poppins text-[13.5px] text-brand-ink-medium mt-1 mb-5 leading-5">
           Quelques infos pour personnaliser ton parcours.
         </Text>
+
+        {/* ── Pays choisi à l'étape précédente ── */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            backgroundColor: "#fff",
+            borderWidth: 1.5,
+            borderColor: C.line,
+            borderRadius: 16,
+            paddingVertical: 12,
+            paddingHorizontal: 14,
+            marginBottom: 18,
+          }}
+        >
+          <CountryMap code={country.code} size={30} />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontFamily: "Poppins_500Medium",
+                fontSize: 11,
+                color: C.ink3,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+              }}
+            >
+              Pays
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Poppins_600SemiBold",
+                fontSize: 15,
+                color: C.ink,
+              }}
+            >
+              {country.name}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text
+              style={{
+                fontFamily: "Poppins_600SemiBold",
+                fontSize: 12,
+                color: C.green,
+              }}
+            >
+              Modifier
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* ── Nom ── */}
         <View className="flex-row gap-3">
@@ -260,18 +299,6 @@ export default function SignupScreen() {
           Créer mon compte
         </Button>
 
-        {/* Statut du référentiel — préventif : si l'API ne répond pas,
-            l'utilisateur sait pourquoi le submit échouera. */}
-        {loadingApiCountries ? (
-          <Text className="font-poppins text-xs text-brand-ink-medium text-center mt-3">
-            Chargement du référentiel…
-          </Text>
-        ) : referentialError ? (
-          <Text className="font-poppins-medium text-xs text-brand-danger text-center mt-3">
-            {getApiErrorMessage(referentialErrorObj)}
-          </Text>
-        ) : null}
-
         {/* ── Séparateur ── */}
         <View className="flex-row items-center my-5">
           <View className="flex-1 h-[1px] bg-line" />
@@ -284,9 +311,7 @@ export default function SignupScreen() {
         <GoogleButton
           onPress={google.start}
           loading={google.isPending}
-          // Sans pays résolu, le backend refuserait la création : mieux vaut
-          // un bouton inerte qu'une erreur après la fenêtre Google.
-          disabled={isPending || !apiCountry}
+          disabled={isPending}
         />
 
         <View className="mt-6 mb-10 flex-row justify-center gap-1">
@@ -300,22 +325,6 @@ export default function SignupScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAwareScreen>
-
-      <CountryPickerSheet
-        isOpen={countryPickerOpen}
-        onClose={() => setCountryPickerOpen(false)}
-        options={COUNTRIES.map((c) => ({
-          key: c.code,
-          code: c.code,
-          name: c.name,
-          dial: c.dial,
-        }))}
-        selectedKey={country.code}
-        onSelect={(opt) => {
-          const next = COUNTRIES.find((c) => c.code === opt.key);
-          if (next) setCountry(next);
-        }}
-      />
     </View>
   );
 }

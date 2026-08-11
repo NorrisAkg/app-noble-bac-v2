@@ -17,4 +17,12 @@ export const COUNTRIES: Country[] = [
   { code: 'TG', name: 'Togo', dial: '+228', colors: ['#006A4E', '#FFCE00', '#D21034'], series: ['A', 'C', 'D'] },
 ];
 
-export const DEFAULT_COUNTRY: Country = COUNTRIES[5]; // Niger
+/**
+ * Indicatif présélectionné dans le champ « téléphone » des écrans d'auth.
+ *
+ * ⚠️ Affordance de SAISIE uniquement : cette constante ne détermine JAMAIS le
+ * pays d'un compte. `users.country_id` vient exclusivement du choix explicite
+ * fait sur `/(auth)/country` avant l'inscription — auparavant, l'inscription
+ * retombait sur cette valeur et tous les comptes naissaient au Niger.
+ */
+export const DEFAULT_DIAL_COUNTRY: Country = COUNTRIES[5]; // Niger
