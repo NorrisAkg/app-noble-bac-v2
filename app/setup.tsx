@@ -89,10 +89,11 @@ export default function SetupScreen() {
     }
   }, [openOnSeries, profile, countries, activeCountry, handleCountrySelect]);
 
+  const effectiveCountry = selectedCountry ?? (openOnSeries && !prefilledRef.current ? activeCountry ?? null : null);
   const isDifferentActiveCountry =
-    selectedCountry !== null &&
+    effectiveCountry !== null &&
     activeCountryCode !== undefined &&
-    selectedCountry.code !== activeCountryCode;
+    effectiveCountry.code !== activeCountryCode;
 
   const switchMutation = useMutation({
     mutationFn: (payload: { active_country_id: number; active_series_id: number }) =>
@@ -113,7 +114,7 @@ export default function SetupScreen() {
   };
 
   const handleContinue = () => {
-    if (!selectedSeries || !selectedCountry) return;
+    if (!selectedSeries || !effectiveCountry) return;
 
     // Filet de sécurité : si le profil n'a pas pu être chargé (token absent
     // ou expiré), on ne peut pas savoir si le user change de pays/série.
@@ -139,7 +140,7 @@ export default function SetupScreen() {
     // Pays actif inchangé, seule la série change : pas besoin de confirmation,
     // aucun contenu "pays" n'est affecté.
     if (!isDifferentActiveCountry) {
-      confirmAndSwitch(selectedCountry, selectedSeries);
+      confirmAndSwitch(effectiveCountry, selectedSeries);
       return;
     }
 
@@ -147,16 +148,16 @@ export default function SetupScreen() {
     // ne suit pas automatiquement — on prévient avant de confirmer.
     Alert.alert(
       'Changer de pays actif ?',
-      `Tu vas passer ${withCountryPreposition(selectedCountry.code, selectedCountry.name)}. Tu ne verras plus que le contenu de ce pays — ton pays d'origine (${profile.country.name}) reste enregistré et tu pourras y revenir à tout moment. Ton abonnement est propre à chaque pays et série : s'il n'est pas déjà actif ${withCountryPreposition(selectedCountry.code, selectedCountry.name)} pour cette série, il faudra se réabonner pour débloquer le contenu Premium.`,
+      `Tu vas passer ${withCountryPreposition(effectiveCountry.code, effectiveCountry.name)}. Tu ne verras plus que le contenu de ce pays — ton pays d'origine (${profile.country.name}) reste enregistré et tu pourras y revenir à tout moment. Ton abonnement est propre à chaque pays et série : s'il n'est pas déjà actif ${withCountryPreposition(effectiveCountry.code, effectiveCountry.name)} pour cette série, il faudra se réabonner pour débloquer le contenu Premium.`,
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Changer', onPress: () => confirmAndSwitch(selectedCountry, selectedSeries) },
+        { text: 'Changer', onPress: () => confirmAndSwitch(effectiveCountry, selectedSeries) },
       ],
     );
   };
 
   const isLoading = loadingCountries || loadingProfile;
-  const showSeries = selectedCountry !== null;
+  const showSeries = effectiveCountry !== null;
 
   // Depuis le profil la flèche est toujours présente : à l'étape série elle
   // ferme l'écran (on n'est jamais passé par l'étape pays), à l'étape pays elle
@@ -203,13 +204,20 @@ export default function SetupScreen() {
       <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
         {!showSeries && <CountryStep countries={countries} onSelect={handleCountrySelect} />}
 
-        {showSeries && selectedCountry && (
+        {showSeries && effectiveCountry && (
           <SeriesStep
-            country={selectedCountry}
+            country={effectiveCountry}
             // Pas de changement de pays juste après l'inscription : il vient
             // d'être choisi, et le modifier ici ne toucherait que le pays ACTIF
             // sans corriger le pays d'origine du compte.
-            onModify={fromOnboarding ? undefined : () => setSelectedCountry(null)}
+            onModify={
+              fromOnboarding
+                ? undefined
+                : () => {
+                    prefilledRef.current = true;
+                    setSelectedCountry(null);
+                  }
+            }
             selected={selectedSeries}
             onSelect={setSelectedSeries}
           />
