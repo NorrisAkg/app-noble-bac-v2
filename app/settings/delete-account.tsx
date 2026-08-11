@@ -95,14 +95,18 @@ export default function DeleteAccountScreen() {
         year: 'numeric',
       });
 
+      await clearLocal();
+
       Alert.alert(
         'Compte supprimé',
         `Ton compte est désactivé et sera définitivement effacé le ${purgeDate}. Tu peux encore annuler d'ici là en te reconnectant.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/landing'),
+          },
+        ],
       );
-
-      // Pas de router.replace ici : le garde d'auth de `app/_layout.tsx`
-      // bascule vers /landing dès que le store passe à non authentifié.
-      await clearLocal();
     },
     onError: (error) => {
       // Fermeture volontaire de la fenêtre Google : ce n'est pas un échec.
