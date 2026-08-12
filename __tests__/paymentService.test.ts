@@ -1,6 +1,7 @@
 import {
   initiatePayment,
   getPaymentStatus,
+  shouldOpenHostedCheckout,
   type InitiatePaymentResponse,
 } from '../services/paymentService';
 import apiClient from '../services/apiClient';
@@ -34,6 +35,7 @@ describe('paymentService', () => {
         transaction: transactionFixture,
         // payment_url peut être une URL Moneroo ou FedaPay selon PAYMENT_GATEWAY
         payment_url: 'https://checkout.moneroo.io/pay/test-token',
+        payment_mode: 'hosted_checkout',
       };
       mockedApiClient.post.mockResolvedValueOnce({
         data: { success: true, message: 'Ouvre la page de paiement pour finaliser ton abonnement.', data: response },
@@ -71,6 +73,33 @@ describe('paymentService', () => {
     it('propage l\'erreur axios telle quelle (plan introuvable, scope mismatch, etc.)', async () => {
       mockedApiClient.post.mockRejectedValueOnce(new Error('Forbidden'));
       await expect(initiatePayment({ subscriptionPlanId: 99, operatorId: 1 })).rejects.toThrow('Forbidden');
+    });
+  });
+
+  describe('shouldOpenHostedCheckout', () => {
+    it('ouvre la WebView pour un checkout hébergé avec URL', () => {
+      expect(
+        shouldOpenHostedCheckout({
+          payment_mode: 'hosted_checkout',
+          payment_url: 'https://checkout.moneroo.io/pay/test-token',
+        }),
+      ).toBe(true);
+    });
+
+    it('n\'ouvre rien pour un débit direct (le push USSD est déjà parti)', () => {
+      expect(shouldOpenHostedCheckout({ payment_mode: 'direct_charge', payment_url: null })).toBe(
+        false,
+      );
+    });
+
+    it('n\'ouvre pas de WebView blanche quand l\'URL du checkout hébergé est vide', () => {
+      // La régression exacte de production : le backend renvoyait '' et
+      // `if (payment_url)` faisait basculer l'app en attente d'un push USSD
+      // qui n'avait jamais été demandé. Le mode dit maintenant la vérité, mais
+      // l'URL vide ne doit toujours pas ouvrir une page blanche.
+      expect(shouldOpenHostedCheckout({ payment_mode: 'hosted_checkout', payment_url: '' })).toBe(
+        false,
+      );
     });
   });
 

@@ -18,7 +18,11 @@ import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTyp
 import { ChevronLeft, ChevronDown } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { initiatePayment, getPaymentStatus } from '@/services/paymentService';
+import {
+  initiatePayment,
+  getPaymentStatus,
+  shouldOpenHostedCheckout,
+} from '@/services/paymentService';
 import { getProfile } from '@/services/profileService';
 import { getOperators } from '@/services/referentialService';
 import { getApiErrorMessage } from '@/utils/apiError';
@@ -41,6 +45,14 @@ const POLL_STEP_MS = 1_500;
 const POLL_MAX_MS = 8_000;
 const POLL_TIMEOUT_MS = 90_000;
 
+/**
+ * Au-delà de ce nombre d'échecs consécutifs de /status, on arrête d'attendre :
+ * l'endpoint est en panne, pas le paiement en cours. Sans ce garde-fou les
+ * erreurs étaient réduites à un console.warn et l'utilisateur patientait 90 s
+ * avant un message rassurant mais faux.
+ */
+const POLL_MAX_CONSECUTIVE_ERRORS = 3;
+
 export default function PaymentCheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -62,6 +74,11 @@ export default function PaymentCheckoutScreen() {
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [webViewReady, setWebViewReady] = useState(false);
   const [transactionId, setTransactionId] = useState<number | null>(null);
+  // Référence interne de la transaction : seul lien entre l'écran de
+  // l'utilisateur et la ligne de log serveur quand il faut diagnostiquer.
+  // Une ref plutôt qu'un state : elle n'est lue que dans les Alert, et un state
+  // exposerait la boucle de polling à sa propre closure périmée.
+  const referenceRef = useRef<string | null>(null);
   const [status, setStatus] = useState<TransactionStatus>('pending');
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
 
@@ -117,21 +134,25 @@ export default function PaymentCheckoutScreen() {
         ? buildE164Phone(profileQuery.data?.country.phone_code ?? '', phone)
         : undefined;
 
-      const { transaction, payment_url } = await initiatePayment({
+      const initiation = await initiatePayment({
         subscriptionPlanId: planId,
         operatorId: selectedOperator?.id,
         phoneNumber: e164,
       });
+      const { transaction, payment_url } = initiation;
 
       startedAtRef.current = Date.now();
       setTransactionId(transaction.id);
+      referenceRef.current = transaction.internal_reference;
 
-      if (payment_url) {
-        // Checkout hébergé : ouvre la page de paiement dans la WebView intégrée.
+      // On switche sur le mode annoncé par le backend, jamais sur la présence
+      // de payment_url : une URL vide est falsy et faisait passer un checkout
+      // raté pour un débit direct réussi (90 s d'attente, aucun push).
+      if (shouldOpenHostedCheckout(initiation) && payment_url) {
         setCheckoutUrl(payment_url);
         setStep('checkout');
       } else {
-        // Débit direct (FedaPay USSD) : push déjà envoyé, on poll.
+        // Débit direct (USSD) : la demande est déjà partie, on attend.
         setStep('polling');
       }
     } catch (e) {
@@ -145,6 +166,7 @@ export default function PaymentCheckoutScreen() {
     if (transactionId === null) return;
 
     let currentInterval = POLL_INITIAL_MS;
+    let consecutiveErrors = 0;
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const poll = async () => {
@@ -154,7 +176,8 @@ export default function PaymentCheckoutScreen() {
         finishedRef.current = true;
         Alert.alert(
           'Paiement en cours de validation',
-          'La confirmation prend plus de temps que prévu. Tu seras notifié dès que ton abonnement sera activé. Tu peux vérifier le statut dans "Mon abonnement".',
+          'La confirmation prend plus de temps que prévu. Tu seras notifié dès que ton abonnement sera activé. Tu peux vérifier le statut dans "Mon abonnement".' +
+            (referenceRef.current ? `\n\nRéférence : ${referenceRef.current}` : ''),
           [{ text: 'OK', onPress: () => router.replace('/my-subscription') }],
         );
         return;
@@ -185,8 +208,24 @@ export default function PaymentCheckoutScreen() {
           );
           return;
         }
+        consecutiveErrors = 0;
       } catch (e) {
+        consecutiveErrors += 1;
         console.warn('[payment-checkout] poll status failed:', getApiErrorMessage(e));
+
+        // L'endpoint de statut est cassé (ex. 502 de la passerelle) : continuer
+        // à boucler ne ferait qu'aboutir au message de timeout, qui promet une
+        // notification à venir. Mieux vaut dire ce qui se passe vraiment.
+        if (consecutiveErrors >= POLL_MAX_CONSECUTIVE_ERRORS) {
+          finishedRef.current = true;
+          Alert.alert(
+            'Vérification impossible',
+            getApiErrorMessage(e, 'Impossible de vérifier le paiement pour le moment.') +
+              (referenceRef.current ? `\n\nRéférence : ${referenceRef.current}` : ''),
+            [{ text: 'OK', onPress: () => router.replace('/my-subscription') }],
+          );
+          return;
+        }
       }
 
       currentInterval = Math.min(currentInterval + POLL_STEP_MS, POLL_MAX_MS);

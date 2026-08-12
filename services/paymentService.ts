@@ -2,15 +2,28 @@ import apiClient from './apiClient';
 import type { ApiResponse, PaymentTransaction } from '@/types/api';
 
 /**
+ * Comment poursuivre le paiement, annoncé explicitement par le backend.
+ * - `hosted_checkout` : ouvrir `payment_url` dans la WebView.
+ * - `direct_charge`   : la demande USSD est partie, il n'y a qu'à attendre.
+ *
+ * Ne jamais redéduire ce mode de `payment_url` : une chaîne vide est falsy en
+ * JS, donc un checkout hébergé raté ressemblait trait pour trait à un débit
+ * direct réussi et l'app attendait 90 s un push jamais demandé.
+ */
+export type PaymentMode = 'direct_charge' | 'hosted_checkout';
+
+/**
  * Reponse de POST /api/v1/payments/initiate.
  * `transaction` contient le statut initial (pending) + l'internal_reference.
- * `payment_url` est la page de paiement hebergee FedaPay a ouvrir : le client
- * la charge, l'utilisateur paie, puis le mobile poll getPaymentStatus pour
- * detecter la confirmation (l'activation se fait via webhook / poll backend).
+ * `payment_url` est la page de paiement hebergee a ouvrir quand
+ * `payment_mode === 'hosted_checkout'` : le client la charge, l'utilisateur
+ * paie, puis le mobile poll getPaymentStatus pour detecter la confirmation
+ * (l'activation se fait via webhook / poll backend).
  */
 export interface InitiatePaymentResponse {
   transaction: PaymentTransaction;
   payment_url: string | null;
+  payment_mode: PaymentMode;
 }
 
 /**
@@ -24,6 +37,20 @@ export interface InitiatePaymentPayload {
   subscriptionPlanId: number;
   operatorId?: number;
   phoneNumber?: string;
+}
+
+/**
+ * Faut-il ouvrir la WebView de checkout, ou attendre une confirmation USSD ?
+ *
+ * Le mode fait foi ; l'URL n'est qu'un garde-fou pour un backend plus ancien
+ * qui renverrait encore une chaîne vide. Un `hosted_checkout` sans URL n'ouvre
+ * rien : il vaut mieux tomber sur le message de timeout que sur une WebView
+ * blanche.
+ */
+export function shouldOpenHostedCheckout(
+  response: Pick<InitiatePaymentResponse, 'payment_mode' | 'payment_url'>,
+): boolean {
+  return response.payment_mode === 'hosted_checkout' && !!response.payment_url;
 }
 
 /**
