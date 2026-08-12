@@ -22,8 +22,13 @@ export default function CourseReaderScreen() {
     subject?: string;
   }>();
 
+  // `Number(...)` est indispensable : les params de route arrivent en string,
+  // alors que le snapshot de prefetch écrit la clé avec l'id numérique
+  // (prefetchService). `['courses','lesson','12']` et `['courses','lesson',12]`
+  // sont deux entrées de cache distinctes — le lecteur ne lisait donc jamais le
+  // contenu préchargé et laissait une entrée fantôme dans le cache persisté.
   const { data: lesson, isLoading, error } = useQuery({
-    queryKey: queryKeys.courses.lesson(lessonId),
+    queryKey: queryKeys.courses.lesson(Number(lessonId)),
     queryFn: () => courseService.getLesson(Number(lessonId)),
     enabled: !!lessonId,
   });
