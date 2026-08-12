@@ -2,7 +2,7 @@ import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { LogBox } from 'react-native';
+import { AppState, LogBox, type AppStateStatus } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import NetInfo from '@react-native-community/netinfo';
@@ -53,7 +53,7 @@ import '@/global.css';
 import { ForceUpdateGate } from '@/components/ForceUpdateGate';
 import { PasswordUpgradeGate } from '@/components/PasswordUpgradeGate';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
-import { ADMIN_MANAGED_QUERY_PREFIXES, queryKeys } from '@/lib/queryKeys';
+import { invalidateAdminManagedQueries, queryKeys } from '@/lib/queryKeys';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
 import { QueryProvider, queryClient } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
@@ -116,13 +116,30 @@ export default function RootLayout() {
         // téléchargements étaient rafraîchis : le contenu édité en admin
         // (référentiel, cours, catalogue, quiz) restait sur la copie mise en
         // cache avant la coupure.
-        for (const prefix of ADMIN_MANAGED_QUERY_PREFIXES) {
-          queryClient.invalidateQueries({ queryKey: prefix });
-        }
+        invalidateAdminManagedQueries(queryClient);
       }
       wasOnlineRef.current = online;
     });
     return unsub;
+  }, []);
+
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  // Le contenu édité en back-office n'était invalidé qu'au retour du réseau.
+  // Une app simplement mise en arrière-plan puis rouverte gardait donc sa copie
+  // en cache : une leçon ajoutée depuis Filament n'apparaissait qu'après un
+  // redémarrage complet du binaire (seul le remontage de l'écran relançait la
+  // requête). Le pont `focusManager` de QueryProvider ne suffit pas : il ne
+  // relance que les requêtes stale ayant un observateur actif, ce qui exclut
+  // les accordéons repliés (`enabled: false`).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active' && appStateRef.current !== 'active') {
+        invalidateAdminManagedQueries(queryClient);
+      }
+      appStateRef.current = next;
+    });
+    return () => sub.remove();
   }, []);
 
   // On attend aussi la vérification de compatibilité : sans ça, un binaire

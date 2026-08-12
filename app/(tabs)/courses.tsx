@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator,
   TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, BookOpen, Lock } from 'lucide-react-native';
 
 import { courseService } from '@/services/courseService';
@@ -38,10 +38,33 @@ export default function CoursesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const queryClient = useQueryClient();
+
   const subjectsQuery = useQuery({
     queryKey: queryKeys.courses.subjects(),
     queryFn: courseService.getSubjects,
   });
+
+  // Cet écran ne se monte qu'une fois par processus (le tab navigator le garde
+  // monté), donc `refetchOnMount` ne rejoue jamais : la liste de leçons d'un
+  // chapitre déjà déplié restait figée jusqu'au redémarrage de l'app, même
+  // après l'ajout d'une leçon en back-office. On invalide donc tout le préfixe
+  // `courses` à chaque retour de focus — cela couvre les leçons, fiches et
+  // vidéos portées par les accordéons enfants, hors de portée d'un refetch
+  // depuis ce composant.
+  //
+  // Le tout premier focus est ignoré : les requêtes viennent de partir au
+  // montage, une invalidation immédiate les doublerait.
+  const hasFocusedOnceRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.courses.all() });
+    }, [queryClient]),
+  );
   const apiSubjects = subjectsQuery.data;
   const subjectsLoading = subjectsQuery.isLoading;
 
@@ -171,6 +194,11 @@ export default function CoursesScreen() {
             <RefreshControl
               refreshing={subjectsQuery.isRefetching || chaptersQuery.isRefetching}
               onRefresh={() => {
+                // Les leçons/fiches/vidéos vivent dans les accordéons enfants :
+                // sans cette invalidation, le pull-to-refresh ne rafraîchissait
+                // que les matières et les chapitres, et le geste réflexe de
+                // l'utilisateur était un no-op sur le contenu réellement lu.
+                queryClient.invalidateQueries({ queryKey: queryKeys.courses.all() });
                 subjectsQuery.refetch();
                 if (selectedSubject) chaptersQuery.refetch();
               }}

@@ -1,3 +1,5 @@
+import type { QueryClient } from '@tanstack/react-query';
+
 /**
  * Clés React Query centralisées.
  *
@@ -87,3 +89,18 @@ export const ADMIN_MANAGED_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   queryKeys.quiz.all(),
   ['home'],
 ];
+
+/**
+ * Invalide tout le contenu éditable en back-office.
+ *
+ * À préférer au pont `focusManager` de QueryProvider : ce dernier ne relance
+ * que les requêtes déjà stale ET dotées d'un observateur actif, alors qu'une
+ * invalidation explicite force le refetch quelle que soit la fenêtre de
+ * fraîcheur — y compris pour les accordéons repliés (`enabled: false`), qui
+ * repartiront en réseau à leur prochaine ouverture.
+ */
+export function invalidateAdminManagedQueries(queryClient: QueryClient): void {
+  for (const prefix of ADMIN_MANAGED_QUERY_PREFIXES) {
+    queryClient.invalidateQueries({ queryKey: prefix });
+  }
+}

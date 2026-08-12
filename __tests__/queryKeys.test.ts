@@ -1,4 +1,10 @@
-import { ADMIN_MANAGED_QUERY_PREFIXES, queryKeys } from '../lib/queryKeys';
+import type { QueryClient } from '@tanstack/react-query';
+
+import {
+  ADMIN_MANAGED_QUERY_PREFIXES,
+  invalidateAdminManagedQueries,
+  queryKeys,
+} from '../lib/queryKeys';
 
 describe('queryKeys', () => {
   /**
@@ -76,5 +82,27 @@ describe('queryKeys', () => {
     expect(flattened).not.toContain('profile');
     expect(flattened).not.toContain('subscription');
     expect(flattened).not.toContain('my-downloads');
+  });
+});
+
+describe('invalidateAdminManagedQueries', () => {
+  /**
+   * Déclenchée au retour au premier plan, au retour du réseau et au
+   * pull-to-refresh de l'onglet Cours. Le préfixe `['courses']` est celui qui
+   * fait réapparaître une leçon ajoutée en back-office sans redémarrer l'app :
+   * il couvre aussi les leçons/fiches/vidéos des accordéons repliés, que le
+   * pont `focusManager` ne relance jamais (pas d'observateur actif).
+   */
+  it('invalide chaque préfixe géré par l\'admin', () => {
+    const invalidateQueries = jest.fn();
+    const queryClient = { invalidateQueries } as unknown as QueryClient;
+
+    invalidateAdminManagedQueries(queryClient);
+
+    expect(invalidateQueries).toHaveBeenCalledTimes(ADMIN_MANAGED_QUERY_PREFIXES.length);
+    for (const prefix of ADMIN_MANAGED_QUERY_PREFIXES) {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: prefix });
+    }
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.courses.all() });
   });
 });
