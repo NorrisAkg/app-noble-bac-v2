@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
+import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { ChevronLeft } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 
@@ -11,14 +12,7 @@ import { courseService } from '@/services/courseService';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { queryKeys } from '@/lib/queryKeys';
-
-function buildEmbedUri(provider: string, videoId: string): string {
-  const id = encodeURIComponent(videoId);
-  if (provider === 'vimeo') {
-    return `https://player.vimeo.com/video/${id}?autoplay=1`;
-  }
-  return `https://www.youtube.com/watch?v=${id}`;
-}
+import { buildEmbedUri, isPlayerExitUrl } from '@/utils/videoEmbed';
 
 export default function ChapterVideoScreen() {
   const router = useRouter();
@@ -51,6 +45,19 @@ export default function ChapterVideoScreen() {
   }, [isForbidden, showPremium, router]);
 
   const embedUri = video ? buildEmbedUri(video.video_provider, video.video_id) : null;
+
+  /**
+   * Intercepte chaque navigation dans la WebView pour que seule la vidéo reste
+   * visible : un tap sur le logo, le titre ou « Regarder sur YouTube »
+   * rechargerait le site complet à la place du lecteur. On le délègue au
+   * navigateur système plutôt que de laisser l'utilisateur sortir du lecteur
+   * sans pouvoir y revenir.
+   */
+  const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest): boolean => {
+    if (!isPlayerExitUrl(request.url)) return true;
+    Linking.openURL(request.url).catch(() => {});
+    return false;
+  };
 
   return (
     <View style={styles.container}>
@@ -101,6 +108,14 @@ export default function ChapterVideoScreen() {
               allowsFullscreenVideo
               javaScriptEnabled
               mediaPlaybackRequiresUserAction={false}
+              onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+              // Empêche les liens target="_blank" du lecteur d'ouvrir une
+              // fenêtre : la navigation repasse par le handler ci-dessus.
+              setSupportMultipleWindows={false}
+              onOpenWindow={(e) => {
+                // iOS : window.open() n'est pas couvert par le handler.
+                Linking.openURL(e.nativeEvent.targetUrl).catch(() => {});
+              }}
               onLoadStart={() => setWebviewLoading(true)}
               onLoadEnd={() => setWebviewLoading(false)}
               onError={() => { setWebviewLoading(false); setWebviewError(true); }}
