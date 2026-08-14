@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { googleSignIn } from '@/services/authService';
-import { GoogleSignInCancelled, signInWithGoogle } from '@/services/googleService';
+import { cancelAccountDeletion } from '@/services/accountService';
+import {
+  GoogleSignInCancelled,
+  signInWithGoogle,
+  formatGoogleErrorMessage,
+} from '@/services/googleService';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getApiErrorMessage, getValidationErrors } from '@/utils/apiError';
+import {
+  getApiErrorMessage,
+  getPendingDeletionPurgeAt,
+  getValidationErrors,
+} from '@/utils/apiError';
 
 interface UseGoogleAuthOptions {
   /**
@@ -15,36 +25,75 @@ interface UseGoogleAuthOptions {
   /**
    * Appelé quand le backend exige un pays qu'on ne lui a pas fourni — cas
    * d'un nouvel utilisateur qui tape « Continuer avec Google » depuis l'écran
-   * de connexion. À l'écran de le rediriger vers l'inscription.
+   * de connexion. À l'écran de le rediriger vers l'inscription / choix du pays.
    */
   onCountryRequired?: () => void;
 }
 
 /**
  * Parcours Google complet : fenêtre native → échange de l'id_token contre les
- * tokens applicatifs → hydratation du store.
+ * tokens applicatifs → hydratation du store → onboarding si nouveau compte.
  *
  * Partagé par les écrans de connexion et d'inscription : côté backend c'est le
  * même endpoint, et l'utilisateur n'a pas à savoir s'il possède déjà un compte.
  */
 export function useGoogleAuth({ countryId, onCountryRequired }: UseGoogleAuthOptions = {}) {
+  const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [isPending, setIsPending] = useState(false);
+
+  const promptCancelDeletion = (purgeAt: string, idToken: string) => {
+    const purgeDate = new Date(purgeAt).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    Alert.alert(
+      'Compte en cours de suppression',
+      `Ton compte sera définitivement supprimé le ${purgeDate}. Tu peux encore annuler et le récupérer intact.`,
+      [
+        { text: 'Laisser supprimer', style: 'cancel' },
+        {
+          text: 'Annuler la suppression',
+          onPress: async () => {
+            try {
+              setIsPending(true);
+              const data = await cancelAccountDeletion({ google_id_token: idToken });
+              await setAuth(data.user, data.access_token, data.refresh_token);
+            } catch (err) {
+              Alert.alert('Erreur', getApiErrorMessage(err));
+            } finally {
+              setIsPending(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const start = async () => {
     if (isPending) return;
 
     setIsPending(true);
+    let idToken = '';
     try {
-      const idToken = await signInWithGoogle();
+      idToken = await signInWithGoogle();
 
       const response = await googleSignIn({
         id_token: idToken,
         ...(countryId ? { country_id: countryId } : {}),
       });
 
-      // La navigation est prise en charge par le garde d'auth de _layout.tsx
-      // dès que le store passe à authentifié.
+      const isNewUser = Boolean(response.data.is_new_user);
+
+      if (isNewUser) {
+        // Rediriger vers l'écran congrats AVANT d'hydrater l'auth
+        // pour que le guard de _layout.tsx voie la route congrats et ne
+        // court-circuite pas vers (tabs).
+        router.replace('/(auth)/congrats');
+      }
+
       await setAuth(
         response.data.user,
         response.data.access_token,
@@ -57,12 +106,23 @@ export function useGoogleAuth({ countryId, onCountryRequired }: UseGoogleAuthOpt
         return;
       }
 
+      const purgeAt = getPendingDeletionPurgeAt(error);
+      if (purgeAt && idToken) {
+        promptCancelDeletion(purgeAt, idToken);
+        return;
+      }
+
       if (getValidationErrors(error).country_id && onCountryRequired) {
         onCountryRequired();
         return;
       }
 
-      Alert.alert('Connexion Google échouée', getApiErrorMessage(error));
+      const formatted = formatGoogleErrorMessage(error);
+      const errorMessage = formatted !== 'Erreur inconnue lors de la connexion Google.'
+        ? formatted
+        : getApiErrorMessage(error);
+
+      Alert.alert('Connexion Google échouée', errorMessage);
     } finally {
       setIsPending(false);
     }

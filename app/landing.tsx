@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Alert, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { clearAuthTrace, getAuthTrace } from "@/services/authTrace";
 
 // ─── Landing Screen ──────────────────────────────────────────────────────────
 // Full-bleed video background avec dégradés conformes à la maquette :
@@ -16,6 +18,26 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // ni le player. Un mount/unmount conditionnel crée une race au release du
 // shared object natif. On garde donc VideoView monté en permanence et on
 // contrôle la lecture via player.play()/pause() sur les transitions focus.
+
+/**
+ * Ouvre le journal d'auth (appui long sur « Commencer »).
+ *
+ * Instrumentation temporaire : deux défauts du parcours Google survivent aux
+ * correctifs, et l'appareil de test n'a pas `adb`. Le landing est le seul écran
+ * commun aux deux symptômes — c'est là qu'on retombe à chaque fois — donc le
+ * seul endroit où le journal est toujours atteignable.
+ */
+function showAuthTrace(): void {
+  const events = getAuthTrace();
+  Alert.alert(
+    'Journal de session',
+    events.length > 0 ? events.slice(-14).join('\n\n') : 'Aucun évènement enregistré.',
+    [
+      { text: 'Effacer', style: 'destructive', onPress: () => void clearAuthTrace() },
+      { text: 'Fermer', style: 'cancel' },
+    ],
+  );
+}
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -107,6 +129,8 @@ export default function LandingScreen() {
             style={styles.btnPrimary}
             activeOpacity={0.85}
             onPress={() => router.push("/(auth)/country" as Href)}
+            onLongPress={showAuthTrace}
+            delayLongPress={1200}
           >
             <Text style={styles.btnPrimaryText}>Commencer</Text>
           </TouchableOpacity>

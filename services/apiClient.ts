@@ -6,6 +6,8 @@ import axios, {
 } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
+import { traceAuth } from './authTrace';
+
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
@@ -173,6 +175,7 @@ apiClient.interceptors.response.use(
     const outcome = await refreshInFlight;
 
     if (outcome.status === 'renewed') {
+      traceAuth(`401 sur ${originalRequest.url} — tokens renouvelés, requête rejouée`);
       originalRequest.headers.set('Authorization', `Bearer ${outcome.accessToken}`);
       return apiClient(originalRequest);
     }
@@ -180,6 +183,9 @@ apiClient.interceptors.response.use(
     if (outcome.status === 'unavailable') {
       // Panne passagère : on rend la main à l'appelant (react-query réessaiera,
       // le bandeau hors-ligne s'affiche) en laissant la session intacte.
+      traceAuth(
+        `401 sur ${originalRequest.url} — refresh indisponible (${outcome.httpStatus ?? 'aucune réponse'}), session gardée`,
+      );
       return Promise.reject(error);
     }
 
@@ -187,8 +193,8 @@ apiClient.interceptors.response.use(
     // autorise à effacer les tokens. La trace nomme la requête déclenchante —
     // sans elle, une déconnexion en production est indiscernable d'un
     // redémarrage à froid. Aucun token ni corps de réponse n'est journalisé.
-    console.warn(
-      `[auth] session effacée après un 401 sur ${originalRequest.url} — ` +
+    traceAuth(
+      `SESSION EFFACÉE : 401 sur ${originalRequest.url} — ` +
         `/auth/refresh a répondu ${outcome.httpStatus ?? 'aucune réponse'}`,
     );
 

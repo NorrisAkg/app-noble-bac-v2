@@ -327,11 +327,16 @@ export interface TokenData {
   refresh_token: string;
   expires_at: string;
   /**
-   * Compte historique dont le mot de passe fait moins de 8 caractères.
+   * Compte historique dont le mot de passe fait moins de8 caractères.
    * Renseigné par /auth/login uniquement — c'est le seul endpoint où le
    * backend voit le mot de passe en clair. Vaut false partout ailleurs.
    */
   password_upgrade_required: boolean;
+  /**
+   * Vrai si le compte vient d'être créé (ex: nouvelle inscription Google),
+   * permettant de guider l'utilisateur vers le choix de sa série.
+   */
+  is_new_user?: boolean;
 }
 export type LoginResponse = ApiResponse<TokenData>;
 

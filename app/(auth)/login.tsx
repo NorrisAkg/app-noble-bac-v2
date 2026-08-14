@@ -41,10 +41,10 @@ export default function LoginScreen() {
     onCountryRequired: () => {
       Alert.alert(
         'Compte introuvable',
-        'Aucun compte n\'est associé à ce compte Google. Crée ton compte pour choisir ton pays.',
+        'Aucun compte n\'est associé à ce compte Google. Choisis ton pays pour finaliser ton inscription.',
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: 'Créer un compte', onPress: () => router.push('/(auth)/signup') },
+          { text: 'Choisir mon pays', onPress: () => router.push('/(auth)/country') },
         ],
       );
     },

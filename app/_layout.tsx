@@ -57,6 +57,7 @@ import { invalidateAdminManagedQueries, queryKeys } from '@/lib/queryKeys';
 import { PremiumGateProvider } from '@/providers/PremiumGateProvider';
 import { QueryProvider, queryClient } from '@/providers/QueryProvider';
 import { registerAuthCleanup } from '@/services/apiClient';
+import { loadAuthTrace, traceAuth } from '@/services/authTrace';
 import { prefetchAllData } from '@/services/prefetchService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -91,6 +92,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     registerAuthCleanup(() => useAuthStore.getState().clearLocal());
+    // Recharge le journal d'auth persisté : les évènements d'une session
+    // précédente doivent survivre au redémarrage de l'app, c'est souvent après
+    // coup qu'on vient les lire.
+    loadAuthTrace().then(() => traceAuth('démarrage de l\'app'));
     initialize();
   }, [initialize]);
 
@@ -184,12 +189,10 @@ export default function RootLayout() {
       // Logout ou clearLocal (refresh token invalide) en cours de session.
       //
       // La trace distingue ce retour au landing d'un démarrage à froid, qui
-      // passe lui par index.tsx et n'imprime rien. Couplée à celle du
+      // passe lui par index.tsx et n'enregistre rien. Couplée à celle du
       // gestionnaire de 401 d'apiClient, elle dit si la session a été effacée
-      // par le serveur — et sur quelle requête — ou perdue autrement. Visible
-      // sur un APK installé via `adb logcat -s ReactNativeJS` ; volontairement
-      // pas sous `__DEV__`, un build preview n'étant pas un build dev.
-      console.warn('[auth] retour au landing depuis les onglets : session non authentifiée');
+      // par le serveur — et sur quelle requête — ou perdue autrement.
+      traceAuth('retour au landing depuis les onglets : session non authentifiée');
       router.replace('/landing');
     } else if (isAuthenticated && (inAuthGroup || isLanding)) {
       // L'écran congrats est volontairement post-auth (affiché après le succès

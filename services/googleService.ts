@@ -4,6 +4,8 @@ import {
   isErrorWithCode,
 } from '@react-native-google-signin/google-signin';
 
+import { traceAuth } from './authTrace';
+
 /**
  * Levée quand l'utilisateur ferme lui-même la fenêtre Google. L'appelant doit
  * la traiter en silence : afficher une alerte « connexion échouée » alors que
@@ -27,7 +29,7 @@ let isConfigured = false;
  * SDK Android émet un id_token dont l'audience est le client web, et c'est
  * cette audience que le backend vérifie.
  */
-function configure(): void {
+export function configure(): void {
   if (isConfigured) return;
 
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -48,6 +50,37 @@ function configure(): void {
 }
 
 /**
+ * Formate un message d'erreur explicite pour les échecs natifs de Google Sign-In.
+ */
+export function formatGoogleErrorMessage(error: unknown): string {
+  if (error instanceof GoogleSignInCancelled) {
+    return 'Connexion Google annulée.';
+  }
+
+  if (isErrorWithCode(error)) {
+    const code = String(error.code);
+    if (code === '10' || code === 'DEVELOPER_ERROR') {
+      return 'Configuration Google incomplète (code 10). Vérifie l\'enregistrement de l\'empreinte SHA-1 de l\'application et du Web Client ID dans Google Cloud / Firebase.';
+    }
+    if (code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE || code === '2' || code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+      return 'Les services Google Play ne sont pas disponibles ou nécessitent une mise à jour sur cet appareil.';
+    }
+    if (code === statusCodes.SIGN_IN_CANCELLED || code === '12501' || code === 'SIGN_IN_CANCELLED') {
+      return 'Connexion Google annulée.';
+    }
+    if (code === statusCodes.SIGN_IN_REQUIRED || code === '4' || code === 'SIGN_IN_REQUIRED') {
+      return 'Connexion Google requise.';
+    }
+    if (code === '7' || code.toUpperCase().includes('NETWORK')) {
+      return 'Impossible de joindre les serveurs Google. Vérifie ta connexion Internet.';
+    }
+    return `Erreur Google Sign-In (${code}) : ${error.message}`;
+  }
+
+  return error instanceof Error ? error.message : 'Erreur inconnue lors de la connexion Google.';
+}
+
+/**
  * Ouvre la fenêtre Google et renvoie l'id_token à transmettre au backend.
  *
  * On ne renvoie ni l'email ni le nom lus côté client : ils sont extraits par
@@ -63,6 +96,23 @@ export async function signInWithGoogle(): Promise<string> {
   // Obligatoire sur Android : sans ce contrôle, l'appel échoue avec une
   // erreur native peu lisible sur un appareil sans Play Services à jour.
   await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+  // Un compte encore en cache à cet instant produit la reconnexion silencieuse.
+  // On s'assure d'invalider la session précédente pour forcer le sélecteur de compte.
+  const cachedAccount = GoogleSignin.getCurrentUser() !== null;
+  traceAuth(`google.signIn : compte en cache avant ouverture = ${cachedAccount ? 'oui' : 'non'}`);
+
+  if (cachedAccount) {
+    await forgetGoogleAccount();
+  } else {
+    // Sécurité supplémentaire : même si getCurrentUser() est null en mémoire JS,
+    // on purge la session native pour forcer l'Account Picker.
+    try {
+      await GoogleSignin.signOut();
+    } catch {
+      // Ignoré si aucun compte connecté
+    }
+  }
 
   try {
     const response = await GoogleSignin.signIn();
@@ -85,10 +135,11 @@ export async function signInWithGoogle(): Promise<string> {
 
     // Les versions récentes du SDK renvoient `type: 'cancelled'`, mais un
     // appareil peut encore remonter l'ancien code d'erreur.
-    if (isErrorWithCode(error) && error.code === statusCodes.SIGN_IN_CANCELLED) {
+    if (isErrorWithCode(error) && (error.code === statusCodes.SIGN_IN_CANCELLED || String(error.code) === '12501')) {
       throw new GoogleSignInCancelled();
     }
 
+    traceAuth(`google.signIn : échec — ${formatGoogleErrorMessage(error)}`);
     throw error;
   }
 }
@@ -108,7 +159,7 @@ export async function forgetGoogleAccount(): Promise<void> {
   // Le client natif doit être configuré pour que revokeAccess() ait une cible :
   // une session restaurée au démarrage n'est jamais passée par
   // signInWithGoogle(), donc jamais par configure().
-  await bounded(async () => {
+  await bounded('revokeAccess', async () => {
     configure();
     await GoogleSignin.revokeAccess();
   });
@@ -117,7 +168,7 @@ export async function forgetGoogleAccount(): Promise<void> {
   // revokeAccess() échoue dès qu'aucun compte n'est connecté côté SDK — le cas
   // de tout utilisateur inscrit par téléphone — et cet échec ne doit pas
   // empêcher le nettoyage du cache local.
-  await bounded(() => GoogleSignin.signOut());
+  await bounded('signOut', () => GoogleSignin.signOut());
 }
 
 /** Délai au-delà duquel on cesse d'attendre le SDK Google. */
@@ -133,16 +184,32 @@ const FORGET_TIMEOUT_MS = 4_000;
  * aucune requête n'aboutit. Oublier le compte Google est souhaitable, pas
  * indispensable ; l'effacement de la session, lui, ne peut pas attendre.
  */
-function bounded(run: () => Promise<unknown>): Promise<void> {
+function bounded(label: string, run: () => Promise<unknown>): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, FORGET_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      traceAuth(`google.${label} : pas de réponse après ${FORGET_TIMEOUT_MS} ms`);
+      resolve();
+    }, FORGET_TIMEOUT_MS);
+
     run()
-      .catch(() => {
+      .then(() => traceAuth(`google.${label} : ok`))
+      .catch((error: unknown) => {
         // Best-effort : compte non Google, SDK non configuré, réseau coupé.
+        // La raison est tracée — c'est elle qui dira pourquoi le sélecteur de
+        // compte ne revient pas si le symptôme survit.
+        traceAuth(`google.${label} : échec — ${describeError(error)}`);
       })
       .finally(() => {
         clearTimeout(timer);
         resolve();
       });
   });
+}
+
+/** Message + code natif (`SIGN_IN_REQUIRED`, `NETWORK_ERROR`…), sans donnée personnelle. */
+function describeError(error: unknown): string {
+  if (isErrorWithCode(error)) {
+    return `${error.code} ${error.message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { User } from '@/types/api';
 import { logout as apiLogout } from '@/services/authService';
+import { traceAuth } from '@/services/authTrace';
 import { forgetGoogleAccount } from '@/services/googleService';
 import { unregisterCurrentPushToken } from '@/services/pushNotificationService';
 
@@ -59,6 +60,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       passwordUpgradeRequired ? '1' : '0',
     );
     set({ user, accessToken, refreshToken, isAuthenticated: true, passwordUpgradeRequired });
+    traceAuth('setAuth : session ouverte');
   },
 
   clearPasswordUpgrade: async () => {
@@ -83,6 +85,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   clearLocal: async () => {
+    traceAuth('clearLocal : fin de session');
+
     // Toutes les fins de session passent par ici : déconnexion volontaire,
     // session invalidée par le serveur (apiClient), suppression de compte. Le
     // compte Google doit être oublié dans les trois cas, sans quoi le prochain
