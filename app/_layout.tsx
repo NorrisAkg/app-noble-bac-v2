@@ -182,6 +182,14 @@ export default function RootLayout() {
 
     if (!isAuthenticated && inTabsGroup) {
       // Logout ou clearLocal (refresh token invalide) en cours de session.
+      //
+      // La trace distingue ce retour au landing d'un démarrage à froid, qui
+      // passe lui par index.tsx et n'imprime rien. Couplée à celle du
+      // gestionnaire de 401 d'apiClient, elle dit si la session a été effacée
+      // par le serveur — et sur quelle requête — ou perdue autrement. Visible
+      // sur un APK installé via `adb logcat -s ReactNativeJS` ; volontairement
+      // pas sous `__DEV__`, un build preview n'étant pas un build dev.
+      console.warn('[auth] retour au landing depuis les onglets : session non authentifiée');
       router.replace('/landing');
     } else if (isAuthenticated && (inAuthGroup || isLanding)) {
       // L'écran congrats est volontairement post-auth (affiché après le succès
