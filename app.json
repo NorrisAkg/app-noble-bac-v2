@@ -30,6 +30,10 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#3DBE45"
+    },
     "plugins": [
       "expo-router",
       [
