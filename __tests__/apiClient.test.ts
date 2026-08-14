@@ -1,28 +1,61 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-import apiClient, { performRefresh, registerAuthCleanup } from '../services/apiClient';
+import apiClient, {
+  performRefresh,
+  registerAuthCleanup,
+  resetRefreshStateForTests,
+} from '../services/apiClient';
 
 const mockedSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
+
+/**
+ * Stockage simulé, plutôt qu'une file de `mockResolvedValueOnce`.
+ *
+ * Les tests de concurrence lancent plusieurs requêtes en parallèle : l'ordre
+ * dans lequel elles lisent SecureStore n'est pas déterministe, et une file
+ * ordonnée rendrait le test faussement rouge.
+ */
+function mockSecureStore(initial: Record<string, string>): Record<string, string> {
+  const store: Record<string, string> = { ...initial };
+
+  mockedSecureStore.getItemAsync.mockImplementation(async (key: string) => store[key] ?? null);
+  mockedSecureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+    store[key] = value;
+  });
+  mockedSecureStore.deleteItemAsync.mockImplementation(async (key: string) => {
+    delete store[key];
+  });
+
+  return store;
+}
+
+/** Erreur au format axios, telle que la produit un adaptateur qui répond 401. */
+function unauthorized(config: any) {
+  const err: any = new Error('Unauthorized');
+  err.response = { status: 401, data: {}, headers: {}, config, statusText: 'Unauthorized' };
+  err.config = config;
+  err.isAxiosError = true;
+  return err;
+}
 
 describe('apiClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    resetRefreshStateForTests();
   });
 
   describe('performRefresh', () => {
-    it('returns null when no refresh_token is stored', async () => {
+    it('reports an invalid session when no refresh_token is stored', async () => {
       mockedSecureStore.getItemAsync.mockResolvedValueOnce(null);
 
-      const result = await performRefresh();
-
-      expect(result).toBeNull();
+      await expect(performRefresh()).resolves.toEqual({ status: 'invalid' });
       expect(mockedSecureStore.setItemAsync).not.toHaveBeenCalled();
     });
 
     it('returns the new access_token and rotates both tokens on success', async () => {
-      mockedSecureStore.getItemAsync.mockResolvedValueOnce('refresh-old');
+      mockSecureStore({ refresh_token: 'refresh-old' });
       const postSpy = jest.spyOn(axios, 'post').mockResolvedValueOnce({
         data: {
           success: true,
@@ -36,9 +69,10 @@ describe('apiClient', () => {
         },
       } as any);
 
-      const result = await performRefresh();
-
-      expect(result).toBe('access-new');
+      await expect(performRefresh()).resolves.toEqual({
+        status: 'renewed',
+        accessToken: 'access-new',
+      });
       expect(postSpy).toHaveBeenCalledWith(
         expect.stringContaining('/auth/refresh'),
         { refresh_token: 'refresh-old' },
@@ -48,23 +82,52 @@ describe('apiClient', () => {
       expect(mockedSecureStore.setItemAsync).toHaveBeenCalledWith('refresh_token', 'refresh-new');
     });
 
-    it('returns null when /auth/refresh throws', async () => {
-      mockedSecureStore.getItemAsync.mockResolvedValueOnce('refresh-old');
-      jest.spyOn(axios, 'post').mockRejectedValueOnce(new Error('boom'));
+    it('treats a network failure as transient, not as an expired session', async () => {
+      mockSecureStore({ refresh_token: 'refresh-old' });
+      jest.spyOn(axios, 'post').mockRejectedValueOnce(new Error('Network Error'));
 
-      const result = await performRefresh();
-
-      expect(result).toBeNull();
+      await expect(performRefresh()).resolves.toEqual({
+        status: 'unavailable',
+        httpStatus: undefined,
+      });
       expect(mockedSecureStore.setItemAsync).not.toHaveBeenCalled();
     });
 
-    it('returns null when the response payload is malformed', async () => {
-      mockedSecureStore.getItemAsync.mockResolvedValueOnce('refresh-old');
-      jest.spyOn(axios, 'post').mockResolvedValueOnce({ data: { data: {} } } as any);
+    it('treats a 5xx as transient', async () => {
+      mockSecureStore({ refresh_token: 'refresh-old' });
+      jest.spyOn(axios, 'post').mockRejectedValueOnce(
+        Object.assign(new Error('Server Error'), {
+          response: { status: 500 },
+          isAxiosError: true,
+        }),
+      );
 
-      const result = await performRefresh();
+      await expect(performRefresh()).resolves.toEqual({
+        status: 'unavailable',
+        httpStatus: 500,
+      });
+    });
 
-      expect(result).toBeNull();
+    it('treats a malformed payload as transient', async () => {
+      mockSecureStore({ refresh_token: 'refresh-old' });
+      jest.spyOn(axios, 'post').mockResolvedValueOnce({ status: 200, data: { data: {} } } as any);
+
+      await expect(performRefresh()).resolves.toEqual({
+        status: 'unavailable',
+        httpStatus: 200,
+      });
+    });
+
+    it('reports an invalid session when the server rejects the refresh token', async () => {
+      mockSecureStore({ refresh_token: 'refresh-old' });
+      jest.spyOn(axios, 'post').mockRejectedValueOnce(
+        Object.assign(new Error('Unauthorized'), {
+          response: { status: 401 },
+          isAxiosError: true,
+        }),
+      );
+
+      await expect(performRefresh()).resolves.toEqual({ status: 'invalid', httpStatus: 401 });
     });
   });
 
@@ -77,33 +140,21 @@ describe('apiClient', () => {
 
     afterEach(() => {
       apiClient.defaults.adapter = originalAdapter;
+      registerAuthCleanup(() => undefined);
     });
 
     it('on 401, refreshes once and retries the original request with the new token', async () => {
-      // Tokens in store
-      mockedSecureStore.getItemAsync
-        .mockResolvedValueOnce('access-old') // request interceptor: 1st call
-        .mockResolvedValueOnce('refresh-old') // performRefresh reads refresh
-        .mockResolvedValueOnce('access-new'); // request interceptor: retry
+      mockSecureStore({ access_token: 'access-old', refresh_token: 'refresh-old' });
       jest.spyOn(axios, 'post').mockResolvedValueOnce({
-        data: {
-          data: {
-            access_token: 'access-new',
-            refresh_token: 'refresh-new',
-          },
-        },
+        status: 200,
+        data: { data: { access_token: 'access-new', refresh_token: 'refresh-new' } },
       } as any);
 
       let callCount = 0;
       apiClient.defaults.adapter = jest.fn(async (config: any) => {
         callCount += 1;
         if (callCount === 1) {
-          // First call: 401
-          const err: any = new Error('Unauthorized');
-          err.response = { status: 401, data: {}, headers: {}, config, statusText: 'Unauthorized' };
-          err.config = config;
-          err.isAxiosError = true;
-          throw err;
+          throw unauthorized(config);
         }
         // Retry: succeeds, echoes the Authorization header
         return {
@@ -122,20 +173,13 @@ describe('apiClient', () => {
       expect(callCount).toBe(2);
     });
 
-    it('on 401 with failed refresh, clears storage and notifies the cleanup hook', async () => {
-      mockedSecureStore.getItemAsync
-        .mockResolvedValueOnce('access-old') // request interceptor
-        .mockResolvedValueOnce(null); // performRefresh finds no refresh_token
-
+    it('on 401 with a rejected refresh token, clears storage and notifies the cleanup hook', async () => {
+      mockSecureStore({ access_token: 'access-old' }); // pas de refresh_token
       const cleanup = jest.fn();
       registerAuthCleanup(cleanup);
 
       apiClient.defaults.adapter = jest.fn(async (config: any) => {
-        const err: any = new Error('Unauthorized');
-        err.response = { status: 401, data: {}, headers: {}, config, statusText: 'Unauthorized' };
-        err.config = config;
-        err.isAxiosError = true;
-        throw err;
+        throw unauthorized(config);
       }) as any;
 
       await expect(apiClient.get('/protected/resource')).rejects.toBeDefined();
@@ -143,25 +187,106 @@ describe('apiClient', () => {
       expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('access_token');
       expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('refresh_token');
       expect(cleanup).toHaveBeenCalledTimes(1);
-
-      // Reset the hook so it doesn't leak into other suites.
-      registerAuthCleanup(() => undefined);
     });
 
-    it('does not loop forever when the refresh call itself returns 401', async () => {
-      mockedSecureStore.getItemAsync.mockResolvedValueOnce('refresh-old');
-      // Simulate axios.post (the bare refresh call) rejecting with 401
-      jest.spyOn(axios, 'post').mockRejectedValueOnce(
-        Object.assign(new Error('Unauthorized'), {
-          response: { status: 401 },
-          isAxiosError: true,
-        }),
-      );
+    /**
+     * Le cas qui renvoyait l'utilisateur sur le landing au moindre trou de
+     * réseau : le rafraîchissement échoue sans que le serveur ait rien dit de
+     * la session, elle doit donc rester intacte.
+     */
+    it('leaves the session intact when the refresh call fails on the network', async () => {
+      mockSecureStore({ access_token: 'access-old', refresh_token: 'refresh-old' });
+      jest.spyOn(axios, 'post').mockRejectedValueOnce(new Error('Network Error'));
 
-      const result = await performRefresh();
+      const cleanup = jest.fn();
+      registerAuthCleanup(cleanup);
 
-      // It returns null instead of retrying.
-      expect(result).toBeNull();
+      apiClient.defaults.adapter = jest.fn(async (config: any) => {
+        throw unauthorized(config);
+      }) as any;
+
+      await expect(apiClient.get('/protected/resource')).rejects.toBeDefined();
+
+      expect(cleanup).not.toHaveBeenCalled();
+      expect(mockedSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('refreshes only once when several requests get a 401 at the same time', async () => {
+      mockSecureStore({ access_token: 'access-old', refresh_token: 'refresh-old' });
+      const postSpy = jest.spyOn(axios, 'post').mockResolvedValue({
+        status: 200,
+        data: { data: { access_token: 'access-new', refresh_token: 'refresh-new' } },
+      } as any);
+
+      const seen = new Set<string>();
+      apiClient.defaults.adapter = jest.fn(async (config: any) => {
+        // Chaque URL échoue une fois, puis réussit — c'est la rafale de
+        // requêtes que l'entrée dans les onglets déclenche.
+        if (!seen.has(config.url)) {
+          seen.add(config.url);
+          throw unauthorized(config);
+        }
+        return {
+          data: { sentAuth: config.headers.get('Authorization') },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      }) as any;
+
+      const responses = await Promise.all([
+        apiClient.get('/a'),
+        apiClient.get('/b'),
+        apiClient.get('/c'),
+      ]);
+
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      for (const response of responses) {
+        expect(response.data.sentAuth).toBe('Bearer access-new');
+      }
+    });
+
+    /**
+     * La seconde rotation était la déconnexion : le refresh token est à usage
+     * unique, rejouer le jti déjà consommé se solde par un 401 sur
+     * /auth/refresh, donc par un effacement de session.
+     */
+    it('replays a late 401 with the current token instead of rotating twice', async () => {
+      mockSecureStore({ access_token: 'access-old', refresh_token: 'refresh-old' });
+      const postSpy = jest.spyOn(axios, 'post').mockResolvedValueOnce({
+        status: 200,
+        data: { data: { access_token: 'access-new', refresh_token: 'refresh-new' } },
+      } as any);
+
+      const cleanup = jest.fn();
+      registerAuthCleanup(cleanup);
+
+      const seen = new Set<string>();
+      apiClient.defaults.adapter = jest.fn(async (config: any) => {
+        if (!seen.has(config.url)) {
+          seen.add(config.url);
+          throw unauthorized(config);
+        }
+        return {
+          data: { sentAuth: config.headers.get('Authorization') },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      }) as any;
+
+      // Première requête : rotation complète.
+      await apiClient.get('/first');
+      expect(postSpy).toHaveBeenCalledTimes(1);
+
+      // Requête partie avant la rotation, qui revient en 401 juste après.
+      const late = await apiClient.get('/late');
+
+      expect(postSpy).toHaveBeenCalledTimes(1); // aucune seconde rotation
+      expect(late.data.sentAuth).toBe('Bearer access-new');
+      expect(cleanup).not.toHaveBeenCalled();
     });
   });
 });
