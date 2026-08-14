@@ -94,14 +94,55 @@ export async function signInWithGoogle(): Promise<string> {
 }
 
 /**
- * Déconnecte le compte Google local. Sans ça, le SDK resélectionne
- * silencieusement le dernier compte utilisé : un utilisateur qui se déconnecte
- * pour changer de compte serait reconnecté sur le même.
+ * Fait oublier le compte Google à l'appareil, pour que la prochaine connexion
+ * repasse par le sélecteur de compte.
+ *
+ * `signOut()` seul ne suffit pas : il vide le cache local du SDK, mais
+ * l'autorisation accordée par l'utilisateur à l'application reste enregistrée
+ * chez Google. L'API Android historique utilisée par ce SDK ré-honore alors
+ * cette autorisation au `signIn()` suivant, sans afficher la moindre fenêtre —
+ * l'utilisateur qui se déconnecte pour changer de compte est reconnecté sur le
+ * même, en silence. `revokeAccess()` révoque l'autorisation elle-même.
  */
-export async function signOutFromGoogle(): Promise<void> {
-  try {
-    await GoogleSignin.signOut();
-  } catch {
-    // Best-effort : l'échec ne doit pas bloquer la déconnexion applicative.
-  }
+export async function forgetGoogleAccount(): Promise<void> {
+  // Le client natif doit être configuré pour que revokeAccess() ait une cible :
+  // une session restaurée au démarrage n'est jamais passée par
+  // signInWithGoogle(), donc jamais par configure().
+  await bounded(async () => {
+    configure();
+    await GoogleSignin.revokeAccess();
+  });
+
+  // Deuxième appel borné séparément, et non une suite du premier :
+  // revokeAccess() échoue dès qu'aucun compte n'est connecté côté SDK — le cas
+  // de tout utilisateur inscrit par téléphone — et cet échec ne doit pas
+  // empêcher le nettoyage du cache local.
+  await bounded(() => GoogleSignin.signOut());
+}
+
+/** Délai au-delà duquel on cesse d'attendre le SDK Google. */
+const FORGET_TIMEOUT_MS = 4_000;
+
+/**
+ * Exécute un appel au SDK sans jamais rejeter ni dépasser FORGET_TIMEOUT_MS.
+ *
+ * `forgetGoogleAccount` est appelée depuis `clearLocal`, qui est le passage
+ * obligé de toutes les fins de session — y compris celle, automatique, que
+ * déclenche un 401. Un aller-retour réseau qui traîne y bloquerait l'effacement
+ * de la session : l'utilisateur resterait sur un écran authentifié dont plus
+ * aucune requête n'aboutit. Oublier le compte Google est souhaitable, pas
+ * indispensable ; l'effacement de la session, lui, ne peut pas attendre.
+ */
+function bounded(run: () => Promise<unknown>): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, FORGET_TIMEOUT_MS);
+    run()
+      .catch(() => {
+        // Best-effort : compte non Google, SDK non configuré, réseau coupé.
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+  });
 }

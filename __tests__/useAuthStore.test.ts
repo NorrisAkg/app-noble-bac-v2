@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../store/useAuthStore';
 import { logout as apiLogout } from '../services/authService';
+import { forgetGoogleAccount } from '../services/googleService';
 import type { User } from '../types/api';
 
 jest.mock('../services/authService', () => ({
@@ -10,11 +11,14 @@ jest.mock('../services/authService', () => ({
 // Le module natif Google n'existe pas sous Jest : sans ce mock, l'import de
 // googleService par le store fait echouer la suite entiere au chargement.
 jest.mock('../services/googleService', () => ({
-  signOutFromGoogle: jest.fn().mockResolvedValue(undefined),
+  forgetGoogleAccount: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockedSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockedApiLogout = apiLogout as jest.MockedFunction<typeof apiLogout>;
+const mockedForgetGoogleAccount = forgetGoogleAccount as jest.MockedFunction<
+  typeof forgetGoogleAccount
+>;
 
 const userFixture: User = {
   id: 'u-1',
@@ -77,6 +81,20 @@ describe('useAuthStore', () => {
     expect(state.user).toBeNull();
     expect(state.accessToken).toBeNull();
     expect(state.refreshToken).toBeNull();
+  });
+
+  /**
+   * clearLocal est le passage oblige de toutes les fins de session : logout,
+   * session invalidee par le serveur, suppression de compte. C'est donc lui, et
+   * pas logout, qui doit faire oublier le compte Google — sinon le prochain
+   * « Continuer avec Google » reconnecte le meme compte sans rien afficher.
+   */
+  it('clearLocal fait oublier le compte Google', async () => {
+    useAuthStore.setState({ user: userFixture, isAuthenticated: true });
+
+    await useAuthStore.getState().clearLocal();
+
+    expect(mockedForgetGoogleAccount).toHaveBeenCalledTimes(1);
   });
 
   it('logout appelle le serveur puis clearLocal', async () => {

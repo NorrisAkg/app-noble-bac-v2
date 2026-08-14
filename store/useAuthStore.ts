@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { User } from '@/types/api';
 import { logout as apiLogout } from '@/services/authService';
-import { signOutFromGoogle } from '@/services/googleService';
+import { forgetGoogleAccount } from '@/services/googleService';
 import { unregisterCurrentPushToken } from '@/services/pushNotificationService';
 
 const STORAGE_KEYS = {
@@ -79,14 +79,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // silent
     }
-    // Sans ça, le SDK Google resélectionne silencieusement le dernier compte :
-    // un utilisateur qui se déconnecte pour en changer serait reconnecté sur
-    // le même, sans jamais voir le sélecteur de compte.
-    await signOutFromGoogle();
     await get().clearLocal();
   },
 
   clearLocal: async () => {
+    // Toutes les fins de session passent par ici : déconnexion volontaire,
+    // session invalidée par le serveur (apiClient), suppression de compte. Le
+    // compte Google doit être oublié dans les trois cas, sans quoi le prochain
+    // « Continuer avec Google » reconnecte le même compte en silence, sans même
+    // afficher le sélecteur. Best-effort en interne : le state local ne dépend
+    // pas de l'aboutissement de cet aller-retour.
+    await forgetGoogleAccount();
+
     await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
