@@ -32,7 +32,8 @@ let isConfigured = false;
 export function configure(): void {
   if (isConfigured) return;
 
-  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const rawWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const webClientId = rawWebClientId ? rawWebClientId.split('#')[0].trim() : undefined;
 
   if (!webClientId) {
     throw new Error(
