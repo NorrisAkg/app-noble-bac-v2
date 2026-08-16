@@ -33,9 +33,22 @@ export function registerAuthCleanup(fn: () => Promise<void> | void): void {
   onAuthFailure = fn;
 }
 
+let cachedAccessToken: string | null = null;
+let cachedRefreshToken: string | null = null;
+
+export function setApiTokens(tokens: {
+  accessToken: string | null;
+  refreshToken?: string | null;
+}): void {
+  cachedAccessToken = tokens.accessToken;
+  if (tokens.refreshToken !== undefined) {
+    cachedRefreshToken = tokens.refreshToken;
+  }
+}
+
 // ─── Request interceptor ──────────────────────────────────────────────────────
 apiClient.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  const token = cachedAccessToken ?? (await SecureStore.getItemAsync(ACCESS_TOKEN_KEY));
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
@@ -95,10 +108,12 @@ export type RefreshOutcome =
 export function resetRefreshStateForTests(): void {
   refreshInFlight = null;
   lastRefreshAt = 0;
+  cachedAccessToken = null;
+  cachedRefreshToken = null;
 }
 
 export async function performRefresh(): Promise<RefreshOutcome> {
-  const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  const refreshToken = cachedRefreshToken ?? (await SecureStore.getItemAsync(REFRESH_TOKEN_KEY));
   // Rien à présenter : la session est bel et bien inexploitable.
   if (!refreshToken) return { status: 'invalid' };
 
@@ -115,6 +130,8 @@ export async function performRefresh(): Promise<RefreshOutcome> {
       // session est expirée. On ne déconnecte pas là-dessus.
       return { status: 'unavailable', httpStatus: response.status };
     }
+    cachedAccessToken = tokens.access_token as string;
+    cachedRefreshToken = tokens.refresh_token as string;
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
     lastRefreshAt = Date.now();

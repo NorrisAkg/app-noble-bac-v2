@@ -270,11 +270,10 @@ export default function SignupScreen() {
           className="flex-row items-start gap-2.5 mt-2 mb-6"
         >
           <View
-            className={`w-[22px] h-[22px] rounded-md border-[1.5px] items-center justify-center ${
-              agree
+            className={`w-[22px] h-[22px] rounded-md border-[1.5px] items-center justify-center ${agree
                 ? "bg-brand-green border-brand-green"
                 : "bg-white border-line"
-            }`}
+              }`}
           >
             {agree && <Check size={14} color="white" strokeWidth={3} />}
           </View>

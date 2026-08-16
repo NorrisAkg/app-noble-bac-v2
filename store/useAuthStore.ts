@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { User } from '@/types/api';
+import { setApiTokens } from '@/services/apiClient';
 import { logout as apiLogout } from '@/services/authService';
 import { traceAuth } from '@/services/authTrace';
 import { forgetGoogleAccount } from '@/services/googleService';
@@ -21,6 +22,11 @@ interface AuthState {
   /** True once initialize() has finished reading SecureStore on app boot */
   isHydrated: boolean;
   /**
+   * Vrai si l'utilisateur vient de créer son compte et est en cours d'onboarding
+   * (congrats -> setup). Protège la navigation contre le guard de _layout.tsx.
+   */
+  isNewUser: boolean;
+  /**
    * Compte historique dont le mot de passe est encore un PIN à 4 chiffres.
    * Persisté : sans ça, tuer l'app suffirait à contourner la migration
    * jusqu'à la prochaine connexion.
@@ -32,6 +38,7 @@ interface AuthState {
     accessToken: string,
     refreshToken: string,
     passwordUpgradeRequired?: boolean,
+    isNewUser?: boolean,
   ) => Promise<void>;
   /** Appelé après une migration réussie du mot de passe. */
   clearPasswordUpgrade: () => Promise<void>;
@@ -49,9 +56,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: null,
   isAuthenticated: false,
   isHydrated: false,
+  isNewUser: false,
   passwordUpgradeRequired: false,
 
-  setAuth: async (user, accessToken, refreshToken, passwordUpgradeRequired = false) => {
+  setAuth: async (
+    user,
+    accessToken,
+    refreshToken,
+    passwordUpgradeRequired = false,
+    isNewUser = false,
+  ) => {
+    setApiTokens({ accessToken, refreshToken });
     await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
     await SecureStore.setItemAsync(STORAGE_KEYS.USER, JSON.stringify(user));
@@ -59,7 +74,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       STORAGE_KEYS.PASSWORD_UPGRADE,
       passwordUpgradeRequired ? '1' : '0',
     );
-    set({ user, accessToken, refreshToken, isAuthenticated: true, passwordUpgradeRequired });
+    set({
+      user,
+      accessToken,
+      refreshToken,
+      isAuthenticated: true,
+      passwordUpgradeRequired,
+      isNewUser,
+    });
     traceAuth('setAuth : session ouverte');
   },
 
@@ -95,6 +117,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // pas de l'aboutissement de cet aller-retour.
     await forgetGoogleAccount();
 
+    setApiTokens({ accessToken: null, refreshToken: null });
     await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
     await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
@@ -104,6 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      isNewUser: false,
       passwordUpgradeRequired: false,
     });
   },
@@ -112,7 +136,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Build the final state in memory and commit it in a single set() so the
     // routing layer never observes an intermediate {isAuthenticated:true,
     // isHydrated:false} frame (which would race index.tsx vs the layout guard).
-    let next: Partial<AuthState> = { isHydrated: true };
+    let next: Partial<AuthState> = { isHydrated: true, isNewUser: false };
     try {
       const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
       const refreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
@@ -122,22 +146,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
           const user: User = JSON.parse(rawUser);
           const upgrade = await SecureStore.getItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE);
+          setApiTokens({ accessToken, refreshToken });
           next = {
             user,
             accessToken,
             refreshToken,
             isAuthenticated: true,
             isHydrated: true,
+            isNewUser: false,
             passwordUpgradeRequired: upgrade === '1',
           };
         } catch {
           // Corrupted storage — clear it
+          setApiTokens({ accessToken: null, refreshToken: null });
           await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
           await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
           await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
           await SecureStore.deleteItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE);
         }
+      } else {
+        setApiTokens({ accessToken: null, refreshToken: null });
       }
+    } catch {
+      setApiTokens({ accessToken: null, refreshToken: null });
     } finally {
       // Mark hydration complete in all cases so the routing guards can run.
       set(next);

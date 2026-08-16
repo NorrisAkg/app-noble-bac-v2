@@ -23,6 +23,7 @@ import { withCountryPreposition } from '@/utils/countryLocative';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Country, Series } from '@/types/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function SetupScreen() {
   const router = useRouter();
@@ -99,6 +100,7 @@ export default function SetupScreen() {
     mutationFn: (payload: { active_country_id: number; active_series_id: number }) =>
       switchActiveCountry(payload),
     onSuccess: () => {
+      useAuthStore.setState({ isNewUser: false });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       router.replace('/(tabs)');
     },
@@ -133,6 +135,7 @@ export default function SetupScreen() {
 
     // Pays actif ET série actives inchangés : rien à faire.
     if (!isDifferentActiveCountry && numericSeriesId === profile.active_series.id) {
+      useAuthStore.setState({ isNewUser: false });
       router.replace('/(tabs)');
       return;
     }

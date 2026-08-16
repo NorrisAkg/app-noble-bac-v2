@@ -76,7 +76,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { initialize, isAuthenticated, isHydrated, passwordUpgradeRequired } = useAuthStore();
+  const { initialize, isAuthenticated, isHydrated, isNewUser, passwordUpgradeRequired } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   const { isChecking: isCheckingVersion, mustUpdate, storeUrl } = useForceUpdate();
@@ -195,15 +195,14 @@ export default function RootLayout() {
       traceAuth('retour au landing depuis les onglets : session non authentifiée');
       router.replace('/landing');
     } else if (isAuthenticated && (inAuthGroup || isLanding)) {
-      // L'écran congrats est volontairement post-auth (affiché après le succès
-      // de verifyOtp). Sans cette exception, le guard court-circuiterait le
-      // flow inscription → OTP → congrats → setup en redirigeant vers (tabs).
-      if (segments[1] === 'congrats') return;
+      // L'écran congrats et l'onboarding nouvel utilisateur sont volontairement post-auth.
+      // Sans cette exception, le guard court-circuiterait le flow inscription/Google → congrats → setup.
+      if (segments[1] === 'congrats' || isNewUser) return;
       // Post-login : login.tsx ne navigue pas lui-meme, c'est ce guard qui
       // bascule vers (tabs) une fois setAuth() appele.
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isHydrated, segments, loaded, router, mustUpdate, passwordUpgradeRequired]);
+  }, [isAuthenticated, isHydrated, isNewUser, segments, loaded, router, mustUpdate, passwordUpgradeRequired]);
 
 
   if (!loaded && !error) {

@@ -105,8 +105,8 @@ describe('useGoogleAuth - Simulation Pratique de Parcours', () => {
       await result.current.start();
     });
 
-    // Ne doit pas rediriger vers congrats si ce n'est pas un nouvel utilisateur
-    expect(mockRouter.replace).not.toHaveBeenCalled();
+    // Doit rediriger directement vers (tabs) si c'est un utilisateur existant
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)');
 
     // Store hydraté
     expect(useAuthStore.getState().isAuthenticated).toBe(true);

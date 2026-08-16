@@ -86,6 +86,7 @@ export default function LoginScreen() {
     mutationFn: () => cancelAccountDeletion({ identifier, password }),
     onSuccess: async (data) => {
       await setAuth(data.user, data.access_token, data.refresh_token);
+      router.replace('/(tabs)');
     },
     onError: (error) => setFormError(getApiErrorMessage(error)),
   });
@@ -118,7 +119,7 @@ export default function LoginScreen() {
         res.data.refresh_token,
         res.data.password_upgrade_required,
       );
-      // Navigation prise en charge par le garde d'auth de _layout.tsx
+      router.replace('/(tabs)');
     },
     onError: async (error) => {
       const purgeAt = getPendingDeletionPurgeAt(error);

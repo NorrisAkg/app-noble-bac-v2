@@ -87,18 +87,19 @@ export function useGoogleAuth({ countryId, onCountryRequired }: UseGoogleAuthOpt
 
       const isNewUser = Boolean(response.data.is_new_user);
 
-      if (isNewUser) {
-        // Rediriger vers l'écran congrats AVANT d'hydrater l'auth
-        // pour que le guard de _layout.tsx voie la route congrats et ne
-        // court-circuite pas vers (tabs).
-        router.replace('/(auth)/congrats');
-      }
-
       await setAuth(
         response.data.user,
         response.data.access_token,
         response.data.refresh_token,
+        false,
+        isNewUser,
       );
+
+      if (isNewUser) {
+        router.replace('/(auth)/congrats');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (error) {
       // Fermeture volontaire de la fenêtre : aucune alerte, ce n'est pas un
       // échec du point de vue de l'utilisateur.
