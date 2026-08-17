@@ -35,6 +35,7 @@ export function registerAuthCleanup(fn: () => Promise<void> | void): void {
 
 let cachedAccessToken: string | null = null;
 let cachedRefreshToken: string | null = null;
+let lastAuthAt = 0;
 
 export function setApiTokens(tokens: {
   accessToken: string | null;
@@ -44,11 +45,16 @@ export function setApiTokens(tokens: {
   if (tokens.refreshToken !== undefined) {
     cachedRefreshToken = tokens.refreshToken;
   }
+  if (tokens.accessToken) {
+    lastAuthAt = Date.now();
+  }
 }
 
 // ─── Request interceptor ──────────────────────────────────────────────────────
 apiClient.interceptors.request.use(async (config) => {
   const token = cachedAccessToken ?? (await SecureStore.getItemAsync(ACCESS_TOKEN_KEY));
+  (config as any)._sentAt = Date.now();
+  (config as any)._token = token;
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
@@ -108,6 +114,7 @@ export type RefreshOutcome =
 export function resetRefreshStateForTests(): void {
   refreshInFlight = null;
   lastRefreshAt = 0;
+  lastAuthAt = 0;
   cachedAccessToken = null;
   cachedRefreshToken = null;
 }
@@ -171,6 +178,21 @@ apiClient.interceptors.response.use(
     }
 
     originalRequest._retry = true;
+
+    // Requête partie AVANT l'ouverture de la session courante ou portant un
+    // token obsolète : on la rejoue avec le token de session actuel plutôt que
+    // de purger la session.
+    const requestToken = (originalRequest as any)._token;
+    const requestSentAt = (originalRequest as any)._sentAt;
+
+    if (cachedAccessToken && (
+      requestToken !== cachedAccessToken ||
+      (requestSentAt && lastAuthAt && requestSentAt < lastAuthAt)
+    )) {
+      traceAuth(`401 sur requête pré-authentification ${originalRequest.url} — rejouée avec le token de session`);
+      originalRequest.headers.set('Authorization', `Bearer ${cachedAccessToken}`);
+      return apiClient(originalRequest);
+    }
 
     // Requête partie avant une rotation qui vient d'aboutir : elle portait
     // l'ancien token, pas la preuve d'une session morte. On la rejoue avec le

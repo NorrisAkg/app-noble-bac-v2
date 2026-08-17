@@ -15,7 +15,7 @@
 
         // "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8000/api/v1"
         "EXPO_PUBLIC_API_URL": "https://copper-railway-spookily.ngrok-free.dev/api/v1",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "525957849719-85pceil7cm13lt6m8l2dc9c5f0n9v6j2.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "803483113230-rmkqfthcchd0v01qq4hqksaipu230brb.apps.googleusercontent.com"
       }
     },
     "client-test": {
@@ -25,7 +25,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://copper-railway-spookily.ngrok-free.dev/api/v1",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "525957849719-85pceil7cm13lt6m8l2dc9c5f0n9v6j2.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "803483113230-rmkqfthcchd0v01qq4hqksaipu230brb.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -36,7 +36,7 @@
       "env": {
         // "EXPO_PUBLIC_API_URL": "http://192.168.1.56:8000/api/v1"
         "EXPO_PUBLIC_API_URL": "https://api.noble-bac-uemoa.tech/api/v1",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "525957849719-85pceil7cm13lt6m8l2dc9c5f0n9v6j2.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "803483113230-rmkqfthcchd0v01qq4hqksaipu230brb.apps.googleusercontent.com"
       }
     },
     "staging": {
@@ -46,7 +46,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.noble-bac-uemoa.tech/api/v1",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "525957849719-85pceil7cm13lt6m8l2dc9c5f0n9v6j2.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "803483113230-rmkqfthcchd0v01qq4hqksaipu230brb.apps.googleusercontent.com",
         "EXPO_PUBLIC_BYPASS_AUTH": "false",
         "EXPO_PUBLIC_BYPASS_OTP": "false"
       }
@@ -58,7 +58,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.noble-bac-uemoa.tech/api/v1",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "525957849719-85pceil7cm13lt6m8l2dc9c5f0n9v6j2.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "803483113230-rmkqfthcchd0v01qq4hqksaipu230brb.apps.googleusercontent.com",
         "EXPO_PUBLIC_BYPASS_AUTH": "false",
         "EXPO_PUBLIC_BYPASS_OTP": "false"
       }

@@ -31,7 +31,7 @@ function showAuthTrace(): void {
   const events = getAuthTrace();
   Alert.alert(
     'Journal de session',
-    events.length > 0 ? events.slice(-14).join('\n\n') : 'Aucun évènement enregistré.',
+    events.length > 0 ? events.slice(-30).join('\n\n') : 'Aucun évènement enregistré.',
     [
       { text: 'Effacer', style: 'destructive', onPress: () => void clearAuthTrace() },
       { text: 'Fermer', style: 'cancel' },
