@@ -3,7 +3,7 @@ import { buildEmbedUri, isPlayerExitUrl } from '@/utils/videoEmbed';
 describe('buildEmbedUri', () => {
   it('construit une URL de lecteur embarqué YouTube, pas une page du site', () => {
     const uri = buildEmbedUri('youtube', 'abc123');
-    expect(uri).toContain('https://www.youtube-nocookie.com/embed/abc123');
+    expect(uri).toContain('https://www.youtube.com/embed/abc123');
     expect(uri).not.toContain('/watch');
   });
 

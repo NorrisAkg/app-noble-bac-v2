@@ -16,8 +16,8 @@
  * - `modestbranding=1` : atténue le branding dans la barre de contrôles
  * - `iv_load_policy=3` : supprime les annotations
  *
- * Hôte `youtube-nocookie.com` : même lecteur, sans cookies de tracking tant que
- * la lecture n'a pas démarré.
+ * Note : `youtube-nocookie.com` (mode privacy renforcé) est inaccessible depuis
+ * plusieurs pays de l'UEMOA (erreur 153). On utilise `youtube.com` à la place.
  */
 const YOUTUBE_PLAYER_PARAMS =
   'autoplay=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3';
@@ -27,7 +27,7 @@ export function buildEmbedUri(provider: string, videoId: string): string {
   if (provider === 'vimeo') {
     return `https://player.vimeo.com/video/${id}?autoplay=1&playsinline=1`;
   }
-  return `https://www.youtube-nocookie.com/embed/${id}?${YOUTUBE_PLAYER_PARAMS}`;
+  return `https://www.youtube.com/embed/${id}?${YOUTUBE_PLAYER_PARAMS}`;
 }
 
 /**
