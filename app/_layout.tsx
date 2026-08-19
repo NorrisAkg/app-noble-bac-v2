@@ -181,23 +181,30 @@ export default function RootLayout() {
     const inTabsGroup = root === '(tabs)';
     const inAuthGroup = root === '(auth)';
     const isLanding = root === 'landing';
+    // /setup est une route racine (ni (tabs), ni (auth)) : sans cette entrée,
+    // elle tombait dans le return cold-start ci-dessous et AUCUN guard ne la
+    // couvrait — une session morte pendant l'onboarding laissait l'utilisateur
+    // bloqué sur le choix de série avec un « Unauthenticated » sans issue.
+    const isSetup = root === 'setup';
 
     // Cold-start (route '/' / index) : on laisse index.tsx trancher.
-    if (!inTabsGroup && !inAuthGroup && !isLanding) return;
+    if (!inTabsGroup && !inAuthGroup && !isLanding && !isSetup) return;
 
-    if (!isAuthenticated && inTabsGroup) {
+    if (!isAuthenticated && (inTabsGroup || isSetup)) {
       // Logout ou clearLocal (refresh token invalide) en cours de session.
       //
       // La trace distingue ce retour au landing d'un démarrage à froid, qui
       // passe lui par index.tsx et n'enregistre rien. Couplée à celle du
       // gestionnaire de 401 d'apiClient, elle dit si la session a été effacée
       // par le serveur — et sur quelle requête — ou perdue autrement.
-      traceAuth('retour au landing depuis les onglets : session non authentifiée');
+      traceAuth(`retour au landing depuis ${isSetup ? '/setup' : 'les onglets'} : session non authentifiée`);
       router.replace('/landing');
     } else if (isAuthenticated && (inAuthGroup || isLanding)) {
       // L'écran congrats et l'onboarding nouvel utilisateur sont volontairement post-auth.
       // Sans cette exception, le guard court-circuiterait le flow inscription/Google → congrats → setup.
-      if (segments[1] === 'congrats' || isNewUser) return;
+      // Cast : les routes typées d'Expo Router génèrent une union où certains
+      // tuples n'ont qu'un élément — l'accès [1] est légitime au runtime.
+      if ((segments as string[])[1] === 'congrats' || isNewUser) return;
       // Post-login : login.tsx ne navigue pas lui-meme, c'est ce guard qui
       // bascule vers (tabs) une fois setAuth() appele.
       router.replace('/(tabs)');

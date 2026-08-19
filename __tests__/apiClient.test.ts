@@ -5,6 +5,7 @@ import apiClient, {
   performRefresh,
   registerAuthCleanup,
   resetRefreshStateForTests,
+  setApiTokens,
 } from '../services/apiClient';
 
 const mockedSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
@@ -287,6 +288,74 @@ describe('apiClient', () => {
       expect(postSpy).toHaveBeenCalledTimes(1); // aucune seconde rotation
       expect(late.data.sentAuth).toBe('Bearer access-new');
       expect(cleanup).not.toHaveBeenCalled();
+    });
+
+    /**
+     * La course qui écrasait la session Google : les requêtes relancées au
+     * retour du sélecteur de compte partaient SANS token (aucune session), le
+     * 401 déclenchait refresh → invalid → purge + clearLocal, dont le détour
+     * par le SDK Google finissait après setAuth et détruisait la session
+     * fraîchement ouverte. Sans session, un 401 pré-auth doit être rejeté tel
+     * quel : rien à rafraîchir, rien à nettoyer.
+     */
+    it('rejects a pre-auth 401 without touching storage when no session exists', async () => {
+      mockSecureStore({}); // aucune session : ni access ni refresh token
+      const postSpy = jest.spyOn(axios, 'post');
+      const cleanup = jest.fn();
+      registerAuthCleanup(cleanup);
+
+      apiClient.defaults.adapter = jest.fn(async (config: any) => {
+        throw unauthorized(config);
+      }) as any;
+
+      await expect(apiClient.get('/protected/resource')).rejects.toBeDefined();
+
+      expect(postSpy).not.toHaveBeenCalled(); // pas de tentative de refresh
+      expect(cleanup).not.toHaveBeenCalled();
+      expect(mockedSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Second volet de la même course : la purge est décidée (refresh invalid)
+     * pendant qu'une NOUVELLE session s'ouvre. Le verdict porte sur l'ancienne
+     * session — la requête doit être rejouée avec le token courant, jamais
+     * purger la session qui vient de s'ouvrir.
+     */
+    it('replays instead of purging when a new session opened during the refresh', async () => {
+      mockSecureStore({ access_token: 'access-old', refresh_token: 'refresh-old' });
+      const cleanup = jest.fn();
+      registerAuthCleanup(cleanup);
+
+      // Le refresh est rejeté en 401 (session ancienne morte)… mais pendant
+      // l'aller-retour, setAuth a ouvert une nouvelle session.
+      jest.spyOn(axios, 'post').mockImplementationOnce(async () => {
+        setApiTokens({ accessToken: 'access-nouvelle-session', refreshToken: 'refresh-nouvelle-session' });
+        throw Object.assign(new Error('Unauthorized'), {
+          response: { status: 401 },
+          isAxiosError: true,
+        });
+      });
+
+      const seen = new Set<string>();
+      apiClient.defaults.adapter = jest.fn(async (config: any) => {
+        if (!seen.has(config.url)) {
+          seen.add(config.url);
+          throw unauthorized(config);
+        }
+        return {
+          data: { sentAuth: config.headers.get('Authorization') },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      }) as any;
+
+      const response = await apiClient.get('/protected/resource');
+
+      expect(response.data.sentAuth).toBe('Bearer access-nouvelle-session');
+      expect(cleanup).not.toHaveBeenCalled();
+      expect(mockedSecureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
   });
 });

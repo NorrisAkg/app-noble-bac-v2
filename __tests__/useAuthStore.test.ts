@@ -254,3 +254,87 @@ describe('passwordUpgradeRequired', () => {
     expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('password_upgrade_required');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Course clearLocal vs setAuth (verrou d'époque de session)
+//
+// Bug d'origine : un 401 pré-auth (requêtes relancées au retour du sélecteur
+// de compte Google) déclenchait clearLocal pendant que « Continuer avec
+// Google » ouvrait une session. clearLocal, bloqué plusieurs secondes sur le
+// SDK Google, finissait APRÈS setAuth et écrasait la session fraîchement
+// ouverte : retour au landing, ou « Unauthenticated » sur /setup.
+// ---------------------------------------------------------------------------
+
+describe('clearLocal vs setAuth (époque de session)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuthStore.setState({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      isHydrated: false,
+      isNewUser: false,
+      passwordUpgradeRequired: false,
+      sessionEpoch: 0,
+    });
+  });
+
+  it('clearLocal n\'écrase pas une session ouverte pendant son exécution', async () => {
+    // Premier deleteItemAsync bloqué jusqu'à libération manuelle : reproduit
+    // un clearLocal en cours quand setAuth ouvre la nouvelle session.
+    let releaseDelete!: () => void;
+    const blockedDelete = new Promise<void>((resolve) => {
+      releaseDelete = resolve;
+    });
+    mockedSecureStore.deleteItemAsync
+      .mockImplementationOnce(() => blockedDelete)
+      .mockResolvedValue(undefined);
+
+    const clearing = useAuthStore.getState().clearLocal();
+
+    // La session Google aboutit pendant que clearLocal attend SecureStore.
+    await useAuthStore.getState().setAuth(userFixture, 'nouveau-access', 'nouveau-refresh', false, true);
+
+    releaseDelete();
+    await clearing;
+
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.accessToken).toBe('nouveau-access');
+    expect(state.refreshToken).toBe('nouveau-refresh');
+    expect(state.user).toEqual(userFixture);
+    expect(state.isNewUser).toBe(true);
+    // Le nettoyage s'est arrêté net : seule la suppression déjà en vol a eu
+    // lieu, les 3 clés suivantes n'ont pas été touchées.
+    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledTimes(1);
+    // Et le compte Google de la session qui vient de s'ouvrir n'est pas oublié.
+    expect(mockedForgetGoogleAccount).not.toHaveBeenCalled();
+  });
+
+  it('clearLocal n\'attend plus forgetGoogleAccount pour vider la session', async () => {
+    // Le SDK Google ne répond jamais : clearLocal doit quand même aboutir.
+    mockedForgetGoogleAccount.mockImplementation(() => new Promise<void>(() => {}));
+    useAuthStore.setState({
+      user: userFixture,
+      accessToken: 'a',
+      refreshToken: 'r',
+      isAuthenticated: true,
+    });
+
+    await useAuthStore.getState().clearLocal();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledTimes(4);
+    expect(mockedForgetGoogleAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('un clearLocal postérieur au setAuth efface bien la session (pas de faux positif)', async () => {
+    await useAuthStore.getState().setAuth(userFixture, 'access', 'refresh');
+
+    await useAuthStore.getState().clearLocal();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().accessToken).toBeNull();
+  });
+});

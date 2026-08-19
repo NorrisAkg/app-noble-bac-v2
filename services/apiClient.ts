@@ -194,6 +194,19 @@ apiClient.interceptors.response.use(
       return apiClient(originalRequest);
     }
 
+    // Requête partie sans token alors qu'aucune session n'existe en mémoire :
+    // il n'y a rien à rafraîchir ni à nettoyer. Tenter le refresh ici finissait
+    // en `invalid` (pas de refresh token) → purge + clearLocal → oubli du
+    // compte Google… pendant que « Continuer avec Google » était justement en
+    // train d'ouvrir une session. Cas typique : les requêtes relancées par le
+    // focus au retour du sélecteur de compte Google. On rejette, point.
+    if (!requestToken && !cachedAccessToken) {
+      traceAuth(
+        `401 sur ${originalRequest.url} — aucune session (requête pré-auth), rejeté sans purge`,
+      );
+      return Promise.reject(error);
+    }
+
     // Requête partie avant une rotation qui vient d'aboutir : elle portait
     // l'ancien token, pas la preuve d'une session morte. On la rejoue avec le
     // token courant plutôt que de relancer une rotation qui échouerait.
@@ -226,6 +239,19 @@ apiClient.interceptors.response.use(
         `401 sur ${originalRequest.url} — refresh indisponible (${outcome.httpStatus ?? 'aucune réponse'}), session gardée`,
       );
       return Promise.reject(error);
+    }
+
+    // Dernier contrôle avant la purge : si une session PLUS RÉCENTE s'est
+    // ouverte pendant le refresh (setAuth a rempli le cache avec un autre
+    // token que celui de la requête), le verdict `invalid` ne la concerne
+    // pas — il porte sur l'ancienne session. On rejoue avec le token courant
+    // au lieu d'effacer une session parfaitement valide.
+    if (cachedAccessToken && cachedAccessToken !== requestToken) {
+      traceAuth(
+        `401 sur ${originalRequest.url} — refresh invalide mais une nouvelle session est ouverte, requête rejouée sans purge`,
+      );
+      originalRequest.headers.set('Authorization', `Bearer ${cachedAccessToken}`);
+      return apiClient(originalRequest);
     }
 
     // Session réellement refusée par le serveur : c'est la seule issue qui

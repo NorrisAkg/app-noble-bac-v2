@@ -19,6 +19,17 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  /**
+   * Époque de session : incrémentée à CHAQUE ouverture de session (setAuth).
+   * clearLocal() capture l'époque à son entrée et n'a le droit d'effacer que
+   * la session qu'il a vue à ce moment-là. Si une nouvelle session s'ouvre
+   * pendant qu'il attend (SecureStore, SDK Google…), l'époque a changé et le
+   * nettoyage s'annule — c'est le verrou contre la course « clearLocal
+   * déclenché par un 401 pré-auth écrase la session Google qui vient de
+   * s'ouvrir », qui renvoyait l'utilisateur au landing ou le bloquait sur
+   * /setup avec « Unauthenticated ».
+   */
+  sessionEpoch: number;
   /** True once initialize() has finished reading SecureStore on app boot */
   isHydrated: boolean;
   /**
@@ -58,6 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isHydrated: false,
   isNewUser: false,
   passwordUpgradeRequired: false,
+  sessionEpoch: 0,
 
   setAuth: async (
     user,
@@ -66,6 +78,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     passwordUpgradeRequired = false,
     isNewUser = false,
   ) => {
+    // Incrément SYNCHRONE, avant tout await : dès cet instant, tout
+    // clearLocal() entré plus tôt voit une époque différente et s'annule.
+    set((state) => ({ sessionEpoch: state.sessionEpoch + 1 }));
     setApiTokens({ accessToken, refreshToken });
     await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
@@ -109,19 +124,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clearLocal: async () => {
     traceAuth('clearLocal : fin de session');
 
-    // Toutes les fins de session passent par ici : déconnexion volontaire,
-    // session invalidée par le serveur (apiClient), suppression de compte. Le
-    // compte Google doit être oublié dans les trois cas, sans quoi le prochain
-    // « Continuer avec Google » reconnecte le même compte en silence, sans même
-    // afficher le sélecteur. Best-effort en interne : le state local ne dépend
-    // pas de l'aboutissement de cet aller-retour.
-    await forgetGoogleAccount();
+    // Époque capturée à l'entrée : ce nettoyage n'a le droit d'effacer QUE la
+    // session visible à cet instant. Chaque étape destructive re-vérifie
+    // l'époque après un await — si setAuth() a ouvert une session entre-temps,
+    // on s'arrête sans rien toucher. Sans ce verrou, un clearLocal déclenché
+    // par un 401 pré-auth (requêtes relancées au retour du sélecteur de compte
+    // Google) écrasait la session fraîchement ouverte : tokens effacés,
+    // isAuthenticated remis à false, isNewUser perdu.
+    const epoch = get().sessionEpoch;
+    const newerSessionOpened = (): boolean => {
+      if (get().sessionEpoch === epoch) return false;
+      traceAuth('clearLocal annulé : une nouvelle session a été ouverte pendant le nettoyage');
+      return true;
+    };
 
+    if (newerSessionOpened()) return;
     setApiTokens({ accessToken: null, refreshToken: null });
     await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
+    if (newerSessionOpened()) return;
     await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
+    if (newerSessionOpened()) return;
     await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+    if (newerSessionOpened()) return;
     await SecureStore.deleteItemAsync(STORAGE_KEYS.PASSWORD_UPGRADE);
+    if (newerSessionOpened()) return;
     set({
       user: null,
       accessToken: null,
@@ -130,6 +156,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isNewUser: false,
       passwordUpgradeRequired: false,
     });
+
+    // Toutes les fins de session passent par ici : déconnexion volontaire,
+    // session invalidée par le serveur (apiClient), suppression de compte. Le
+    // compte Google doit être oublié dans les trois cas, sans quoi le prochain
+    // « Continuer avec Google » reconnecte le même compte en silence, sans même
+    // afficher le sélecteur. Fire-and-forget APRÈS le wipe : le state local
+    // n'a jamais dépendu de cet aller-retour SDK (jusqu'à 2 × 4 s), et le
+    // laisser bloquer clearLocal ouvrait la fenêtre de course ci-dessus.
+    void forgetGoogleAccount();
   },
 
   initialize: async () => {
