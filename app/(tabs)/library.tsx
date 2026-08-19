@@ -144,9 +144,16 @@ export default function LibraryScreen() {
     },
   });
 
+  const openEpreuve = (examId: number) => {
+    // Si l'épreuve est marquée is_free = true, elle est accessible gratuitement.
+    guard({ is_free: examForYear?.is_free, title: 'cette épreuve' }, () => {
+      openPdfMutation.mutate({ examId, kind: 'epreuve' });
+    });
+  };
+
   const openCorrige = (examId: number) => {
-    // Si l'épreuve/corrigé est marqué is_free = true, il est accessible gratuitement.
-    guard({ is_free: examForYear?.is_free, title: 'ce corrigé' }, () => {
+    // Si le corrigé est marqué is_free = true, il est accessible gratuitement.
+    guard({ is_free: examForYear?.corrige_is_free, title: 'ce corrigé' }, () => {
       openPdfMutation.mutate({ examId, kind: 'corrige' });
     });
   };
@@ -307,18 +314,22 @@ export default function LibraryScreen() {
           {examForYear != null && tab === 'epreuve' && (
             <DocCard
               title={`${currentSubject?.name ?? ''} · BAC ${examForYear.year.value}`}
-              meta={examForYear.session ? `Session ${examForYear.session}` : 'Annale officielle'}
+              meta={
+                examForYear.is_free || isPremium
+                  ? (examForYear.session ? `Session ${examForYear.session}` : 'Annale officielle')
+                  : 'Premium requis'
+              }
               extra={`Bac ${examForYear.series.code} · ${examForYear.country.name}`}
               kind="pdf"
               loading={openPdfMutation.isPending}
-              onOpen={() => openPdfMutation.mutate({ examId: examForYear.id, kind: 'epreuve' })}
+              onOpen={() => openEpreuve(examForYear.id)}
             />
           )}
 
           {examForYear != null && tab === 'corrige' && (
             <DocCard
               title={`Corrigé · ${currentSubject?.name ?? ''} ${examForYear.year.value}`}
-              meta={isPremium ? 'Corrigé complet' : 'Premium requis'}
+              meta={examForYear.corrige_is_free || isPremium ? 'Corrigé complet' : 'Premium requis'}
               extra={`Bac ${examForYear.series.code} · ${examForYear.country.name}`}
               kind="pdf-green"
               loading={openPdfMutation.isPending}

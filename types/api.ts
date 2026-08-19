@@ -500,6 +500,7 @@ export interface ExamListItem {
   series: { id: number; code: string };
   subject: { id: number; name: string; icon_slug: string | null };
   is_free?: boolean;
+  corrige_is_free?: boolean;
 }
 
 /**
