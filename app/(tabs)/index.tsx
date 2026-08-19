@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Search, Bell } from "lucide-react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePremiumGate } from "@/hooks/usePremiumGate";
 import { useDailyQuizSeen } from "@/hooks/useDailyQuizSeen";
@@ -102,6 +102,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
 
   // Profil enrichi pour le countdown localise par pays UEMOA.
   const profileQuery = useQuery<UserProfile>({
@@ -189,6 +190,42 @@ export default function HomeScreen() {
     staleTime: 60 * 1000,
   });
   const unreadCount = unreadQuery.data ?? 0;
+
+  // ── Pull-to-refresh ─────────────────────────────────────────────────────
+  // État local plutôt qu'agrégation des `isRefetching` : le spinner doit
+  // couvrir TOUTES les requêtes de l'écran (badge cloche inclus), et se
+  // terminer proprement même hors ligne (fetches `paused` en offlineFirst).
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Le countdown BAC vit dans useExamDate sous sa propre clé de cache :
+      // l'invalidation de préfixe déclenche son refetch (observateur actif).
+      queryClient.invalidateQueries({ queryKey: ["referential", "exam-date"] });
+      await Promise.allSettled([
+        profileQuery.refetch(),
+        booksQuery.refetch(),
+        adsQuery.refetch(),
+        quotesQuery.refetch(),
+        dailyQuizQuery.refetch(),
+        statsQuery.refetch(),
+        lastReadQuery.refetch(),
+        unreadQuery.refetch(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [
+    queryClient,
+    profileQuery,
+    booksQuery,
+    adsQuery,
+    quotesQuery,
+    dailyQuizQuery,
+    statsQuery,
+    lastReadQuery,
+    unreadQuery,
+  ]);
 
   // ── Skeleton global au premier chargement à froid ──────────────────────
   // `isPending` n'est true que sans données (ni réseau ni cache persisté) :
@@ -424,16 +461,8 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={profileQuery.isRefetching || booksQuery.isRefetching}
-              onRefresh={() => {
-                profileQuery.refetch();
-                booksQuery.refetch();
-                adsQuery.refetch();
-                quotesQuery.refetch();
-                dailyQuizQuery.refetch();
-                lastReadQuery.refetch();
-                statsQuery.refetch();
-              }}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               tintColor="#3DBE45"
             />
           }
