@@ -179,13 +179,16 @@ export default function LibraryScreen() {
     // (à tort, pour cette ressource) comme « order=1 → free » à cause de la
     // règle RM-COURS-05 conçue uniquement pour les leçons. On filtre donc
     // pour ne transmettre que les champs réellement signifiants pour le gate.
-    guard({ is_free: video.is_free, title: video.title }, async () => {
-      const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
-      try {
-        await Linking.openURL(url);
-      } catch {
-        Alert.alert('Vidéo indisponible', 'Impossible d’ouvrir YouTube.');
-      }
+    guard({ is_free: video.is_free, title: video.title }, () => {
+      router.push({
+        pathname: '/video-player',
+        params: {
+          youtubeId: video.youtube_video_id,
+          title: video.title,
+          subject: currentSubject?.name ?? '',
+          provider: 'youtube',
+        },
+      });
     });
   };
 
