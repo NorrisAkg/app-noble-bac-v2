@@ -22,7 +22,7 @@ import { SubjectIcon, backendSlugToSubjectKind } from '@/components/ui/SubjectIc
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IllustrationEmptyDocs } from '@/components/ui/EmptyIllustrations';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
-import { courseService } from '@/services/courseService';
+import { getSubjectsForSeries } from '@/services/referentialService';
 import { catalogService } from '@/services/catalogService';
 import { getProfile } from '@/services/profileService';
 import { getApiErrorMessage } from '@/utils/apiError';
@@ -54,14 +54,18 @@ export default function LibraryScreen() {
   const profile = profileQuery.data;
 
   const subjectsQuery = useQuery<Subject[]>({
-    queryKey: queryKeys.courses.subjects(),
-    queryFn: courseService.getSubjects,
+    queryKey: queryKeys.referential.subjectsForSeries(profile?.active_series.id),
+    queryFn: () =>
+      profile?.active_series.id
+        ? getSubjectsForSeries(profile.active_series.id)
+        : Promise.resolve([]),
+    enabled: profile?.active_series.id != null,
   });
   const subjects = useMemo<Subject[]>(() => subjectsQuery.data ?? [], [subjectsQuery.data]);
 
   // Selection initiale : 1er sujet des qu'ils arrivent.
   useEffect(() => {
-    if (subjects.length > 0 && subjectId == null) {
+    if (subjects.length > 0 && (subjectId == null || !subjects.some((s) => s.id === subjectId))) {
       setSubjectId(subjects[0].id);
     }
   }, [subjects, subjectId]);
@@ -190,6 +194,7 @@ export default function LibraryScreen() {
   const profileMeta = profile != null ? `${profile.active_country.name} · Bac ${profile.active_series.code}` : '';
 
   const isLoadingExams = examsQuery.isLoading;
+  const noSubjects = !subjectsQuery.isLoading && !profileQuery.isLoading && subjects.length === 0;
   const noExamsForSubject = !isLoadingExams && exams.length === 0;
   const noExamForYear = !isLoadingExams && exams.length > 0 && examForYear == null;
 
@@ -223,7 +228,11 @@ export default function LibraryScreen() {
             />
             <View style={styles.subjectSelectorContent}>
               <Text style={styles.subjectLabel}>Matière</Text>
-              <Text style={styles.subjectValue}>{currentSubject?.name ?? 'Chargement...'}</Text>
+              <Text style={styles.subjectValue}>
+                {subjectsQuery.isLoading || profileQuery.isLoading
+                  ? 'Chargement...'
+                  : currentSubject?.name ?? (subjects.length === 0 ? 'Aucune matière' : 'Sélectionner')}
+              </Text>
             </View>
             <ChevronDown size={20} color="#5A6470" />
           </TouchableOpacity>
@@ -297,7 +306,15 @@ export default function LibraryScreen() {
             </View>
           )}
 
-          {noExamsForSubject && (
+          {noSubjects && (
+            <EmptyState
+              illustration={IllustrationEmptyDocs}
+              title="Aucune matière disponible"
+              description={`Aucune matière configurée pour la série ${profile?.active_series.code ?? ''} (${profileMeta}).`}
+            />
+          )}
+
+          {!noSubjects && noExamsForSubject && (
             <EmptyState
               illustration={IllustrationEmptyDocs}
               title="Aucune annale disponible"

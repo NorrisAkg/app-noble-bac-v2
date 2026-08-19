@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import type { ApiResponse, Country, ExamDateInfo, Operator } from '@/types/api';
+import type { ApiResponse, Country, ExamDateInfo, Operator, Subject } from '@/types/api';
 
 /**
  * GET /api/v1/countries
@@ -39,3 +39,16 @@ export async function getExamDate(countryId: string | number): Promise<ExamDateI
   );
   return data.data;
 }
+
+/**
+ * GET /api/v1/series/{seriesId}/subjects
+ * Retourne toutes les matières disponibles pour une série donnée.
+ * Server-side cached.
+ */
+export async function getSubjectsForSeries(seriesId: string | number): Promise<Subject[]> {
+  const { data } = await apiClient.get<ApiResponse<Subject[]>>(
+    `/series/${seriesId}/subjects`,
+  );
+  return data.data;
+}
+

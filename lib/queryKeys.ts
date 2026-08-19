@@ -25,6 +25,8 @@ export const queryKeys = {
       ['referential', 'operators', countryId] as const,
     examDate: (countryId: number | string | null | undefined) =>
       ['referential', 'exam-date', countryId] as const,
+    subjectsForSeries: (seriesId: number | string | null | undefined) =>
+      ['referential', 'subjects-for-series', seriesId] as const,
   },
 
   /** Contenu pédagogique — GET /courses/*, lu en direct en base côté API. */
